@@ -809,7 +809,6 @@ body {
 .file-name {
   font-weight: 500;
   color: var(--text-primary);
-  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -817,7 +816,7 @@ body {
 }
 
 .file-name:hover {
-  color: var(--primary-light);
+  color: var(--text-primary);
 }
 
 .file-size {
@@ -899,6 +898,7 @@ body {
   background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%) !important;
   color: white !important;
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3) !important;
+  cursor: pointer !important;
 }
 
 .detail-btn:hover {
@@ -912,6 +912,7 @@ body {
   background: linear-gradient(135deg, #10B981 0%, #34D399 100%) !important;
   color: white !important;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+  cursor: pointer !important;
 }
 
 .toggle-enable:hover {
@@ -924,6 +925,7 @@ body {
   background: linear-gradient(135deg, #EF4444 0%, #F87171 100%) !important;
   color: white !important;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
+  cursor: pointer !important;
 }
 
 .toggle-disable:hover {
@@ -937,6 +939,7 @@ body {
   background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%) !important;
   color: white !important;
   box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3) !important;
+  cursor: pointer !important;
 }
 
 .move-btn:hover {
