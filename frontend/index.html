@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>LytVPK - L4D2 MOD管理工具</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 加载界面 -->
+      <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <p id="loading-message" class="loading-text">正在加载...</p>
+        </div>
+      </div>
+
+      <!-- 主界面 -->
+      <div id="main-screen" class="main-screen hidden">
+        <!-- 头部工具栏 -->
+        <header class="header">
+          <div class="header-left">
+            <h1>LytVPK</h1>
+            <div class="directory-selector">
+              <button id="select-directory-btn" class="btn btn-primary">
+                <span class="icon">📁</span> 选择addons目录
+              </button>
+              <span id="current-directory" class="current-directory"></span>
+            </div>
+          </div>
+          <div class="header-right">
+            <button id="info-btn" class="btn-icon" title="关于">
+              <span class="icon">🛈</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- 搜索和筛选栏 -->
+        <div class="filter-bar">
+          <!-- 第一行：搜索、位置、批量操作 -->
+          <div class="filter-row filter-row-main">
+            <div class="search-box">
+              <input
+                type="text"
+                id="search-input"
+                placeholder="搜索VPK文件..."
+                class="search-input"
+              />
+            </div>
+            <div class="filter-section" id="location-filter-section">
+              <!-- 动态生成位置筛选 -->
+            </div>
+            <div class="filter-actions">
+              <button id="refresh-btn" class="btn btn-small btn-outline">
+                <span class="icon">↻</span> 刷新
+              </button>
+              <button id="reset-filter-btn" class="btn btn-small btn-outline">
+                <span class="icon">↻</span> 重置筛选
+              </button>
+            </div>
+          </div>
+          
+          <!-- 第二行：标签筛选 -->
+          <div class="filter-row filter-row-tags">
+            <div id="tag-filters" class="tag-filters">
+              <!-- 动态生成标签筛选按钮 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="file-list-container">
+          <div class="file-list-header">
+            <div class="column-header checkbox-column"></div>
+            <div class="column-header name-column">文件名</div>
+            <div class="column-header size-column">大小</div>
+            <div class="column-header status-column">状态</div>
+            <div class="column-header location-column">位置</div>
+            <div class="column-header tags-column">标签</div>
+            <div class="column-header actions-column">操作</div>
+          </div>
+          <div id="file-list" class="file-list">
+            <!-- 动态生成文件列表 -->
+          </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <footer class="status-bar">
+          <div class="status-info">
+            <span id="total-files">总文件数: 0</span>
+            <span id="enabled-files">已启用: 0</span>
+            <span id="disabled-files">已禁用: 0</span>
+            <span id="selected-files">已选择: 0</span>
+          </div>
+          <div class="status-actions">
+            <button id="select-all-btn" class="btn btn-small btn-outline">
+              <span class="icon">☑</span> 全选
+            </button>
+            <button id="deselect-all-btn" class="btn btn-small btn-outline">
+              <span class="icon">☐</span> 取消全选
+            </button>
+            <button id="enable-selected-btn" class="btn btn-small btn-success">
+              <span class="icon">✓</span> 启用选中
+            </button>
+            <button id="disable-selected-btn" class="btn btn-small btn-danger">
+              <span class="icon">✗</span> 禁用选中
+            </button>
+          </div>
+        </footer>
+      </div>
+
+      <!-- 关于信息弹窗 -->
+      <div id="info-modal" class="modal hidden">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h3>关于 LytVPK</h3>
+            <button id="close-info-modal-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="info-section">
+              <div class="app-info">
+                <h2 class="app-title">LytVPK</h2>
+                <p class="app-subtitle">L4D2 MOD管理工具</p>
+              </div>
+              
+              <div class="info-item">
+                <label>作者:</label>
+                <span>LaoYutang</span>
+              </div>
+              
+              <div class="info-item">
+                <label>GitHub:</label>
+                <a href="https://github.com/LaoYutang/lytvpk" target="_blank" class="info-link">
+                  https://github.com/LaoYutang/lytvpk
+                </a>
+              </div>
+              
+              <div class="info-item">
+                <label>开源协议:</label>
+                <a href="https://github.com/LaoYutang/lytvpk?tab=Apache-2.0-1-ov-file" target="_blank" class="info-link">
+                  Apache-2.0
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文件详情弹窗 -->
+      <div id="file-detail-modal" class="modal hidden">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="detail-file-name">文件详情</h3>
+            <button id="close-modal-header-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-section" id="preview-section">
+              <h4>预览图</h4>
+              <div class="preview-container">
+                <img id="detail-preview-image" class="preview-image" alt="预览图" />
+              </div>
+            </div>
+            <div class="detail-section" id="map-info-section">
+              <h4>地图信息</h4>
+              <div class="map-info-content">
+                <div class="campaign-name" id="detail-campaign"></div>
+                <div class="chapters-list" id="detail-chapters-list">
+                  <!-- 动态生成章节列表 -->
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <h4>基本信息</h4>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <label>文件名:</label>
+                  <span id="detail-name"></span>
+                </div>
+                <div class="detail-item">
+                  <label>文件大小:</label>
+                  <span id="detail-size"></span>
+                </div>
+                <div class="detail-item">
+                  <label>位置:</label>
+                  <span id="detail-location"></span>
+                </div>
+                <div class="detail-item">
+                  <label>状态:</label>
+                  <span id="detail-status"></span>
+                </div>
+                <div class="detail-item">
+                  <label>最后修改:</label>
+                  <span id="detail-modified"></span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <h4>标签</h4>
+              <div id="detail-tags" class="tag-list">
+                <!-- 动态生成标签 -->
+              </div>
+            </div>
+            <div class="detail-section">
+              <h4>详细标签</h4>
+              <div id="detail-detail-tags" class="tag-list">
+                <!-- 动态生成详细标签 -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="./src/main.js?v=1.6" type="module"></script>
+  </body>
+</html>
