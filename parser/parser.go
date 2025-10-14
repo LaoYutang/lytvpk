@@ -7,6 +7,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -53,7 +54,7 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 		vpkFile.PrimaryTag = "其他"
 		vpkFile.SecondaryTags = []string{}
 		vpkFile.Chapters = make(map[string]ChapterInfo)
-		return vpkFile, nil
+		// 注意：不在这里 return，让它继续执行提取预览图的逻辑
 	}
 
 	// 设置最终的标签
@@ -65,7 +66,7 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 	vpkFile.Chapters = chapters
 
 	// 提取预览图
-	vpkFile.PreviewImage = ExtractPreviewImage(opener, archive)
+	vpkFile.PreviewImage = ExtractPreviewImage(opener, archive, filePath)
 
 	return vpkFile, nil
 }
@@ -96,16 +97,30 @@ func GetSecondaryTags(vpkFiles []VPKFile, primaryTag string) []string {
 }
 
 // ExtractPreviewImage 从VPK中提取预览图并转换为Base64
-// 查找常见的预览图文件并返回Base64编码的图片数据
-func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive) string {
+// 采用三级查找策略:
+// 1. 优先查找 addonimage.jpg (Steam 创意工坊标准)
+// 2. 查找内部其他预览图
+// 3. 查找外部同名 .jpg 文件
+func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath string) string {
+	// ========== 优先级 1: 查找 addonimage.jpg ==========
+	// Steam 创意工坊的标准缩略图文件名
+	addonImageFile := findFileInArchive(archive, "addonimage.jpg")
+	if addonImageFile != nil {
+		base64Data := readAndEncodeImage(opener, addonImageFile)
+		if base64Data != "" {
+			return base64Data
+		}
+	}
+
+	// ========== 优先级 2: 查找其他预览图 (原有逻辑) ==========
 	// 常见的预览图路径模式
 	previewPatterns := []string{
+		".jpg",
+		".jpeg",
+		".png",
 		"materials/vgui/maps/menu/",
 		"materials/vgui/loadingscreen",
 		"resource/overviews/",
-		".png",
-		".jpg",
-		".jpeg",
 	}
 
 	var previewFile *vpk.File
@@ -133,13 +148,39 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive) string {
 		}
 	}
 
-	// 如果没有找到预览图，返回空字符串
-	if previewFile == nil {
-		return ""
+	if previewFile != nil {
+		if base64Data := readAndEncodeImage(opener, previewFile); base64Data != "" {
+			return base64Data
+		}
 	}
 
-	// 读取文件内容
-	reader, err := previewFile.Open(opener)
+	// ========== 优先级 3: 查找外部同名 .jpg 文件 ==========
+	// 例如: xxx.vpk -> xxx.jpg
+	externalJpgPath := strings.TrimSuffix(vpkFilePath, filepath.Ext(vpkFilePath)) + ".jpg"
+	if fileExists(externalJpgPath) {
+		if base64Data := readExternalImageFile(externalJpgPath); base64Data != "" {
+			return base64Data
+		}
+	}
+
+	return ""
+}
+
+// findFileInArchive 在 VPK 中查找指定文件名（不区分大小写）
+func findFileInArchive(archive *vpk.Archive, targetName string) *vpk.File {
+	targetLower := strings.ToLower(targetName)
+	for i := range archive.Files {
+		file := &archive.Files[i]
+		if strings.ToLower(file.Name()) == targetLower {
+			return file
+		}
+	}
+	return nil
+}
+
+// readAndEncodeImage 读取 VPK 内部文件并编码为 Base64
+func readAndEncodeImage(opener *vpk.Opener, file *vpk.File) string {
+	reader, err := file.Open(opener)
 	if err != nil {
 		return ""
 	}
@@ -150,6 +191,21 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive) string {
 		return ""
 	}
 
+	return encodeImageToBase64(data)
+}
+
+// readExternalImageFile 读取外部图片文件并编码为 Base64
+func readExternalImageFile(filePath string) string {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return ""
+	}
+
+	return encodeImageToBase64(data)
+}
+
+// encodeImageToBase64 将图片数据编码为 Base64 Data URL
+func encodeImageToBase64(data []byte) string {
 	// 尝试解码图片以验证格式
 	_, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
@@ -177,4 +233,10 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive) string {
 	}
 
 	return dataURL
+}
+
+// fileExists 检查文件是否存在
+func fileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return err == nil
 }
