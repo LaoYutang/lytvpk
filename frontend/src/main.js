@@ -52,6 +52,7 @@ let appState = {
   searchQuery: '',
   selectedFiles: new Set(),
   currentDirectory: '',
+  isLoading: false, // 是否正在加载中
 };
 
 // 初始化应用
@@ -379,6 +380,13 @@ function updateDirectoryDisplay() {
 
 // 加载文件
 async function loadFiles() {
+  // 防止重复点击
+  if (appState.isLoading) {
+    console.log('正在加载中，请稍候...');
+    return;
+  }
+
+  appState.isLoading = true;
   showLoadingScreen();
   updateLoadingMessage('正在扫描VPK文件...');
 
@@ -401,12 +409,13 @@ async function loadFiles() {
     await renderTagFilters();
     renderFileList();
     updateStatusBar();
-    showMainScreen();
 
     console.log('扫描完成，找到', files.length, '个文件');
   } catch (error) {
     console.error('扫描文件失败:', error);
     alert('扫描文件失败: ' + error);
+  } finally {
+    appState.isLoading = false;
     showMainScreen();
   }
 }
@@ -427,6 +436,12 @@ async function refreshFilesKeepFilter() {
     return;
   }
 
+  // 防止重复点击
+  if (appState.isLoading) {
+    console.log('正在加载中，请稍候...');
+    return;
+  }
+
   // 保存当前的筛选状态
   const currentFilters = {
     searchText: document.getElementById('search-input')?.value || '',
@@ -436,6 +451,11 @@ async function refreshFilesKeepFilter() {
   };
 
   console.log('保存的筛选状态:', currentFilters);
+
+  // 显示加载状态
+  appState.isLoading = true;
+  showLoadingScreen();
+  updateLoadingMessage('正在刷新文件列表...');
 
   try {
     // 重新获取文件列表和标签
@@ -473,6 +493,10 @@ async function refreshFilesKeepFilter() {
   } catch (error) {
     console.error('刷新文件列表失败:', error);
     showError('刷新失败: ' + error);
+  } finally {
+    // 恢复正常状态
+    appState.isLoading = false;
+    showMainScreen();
   }
 }
 
@@ -531,17 +555,61 @@ function restoreFilterState(filters) {
 function showLoadingScreen() {
   document.getElementById('loading-screen').classList.remove('hidden');
   document.getElementById('main-screen').classList.add('hidden');
+  disableActionButtons();
 }
 
 // 显示主屏幕
 function showMainScreen() {
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
+  enableActionButtons();
 }
 
 // 更新加载消息
 function updateLoadingMessage(message) {
   document.getElementById('loading-message').textContent = message;
+}
+
+// 禁用操作按钮
+function disableActionButtons() {
+  const buttons = [
+    'refresh-btn',
+    'reset-filter-btn',
+    'select-directory-btn',
+    'select-all-btn',
+    'deselect-all-btn',
+    'enable-selected-btn',
+    'disable-selected-btn',
+  ];
+  buttons.forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
+  });
+}
+
+// 启用操作按钮
+function enableActionButtons() {
+  const buttons = [
+    'refresh-btn',
+    'reset-filter-btn',
+    'select-directory-btn',
+    'select-all-btn',
+    'deselect-all-btn',
+    'enable-selected-btn',
+    'disable-selected-btn',
+  ];
+  buttons.forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = '';
+    }
+  });
 }
 
 // 渲染标签筛选器
@@ -770,33 +838,48 @@ function toggleLocationFilter(location, button) {
 
 // 重置所有筛选条件
 async function resetFilters() {
-  // 清空搜索框
-  document.getElementById('search-input').value = '';
-  appState.searchQuery = '';
+  // 防止重复点击
+  if (appState.isLoading) {
+    console.log('正在加载中，请稍候...');
+    return;
+  }
 
-  // 清空一级标签
-  document.querySelectorAll('.primary-tag-btn').forEach((btn) => {
-    btn.classList.remove('active');
-    if (btn.dataset.value === '') {
-      btn.classList.add('active'); // 激活"全部"按钮
-    }
-  });
-  appState.selectedPrimaryTag = '';
+  appState.isLoading = true;
+  showLoadingScreen();
+  updateLoadingMessage('正在重置筛选...');
 
-  // 清空二级标签
-  appState.selectedSecondaryTags = [];
-  
-  // 清空位置筛选
-  appState.selectedLocations = [];
-  document.querySelectorAll('.location-tag-btn').forEach((btn) => {
-    btn.classList.remove('active');
-  });
+  try {
+    // 清空搜索框
+    document.getElementById('search-input').value = '';
+    appState.searchQuery = '';
 
-  // 清空二级标签显示
-  await renderSecondaryTags('');
+    // 清空一级标签
+    document.querySelectorAll('.primary-tag-btn').forEach((btn) => {
+      btn.classList.remove('active');
+      if (btn.dataset.value === '') {
+        btn.classList.add('active'); // 激活"全部"按钮
+      }
+    });
+    appState.selectedPrimaryTag = '';
 
-  // 重新执行搜索
-  performSearch();
+    // 清空二级标签
+    appState.selectedSecondaryTags = [];
+    
+    // 清空位置筛选
+    appState.selectedLocations = [];
+    document.querySelectorAll('.location-tag-btn').forEach((btn) => {
+      btn.classList.remove('active');
+    });
+
+    // 清空二级标签显示
+    await renderSecondaryTags('');
+
+    // 重新执行搜索
+    await performSearch();
+  } finally {
+    appState.isLoading = false;
+    showMainScreen();
+  }
 }
 
 // 处理搜索
