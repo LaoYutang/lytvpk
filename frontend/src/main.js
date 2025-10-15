@@ -882,10 +882,14 @@ function createFileItem(file) {
 
   const statusIcon = file.enabled ? '✅' : '❌';
   const locationIcon = getLocationIcon(file.location);
+  const displayTitle = file.title || file.name;
 
   item.innerHTML = `
         <div class="file-checkbox-container"></div>
-        <div class="file-name" title="${file.path}">${file.name}</div>
+        <div class="file-name" title="${file.path}">
+            <div class="file-title">${displayTitle}</div>
+            <div class="file-filename">${file.name}</div>
+        </div>
         <div class="file-size">${formatFileSize(file.size)}</div>
         <div class="file-status">${statusIcon} ${file.enabled ? '启用' : '禁用'}</div>
         <div class="file-location">${locationIcon} ${getLocationDisplayName(file.location)}</div>
@@ -1215,6 +1219,37 @@ window.showFileDetail = function (filePath) {
       ? file.secondaryTags.map((tag) => `<span class="tag secondary-tag">${tag}</span>`).join('')
       : '';
   detailTagsContainer.innerHTML = secondaryTagsHtml;
+
+  // 填充VPK信息
+  const vpkInfoSection = document.getElementById('vpk-info-section');
+  document.getElementById('detail-vpk-title').textContent = file.title || '无标题';
+  
+  // 作者信息（若有才显示）
+  const authorItem = document.getElementById('detail-vpk-author-item');
+  if (file.author && file.author !== '') {
+    authorItem.style.display = 'grid';
+    document.getElementById('detail-vpk-author').textContent = file.author;
+  } else {
+    authorItem.style.display = 'none';
+  }
+  
+  // 版本信息（若有才显示）
+  const versionItem = document.getElementById('detail-vpk-version-item');
+  if (file.version && file.version !== '') {
+    versionItem.style.display = 'grid';
+    document.getElementById('detail-vpk-version').textContent = file.version;
+  } else {
+    versionItem.style.display = 'none';
+  }
+  
+  // 描述信息（若有才显示）
+  const descItem = document.getElementById('detail-vpk-desc-item');
+  if (file.desc && file.desc !== '') {
+    descItem.style.display = 'grid';
+    document.getElementById('detail-vpk-desc').textContent = file.desc;
+  } else {
+    descItem.style.display = 'none';
+  }
 
   // 填充地图信息
   const mapInfoSection = document.getElementById('map-info-section');

@@ -28,6 +28,10 @@ export namespace parser {
 	    previewImage: string;
 	    // Go type: time
 	    lastModified: any;
+	    title: string;
+	    author: string;
+	    version: string;
+	    desc: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new VPKFile(source);
@@ -47,6 +51,10 @@ export namespace parser {
 	        this.mode = source["mode"];
 	        this.previewImage = source["previewImage"];
 	        this.lastModified = this.convertValues(source["lastModified"], null);
+	        this.title = source["title"];
+	        this.author = source["author"];
+	        this.version = source["version"];
+	        this.desc = source["desc"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

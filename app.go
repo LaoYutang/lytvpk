@@ -295,11 +295,15 @@ func (a *App) SearchVPKFiles(query string, primaryTag string, secondaryTags []st
 	query = strings.ToLower(query)
 
 	for _, vpkFile := range a.vpkFiles {
-		// 搜索文本匹配：文件名或标签名
+		// 搜索文本匹配：标题、文件名或标签名
 		textMatch := query == ""
 		if query != "" {
+			// 匹配标题
+			if strings.Contains(strings.ToLower(vpkFile.Title), query) {
+				textMatch = true
+			}
 			// 匹配文件名
-			if strings.Contains(strings.ToLower(vpkFile.Name), query) {
+			if !textMatch && strings.Contains(strings.ToLower(vpkFile.Name), query) {
 				textMatch = true
 			}
 			// 匹配主标签

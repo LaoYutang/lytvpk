@@ -65,8 +65,8 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 
 	vpkFile.Chapters = chapters
 
-	// 提取预览图
-	vpkFile.PreviewImage = ExtractPreviewImage(opener, archive, filePath)
+	// 一次性提取预览图和addoninfo信息
+	ExtractVPKResources(opener, archive, vpkFile, filePath)
 
 	return vpkFile, nil
 }
@@ -239,4 +239,237 @@ func encodeImageToBase64(data []byte) string {
 func fileExists(filePath string) bool {
 	_, err := os.Stat(filePath)
 	return err == nil
+}
+
+// ExtractVPKResources 一次性提取VPK中的预览图和addoninfo信息
+// 优化性能：只遍历一次archive，同时查找预览图和addoninfo.txt
+func ExtractVPKResources(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKFile, vpkFilePath string) {
+	var addonImageFile *vpk.File
+	var addonInfoFile *vpk.File
+	var previewFile *vpk.File
+
+	// 预览图匹配模式
+	previewPatterns := []string{
+		".jpg",
+		".jpeg",
+		".png",
+		"materials/vgui/maps/menu/",
+		"materials/vgui/loadingscreen",
+		"resource/overviews/",
+	}
+
+	// 只遍历一次archive，同时查找多个文件
+	for i := range archive.Files {
+		file := &archive.Files[i]
+		filename := strings.ToLower(file.Name())
+
+		// 查找 addonimage.jpg (最高优先级的预览图)
+		if addonImageFile == nil && filename == "addonimage.jpg" {
+			addonImageFile = file
+		}
+
+		// 查找 addoninfo.txt
+		if addonInfoFile == nil && filename == "addoninfo.txt" {
+			addonInfoFile = file
+		}
+
+		// 查找其他预览图（如果还没找到addonimage.jpg）
+		if previewFile == nil && addonImageFile == nil {
+			for _, pattern := range previewPatterns {
+				if strings.Contains(filename, pattern) {
+					if strings.HasSuffix(filename, ".png") ||
+						strings.HasSuffix(filename, ".jpg") ||
+						strings.HasSuffix(filename, ".jpeg") {
+						previewFile = file
+						break
+					}
+				}
+			}
+		}
+
+		// 如果所有需要的文件都找到了，提前退出循环
+		if addonImageFile != nil && addonInfoFile != nil {
+			break
+		}
+	}
+
+	// 处理预览图
+	vpkFile.PreviewImage = extractPreviewImageFromFiles(opener, addonImageFile, previewFile, vpkFilePath)
+
+	// 处理addoninfo
+	parseAddonInfoFromFile(opener, addonInfoFile, vpkFile)
+}
+
+// extractPreviewImageFromFiles 从找到的文件中提取预览图
+func extractPreviewImageFromFiles(opener *vpk.Opener, addonImageFile, previewFile *vpk.File, vpkFilePath string) string {
+	// 优先级1: addonimage.jpg
+	if addonImageFile != nil {
+		if base64Data := readAndEncodeImage(opener, addonImageFile); base64Data != "" {
+			return base64Data
+		}
+	}
+
+	// 优先级2: 其他预览图
+	if previewFile != nil {
+		if base64Data := readAndEncodeImage(opener, previewFile); base64Data != "" {
+			return base64Data
+		}
+	}
+
+	// 优先级3: 外部同名.jpg文件
+	externalJpgPath := strings.TrimSuffix(vpkFilePath, filepath.Ext(vpkFilePath)) + ".jpg"
+	if fileExists(externalJpgPath) {
+		if base64Data := readExternalImageFile(externalJpgPath); base64Data != "" {
+			return base64Data
+		}
+	}
+
+	return ""
+}
+
+// parseAddonInfoFromFile 从addoninfo.txt文件解析信息
+func parseAddonInfoFromFile(opener *vpk.Opener, addonInfoFile *vpk.File, vpkFile *VPKFile) {
+	// 初始化默认值
+	vpkFile.Title = ""
+	vpkFile.Author = ""
+	vpkFile.Version = ""
+	vpkFile.Desc = ""
+
+	if addonInfoFile == nil {
+		return
+	}
+
+	// 读取文件内容
+	reader, err := addonInfoFile.Open(opener)
+	if err != nil {
+		return
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return
+	}
+
+	// 解析文件内容
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	// 解析每一行
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// 跳过空行、注释和括号
+		if line == "" || strings.HasPrefix(line, "//") || line == "{" || line == "}" || strings.HasPrefix(line, "\"") {
+			continue
+		}
+
+		// VDF格式: key "value" 或 key		"value"
+		// 查找第一个和最后一个引号
+		firstQuote := strings.Index(line, "\"")
+		if firstQuote == -1 {
+			continue
+		}
+
+		lastQuote := strings.LastIndex(line, "\"")
+		if lastQuote <= firstQuote {
+			continue
+		}
+
+		// 提取键和值
+		key := strings.TrimSpace(line[:firstQuote])
+		value := line[firstQuote+1 : lastQuote]
+
+		// 根据键设置对应的值
+		switch strings.ToLower(key) {
+		case "addontitle":
+			vpkFile.Title = value
+		case "addonauthor":
+			vpkFile.Author = value
+		case "addonversion":
+			vpkFile.Version = value
+		case "addondescription":
+			vpkFile.Desc = value
+		}
+	}
+}
+
+// ParseAddonInfo 解析 addoninfo.txt 文件
+func ParseAddonInfo(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKFile) {
+	// 查找 addoninfo.txt 文件
+	addonInfoFile := findFileInArchive(archive, "addoninfo.txt")
+	if addonInfoFile == nil {
+		// 如果没有找到，设置默认值
+		vpkFile.Title = ""
+		vpkFile.Author = ""
+		vpkFile.Version = ""
+		vpkFile.Desc = ""
+		return
+	}
+
+	// 读取文件内容
+	reader, err := addonInfoFile.Open(opener)
+	if err != nil {
+		vpkFile.Title = ""
+		vpkFile.Author = ""
+		vpkFile.Version = ""
+		vpkFile.Desc = ""
+		return
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		vpkFile.Title = ""
+		vpkFile.Author = ""
+		vpkFile.Version = ""
+		vpkFile.Desc = ""
+		return
+	}
+
+	// 解析文件内容
+	content := string(data)
+	lines := strings.Split(content, "\n")
+
+	// 初始化默认值
+	vpkFile.Title = ""
+	vpkFile.Author = ""
+	vpkFile.Version = ""
+	vpkFile.Desc = ""
+
+	// 解析每一行
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// 跳过空行、注释和括号
+		if line == "" || strings.HasPrefix(line, "//") || line == "{" || line == "}" || strings.HasPrefix(line, "\"") {
+			continue
+		}
+
+		// VDF格式: key "value" 或 key		"value"
+		// 查找第一个和最后一个引号
+		firstQuote := strings.Index(line, "\"")
+		if firstQuote == -1 {
+			continue
+		}
+
+		lastQuote := strings.LastIndex(line, "\"")
+		if lastQuote <= firstQuote {
+			continue
+		}
+
+		// 提取键和值
+		key := strings.TrimSpace(line[:firstQuote])
+		value := line[firstQuote+1 : lastQuote]
+
+		// 根据键设置对应的值
+		switch strings.ToLower(key) {
+		case "addontitle":
+			vpkFile.Title = value
+		case "addonauthor":
+			vpkFile.Author = value
+		case "addonversion":
+			vpkFile.Version = value
+		case "addondescription":
+			vpkFile.Desc = value
+		}
+	}
 }
