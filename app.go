@@ -11,6 +11,7 @@ import (
 	rt "runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"vpk-manager/parser"
 
@@ -35,10 +36,18 @@ type ErrorInfo struct {
 	File    string `json:"file"`
 }
 
+// VPKFileCache 缓存的VPK文件信息
+type VPKFileCache struct {
+	File     VPKFile
+	ModTime  time.Time
+	Size     int64
+	CachedAt time.Time
+}
+
 // App struct
 type App struct {
 	ctx           context.Context
-	vpkFiles      []VPKFile
+	vpkCache      sync.Map // map[string]*VPKFileCache, key是文件路径
 	mu            sync.RWMutex
 	rootDir       string
 	goroutinePool *ants.Pool
@@ -48,7 +57,6 @@ type App struct {
 func NewApp() *App {
 	pool, _ := ants.NewPool(rt.GOMAXPROCS(0)) // 创建协程池
 	return &App{
-		vpkFiles:      make([]VPKFile, 0),
 		goroutinePool: pool,
 	}
 }
@@ -79,19 +87,15 @@ func (a *App) GetRootDirectory() string {
 	return a.rootDir
 }
 
-// ScanVPKFiles 扫描所有VPK文件
+// ScanVPKFiles 扫描所有VPK文件（智能缓存版本）
 func (a *App) ScanVPKFiles() error {
 	if a.rootDir == "" {
 		return fmt.Errorf("请先设置根目录")
 	}
 
-	a.mu.Lock()
-	a.vpkFiles = make([]VPKFile, 0, 128)
-	a.mu.Unlock()
-
 	var wg sync.WaitGroup
 
-	// 首先扫描所有VPK文件
+	// 首先扫描所有VPK文件路径
 	vpkPaths := make([]string, 0)
 
 	// 扫描根目录（仅扫描根目录本身的VPK文件，不包含子目录）
@@ -118,10 +122,28 @@ func (a *App) ScanVPKFiles() error {
 		}
 	}
 
+	// 创建当前文件路径集合，用于清理不存在的缓存
+	currentPaths := make(map[string]bool)
+	for _, path := range vpkPaths {
+		currentPaths[path] = true
+	}
+
+	// 清理缓存中不存在的文件
+	a.vpkCache.Range(func(key, value interface{}) bool {
+		path := key.(string)
+		if !currentPaths[path] {
+			a.vpkCache.Delete(path)
+			log.Printf("清理缓存: 文件已删除 %s", path)
+		}
+		return true
+	})
+
+	// 并发处理所有文件（使用智能缓存）
 	for _, path := range vpkPaths {
 		wg.Add(1)
+		filePath := path // 捕获变量
 		a.goroutinePool.Submit(func() {
-			a.processVPKFile(path)
+			a.processVPKFileWithCache(filePath)
 			wg.Done()
 		})
 	}
@@ -160,14 +182,45 @@ func (a *App) scanDirectory(dir string, vpkPaths *[]string) error {
 	})
 }
 
-// processVPKFile 处理单个VPK文件
+// processVPKFile 处理单个VPK文件（已废弃，保留用于兼容）
 func (a *App) processVPKFile(filePath string) {
+	a.processVPKFileWithCache(filePath)
+}
+
+// processVPKFileWithCache 处理单个VPK文件（智能缓存版本）
+func (a *App) processVPKFileWithCache(filePath string) {
 	info, err := os.Stat(filePath)
 	if err != nil {
+		log.Printf("无法读取文件信息: %s, 错误: %v", filePath, err)
 		return
 	}
 
-	// 使用parser包解析VPK文件
+	modTime := info.ModTime()
+	size := info.Size()
+
+	// 检查缓存
+	if cached, ok := a.vpkCache.Load(filePath); ok {
+		cache := cached.(*VPKFileCache)
+
+		// 判断文件是否变化（通过修改时间和大小）
+		if cache.ModTime.Equal(modTime) && cache.Size == size {
+			// 文件未变化，使用缓存
+			// 但需要更新位置信息（因为文件可能被移动）
+			location := a.getLocationFromPath(filePath)
+			cache.File.Location = location
+			cache.File.Enabled = location != "disabled"
+			cache.File.Path = filePath // 更新路径（处理移动情况）
+
+			// 更新缓存
+			a.vpkCache.Store(filePath, cache)
+			log.Printf("使用缓存: %s (未变化)", filepath.Base(filePath))
+			return
+		}
+
+		log.Printf("文件已变化，重新解析: %s", filepath.Base(filePath))
+	}
+
+	// 文件不在缓存中或已变化，需要重新解析
 	vpkFile, err := parser.ParseVPKFile(filePath)
 	if err != nil {
 		a.LogError("VPK解析", err.Error(), filePath)
@@ -176,14 +229,22 @@ func (a *App) processVPKFile(filePath string) {
 
 	// 设置文件系统相关信息
 	location := a.getLocationFromPath(filePath)
-	vpkFile.Size = info.Size()
+	vpkFile.Size = size
 	vpkFile.Location = location
 	vpkFile.Enabled = location != "disabled"
-	vpkFile.LastModified = info.ModTime()
+	vpkFile.LastModified = modTime
+	vpkFile.Path = filePath
 
-	a.mu.Lock()
-	a.vpkFiles = append(a.vpkFiles, *vpkFile)
-	a.mu.Unlock()
+	// 存入缓存
+	cache := &VPKFileCache{
+		File:     *vpkFile,
+		ModTime:  modTime,
+		Size:     size,
+		CachedAt: time.Now(),
+	}
+	a.vpkCache.Store(filePath, cache)
+
+	log.Printf("已解析并缓存: %s", filepath.Base(filePath))
 }
 
 // getLocationFromPath 根据文件路径判断位置
@@ -204,60 +265,83 @@ func (a *App) getLocationFromPath(filePath string) string {
 	return "root"
 }
 
-// GetVPKFiles 获取所有VPK文件
+// GetVPKFiles 获取所有VPK文件（从缓存中读取）
 func (a *App) GetVPKFiles() []VPKFile {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	result := make([]VPKFile, 0)
 
-	result := make([]VPKFile, len(a.vpkFiles))
-	copy(result, a.vpkFiles)
+	a.vpkCache.Range(func(key, value interface{}) bool {
+		cache := value.(*VPKFileCache)
+		result = append(result, cache.File)
+		return true
+	})
+
 	return result
 }
 
-// ToggleVPKFile 切换VPK文件的启用状态
+// ToggleVPKFile 切换VPK文件的启用状态（智能缓存版本）
 // 注意：workshop文件不能直接启用/禁用，需要先转移到root目录
 func (a *App) ToggleVPKFile(filePath string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	for i, vpkFile := range a.vpkFiles {
-		if vpkFile.Path == filePath {
-			// workshop文件不能直接启用/禁用
-			if vpkFile.Location == "workshop" {
-				return fmt.Errorf("workshop文件需要先转移到插件目录才能启用/禁用")
-			}
-
-			if vpkFile.Enabled && vpkFile.Location == "root" {
-				// 禁用文件：从root移动到disabled目录
-				disabledDir := filepath.Join(a.rootDir, "disabled")
-				os.MkdirAll(disabledDir, 0755)
-
-				newPath := filepath.Join(disabledDir, vpkFile.Name)
-				err := os.Rename(vpkFile.Path, newPath)
-				if err != nil {
-					return err
-				}
-
-				a.vpkFiles[i].Path = newPath
-				a.vpkFiles[i].Enabled = false
-				a.vpkFiles[i].Location = "disabled"
-			} else if !vpkFile.Enabled && vpkFile.Location == "disabled" {
-				// 启用文件：从disabled移动回root目录
-				newPath := filepath.Join(a.rootDir, vpkFile.Name)
-				err := os.Rename(vpkFile.Path, newPath)
-				if err != nil {
-					return err
-				}
-
-				a.vpkFiles[i].Path = newPath
-				a.vpkFiles[i].Enabled = true
-				a.vpkFiles[i].Location = "root"
-			} else {
-				return fmt.Errorf("无效的文件状态转换")
-			}
-			break
-		}
+	// 从缓存中获取文件信息
+	cached, ok := a.vpkCache.Load(filePath)
+	if !ok {
+		return fmt.Errorf("文件未找到: %s", filePath)
 	}
+
+	cache := cached.(*VPKFileCache)
+	vpkFile := cache.File
+
+	// workshop文件不能直接启用/禁用
+	if vpkFile.Location == "workshop" {
+		return fmt.Errorf("workshop文件需要先转移到插件目录才能启用/禁用")
+	}
+
+	var newPath string
+	var err error
+
+	if vpkFile.Enabled && vpkFile.Location == "root" {
+		// 禁用文件：从root移动到disabled目录
+		disabledDir := filepath.Join(a.rootDir, "disabled")
+		os.MkdirAll(disabledDir, 0755)
+
+		newPath = filepath.Join(disabledDir, vpkFile.Name)
+		err = os.Rename(vpkFile.Path, newPath)
+		if err != nil {
+			return err
+		}
+
+		// 更新文件信息
+		vpkFile.Path = newPath
+		vpkFile.Enabled = false
+		vpkFile.Location = "disabled"
+
+	} else if !vpkFile.Enabled && vpkFile.Location == "disabled" {
+		// 启用文件：从disabled移动回root目录
+		newPath = filepath.Join(a.rootDir, vpkFile.Name)
+		err = os.Rename(vpkFile.Path, newPath)
+		if err != nil {
+			return err
+		}
+
+		// 更新文件信息
+		vpkFile.Path = newPath
+		vpkFile.Enabled = true
+		vpkFile.Location = "root"
+
+	} else {
+		return fmt.Errorf("无效的文件状态转换")
+	}
+
+	// 删除旧路径的缓存
+	a.vpkCache.Delete(filePath)
+
+	// 在新路径下存储缓存
+	cache.File = vpkFile
+	a.vpkCache.Store(newPath, cache)
+
+	log.Printf("文件已移动: %s -> %s", filePath, newPath)
 
 	return nil
 }
@@ -267,34 +351,51 @@ func (a *App) MoveWorkshopToAddons(filePath string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	for i, vpkFile := range a.vpkFiles {
-		if vpkFile.Path == filePath && vpkFile.Location == "workshop" {
-			newPath := filepath.Join(a.rootDir, vpkFile.Name)
-			err := os.Rename(vpkFile.Path, newPath)
-			if err != nil {
-				return err
-			}
-
-			// 转移到root目录后，文件默认为启用状态
-			a.vpkFiles[i].Path = newPath
-			a.vpkFiles[i].Location = "root"
-			a.vpkFiles[i].Enabled = true
-			break
-		}
+	// 从缓存中获取文件信息
+	cached, ok := a.vpkCache.Load(filePath)
+	if !ok {
+		return fmt.Errorf("文件未找到: %s", filePath)
 	}
+
+	cache := cached.(*VPKFileCache)
+	vpkFile := cache.File
+
+	if vpkFile.Location != "workshop" {
+		return fmt.Errorf("只能转移workshop文件")
+	}
+
+	newPath := filepath.Join(a.rootDir, vpkFile.Name)
+	err := os.Rename(vpkFile.Path, newPath)
+	if err != nil {
+		return err
+	}
+
+	// 转移到root目录后，文件默认为启用状态
+	vpkFile.Path = newPath
+	vpkFile.Location = "root"
+	vpkFile.Enabled = true
+
+	// 删除旧路径的缓存
+	a.vpkCache.Delete(filePath)
+
+	// 在新路径下存储缓存
+	cache.File = vpkFile
+	a.vpkCache.Store(newPath, cache)
+
+	log.Printf("文件已转移: %s -> %s", filePath, newPath)
 
 	return nil
 }
 
-// SearchVPKFiles 搜索VPK文件
+// SearchVPKFiles 搜索VPK文件（从缓存中搜索）
 func (a *App) SearchVPKFiles(query string, primaryTag string, secondaryTags []string) []VPKFile {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
 	result := make([]VPKFile, 0)
 	query = strings.ToLower(query)
 
-	for _, vpkFile := range a.vpkFiles {
+	a.vpkCache.Range(func(key, value interface{}) bool {
+		cache := value.(*VPKFileCache)
+		vpkFile := cache.File
+
 		// 搜索文本匹配：标题、文件名或标签名
 		textMatch := query == ""
 		if query != "" {
@@ -343,7 +444,9 @@ func (a *App) SearchVPKFiles(query string, primaryTag string, secondaryTags []st
 		if textMatch && primaryMatch && secondaryMatch {
 			result = append(result, vpkFile)
 		}
-	}
+
+		return true
+	})
 
 	return result
 }
@@ -353,11 +456,17 @@ func (a *App) GetPrimaryTags() []string {
 	return parser.GetPrimaryTags()
 }
 
-// GetSecondaryTags 获取指定主标签下的所有二级标签
+// GetSecondaryTags 获取指定主标签下的所有二级标签（从缓存中获取）
 func (a *App) GetSecondaryTags(primaryTag string) []string {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	return parser.GetSecondaryTags(a.vpkFiles, primaryTag)
+	// 从缓存中收集所有文件
+	vpkFiles := make([]VPKFile, 0)
+	a.vpkCache.Range(func(key, value interface{}) bool {
+		cache := value.(*VPKFileCache)
+		vpkFiles = append(vpkFiles, cache.File)
+		return true
+	})
+
+	return parser.GetSecondaryTags(vpkFiles, primaryTag)
 }
 
 // SelectDirectory 选择文件夹对话框

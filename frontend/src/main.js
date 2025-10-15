@@ -458,7 +458,10 @@ async function refreshFilesKeepFilter() {
   updateLoadingMessage('正在刷新文件列表...');
 
   try {
-    // 重新获取文件列表和标签
+    // ⭐ 重新扫描文件系统（触发智能缓存更新）
+    await ScanVPKFiles();
+    
+    // 获取更新后的文件列表和标签
     const [files, primaryTags] = await Promise.all([GetVPKFiles(), GetPrimaryTags()]);
 
     // 确保文件列表按名称排序，保持稳定顺序
