@@ -15,6 +15,13 @@ import {
   ValidateDirectory,
   LaunchL4D2,
   OpenFileLocation,
+  GetWorkshopDetails,
+  StartDownloadTask,
+  GetDownloadTasks,
+  ClearCompletedTasks,
+  CancelDownloadTask,
+  RetryDownloadTask,
+  ForceExit,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn } from '../wailsjs/runtime/runtime';
@@ -92,9 +99,41 @@ function setupEventListeners() {
   // 关于信息按钮
   document.getElementById('info-btn').addEventListener('click', showInfoModal);
 
+  // 退出确认模态框事件
+  document.getElementById('close-exit-modal-btn').addEventListener('click', closeExitModal);
+  document.getElementById('exit-cancel-btn').addEventListener('click', closeExitModal);
+  document.getElementById('exit-confirm-btn').addEventListener('click', confirmExit);
+  
+  // 点击模态框外部关闭
+  document.getElementById('exit-confirm-modal').addEventListener('click', function (e) {
+    if (e.target === this) {
+      closeExitModal();
+    }
+  });
+
   // 模态框关闭按钮
   document.getElementById('close-modal-header-btn').addEventListener('click', closeModal);
   document.getElementById('close-info-modal-btn').addEventListener('click', closeInfoModal);
+
+  // 创意工坊按钮
+  document.getElementById('workshop-btn').addEventListener('click', openWorkshopModal);
+  document.getElementById('close-workshop-modal-btn').addEventListener('click', closeWorkshopModal);
+  document.getElementById('check-workshop-btn').addEventListener('click', checkWorkshopUrl);
+  document.getElementById('download-workshop-btn').addEventListener('click', downloadWorkshopFile);
+  
+  // 复制下载链接按钮
+  document.getElementById('copy-url-btn').addEventListener('click', function() {
+    const input = document.getElementById('download-url');
+    if (input.value) {
+      input.select();
+      navigator.clipboard.writeText(input.value).then(() => {
+        showNotification('链接已复制', 'success');
+      }).catch(err => {
+        console.error('复制失败:', err);
+        showError('复制失败');
+      });
+    }
+  });
 
   console.log('模态框事件监听器已设置');
 
@@ -102,6 +141,12 @@ function setupEventListeners() {
   document.getElementById('file-detail-modal').addEventListener('click', function (e) {
     if (e.target === this) {
       closeModal();
+    }
+  });
+
+  document.getElementById('workshop-modal').addEventListener('click', function (e) {
+    if (e.target === this) {
+      closeWorkshopModal();
     }
   });
 
@@ -298,6 +343,43 @@ function setupEventListeners() {
 function setupWailsEvents() {
   // 监听错误事件
   EventsOn('error', handleError);
+  
+  // 监听任务更新
+  EventsOn("task_updated", (task) => {
+    updateTaskInList(task);
+  });
+
+  // 监听任务进度
+  EventsOn("task_progress", (task) => {
+    updateTaskProgress(task);
+  });
+
+  // 监听任务清理
+  EventsOn("tasks_cleared", () => {
+    refreshTaskList();
+  });
+
+  // 监听退出确认
+  EventsOn("show_exit_confirmation", () => {
+    showExitModal();
+  });
+}
+
+// 退出确认相关函数
+function showExitModal() {
+  document.getElementById('exit-confirm-modal').classList.remove('hidden');
+}
+
+function closeExitModal() {
+  document.getElementById('exit-confirm-modal').classList.add('hidden');
+}
+
+async function confirmExit() {
+  try {
+    await ForceExit();
+  } catch (err) {
+    console.error('强制退出失败:', err);
+  }
 }
 
 // 检查初始目录
@@ -1641,4 +1723,345 @@ function showInfo(message) {
       }, 300);
     }
   }, 3000);
+}
+
+// 创意工坊相关
+let currentWorkshopDetails = null;
+
+function openWorkshopModal() {
+  document.getElementById('workshop-modal').classList.remove('hidden');
+  document.getElementById('workshop-url').focus();
+  refreshTaskList();
+}
+
+function closeWorkshopModal() {
+  document.getElementById('workshop-modal').classList.add('hidden');
+  // Reset state
+  document.getElementById('workshop-url').value = '';
+  document.getElementById('download-url').value = '';
+  document.getElementById('workshop-result').classList.add('hidden');
+  currentWorkshopDetails = null;
+}
+
+async function checkWorkshopUrl() {
+  const url = document.getElementById('workshop-url').value.trim();
+  if (!url) {
+    showError('请输入创意工坊链接');
+    return;
+  }
+
+  const checkBtn = document.getElementById('check-workshop-btn');
+  const result = document.getElementById('workshop-result');
+  const downloadUrlInput = document.getElementById('download-url');
+  
+  // Set loading state
+  const originalBtnText = checkBtn.innerHTML;
+  checkBtn.disabled = true;
+  checkBtn.innerHTML = '<span class="btn-spinner"></span> 解析中...';
+  
+  result.classList.add('hidden');
+  downloadUrlInput.value = '';
+
+  try {
+    const details = await GetWorkshopDetails(url);
+    currentWorkshopDetails = details;
+    
+    document.getElementById('workshop-title').textContent = details.title;
+    document.getElementById('workshop-filename').textContent = details.filename;
+    document.getElementById('workshop-filesize').textContent = formatBytes(parseInt(details.file_size));
+    
+    const creatorContainer = document.getElementById('workshop-creator-container');
+    if (details.creator && details.creator.trim() !== '') {
+      creatorContainer.style.display = 'block';
+      document.getElementById('workshop-creator').textContent = details.creator;
+    } else {
+      creatorContainer.style.display = 'none';
+    }
+
+    document.getElementById('workshop-preview').src = details.preview_url;
+    
+    // Fill download URL
+    downloadUrlInput.value = details.file_url;
+    
+    result.classList.remove('hidden');
+  } catch (err) {
+    showError('解析失败: ' + err);
+  } finally {
+    // Restore button state
+    checkBtn.disabled = false;
+    checkBtn.innerHTML = originalBtnText;
+  }
+}
+
+async function downloadWorkshopFile() {
+  const downloadUrl = document.getElementById('download-url').value.trim();
+  
+  if (!downloadUrl) {
+    showError('请输入或解析下载链接');
+    return;
+  }
+
+  // If we have details, update the URL from input (in case user edited it)
+  if (currentWorkshopDetails) {
+    currentWorkshopDetails.file_url = downloadUrl;
+  } else {
+    // Create dummy details for direct download
+    // Try to extract filename from URL
+    let filename = 'unknown.vpk';
+    try {
+      const urlObj = new URL(downloadUrl);
+      const pathParts = urlObj.pathname.split('/');
+      if (pathParts.length > 0) {
+        const lastPart = pathParts[pathParts.length - 1];
+        if (lastPart && lastPart.trim() !== '') {
+          filename = decodeURIComponent(lastPart);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse URL for filename:', e);
+    }
+
+    currentWorkshopDetails = {
+      title: 'Direct Download',
+      filename: filename,
+      file_url: downloadUrl,
+      file_size: '0',
+      preview_url: '', // No preview
+      publishedfileid: 'direct-' + Date.now(),
+      result: 1
+    };
+  }
+  
+  try {
+    await StartDownloadTask(currentWorkshopDetails);
+    showInfo('已添加到后台下载队列');
+    
+    // Reset UI for next input
+    document.getElementById('workshop-url').value = '';
+    document.getElementById('download-url').value = '';
+    document.getElementById('workshop-result').classList.add('hidden');
+    currentWorkshopDetails = null;
+    
+    refreshTaskList();
+  } catch (err) {
+    showError('启动下载失败: ' + err);
+  }
+}
+
+async function refreshTaskList() {
+  const listContainer = document.getElementById('download-tasks-list');
+  try {
+    const tasks = await GetDownloadTasks();
+    
+    if (!tasks || tasks.length === 0) {
+      listContainer.innerHTML = '<div class="empty-tasks" style="text-align: center; color: #888; padding: 20px;">暂无下载任务</div>';
+      return;
+    }
+
+    // Sort tasks: pending/downloading first, then by time
+    tasks.sort((a, b) => {
+      const statusOrder = { 'downloading': 0, 'pending': 1, 'failed': 2, 'completed': 3 };
+      if (statusOrder[a.status] !== statusOrder[b.status]) {
+        return statusOrder[a.status] - statusOrder[b.status];
+      }
+      return b.id.localeCompare(a.id);
+    });
+
+    listContainer.innerHTML = '';
+    tasks.forEach(task => {
+      const item = createTaskElement(task);
+      listContainer.appendChild(item);
+    });
+  } catch (err) {
+    console.error("Failed to refresh tasks:", err);
+  }
+}
+
+function createTaskElement(task) {
+  const div = document.createElement('div');
+  div.className = 'task-item';
+  div.id = `task-${task.id}`;
+  div.style.cssText = 'padding: 10px; border-bottom: 1px solid #eee; display: flex; gap: 10px; align-items: center;';
+  
+  const statusColors = {
+    'pending': '#ff9800',
+    'downloading': '#2196f3',
+    'completed': '#4caf50',
+    'failed': '#f44336'
+  };
+
+  const statusText = {
+    'pending': '等待中',
+    'downloading': '下载中',
+    'completed': '已完成',
+    'failed': '失败',
+    'cancelled': '已取消'
+  };
+
+  let actionButtons = '';
+  if (task.status === 'downloading' || task.status === 'pending') {
+    actionButtons = `
+      <button class="task-action-btn cancel-btn cancel-task-btn" data-id="${task.id}" title="取消下载">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>`;
+  } else if (task.status === 'failed' || task.status === 'cancelled') {
+    actionButtons = `
+      <button class="task-action-btn retry-btn retry-task-btn" data-id="${task.id}" title="重试下载">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 4v6h-6"></path>
+          <path d="M1 20v-6h6"></path>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+      </button>`;
+  }
+
+  let previewHtml = '';
+  if (task.preview_url) {
+    previewHtml = `<img src="${task.preview_url}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">`;
+  } else {
+    previewHtml = `
+      <div style="width: 50px; height: 50px; background-color: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #888;">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </div>`;
+  }
+
+  div.innerHTML = `
+    ${previewHtml}
+    <div style="flex: 1;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span class="task-title" style="font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;">${task.title}</span>
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <span class="task-status" style="font-size: 12px; color: ${statusColors[task.status] || '#666'};">${statusText[task.status] || task.status}</span>
+          ${actionButtons}
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #666; margin-bottom: 5px;">${task.filename}</div>
+      <div class="progress-bar" style="width: 100%; height: 6px; background-color: #eee; border-radius: 3px; overflow: hidden;">
+        <div class="progress-fill" style="width: ${task.progress}%; height: 100%; background-color: ${statusColors[task.status] || '#ccc'}; transition: width 0.3s;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 2px;">
+        <span class="task-size">${formatBytes(task.downloaded_size)} / ${formatBytes(task.total_size)} ${task.speed ? `(${task.speed})` : ''}</span>
+        <span class="task-percent">${task.progress}%</span>
+      </div>
+      ${task.error ? `<div style="color: #f44336; font-size: 11px; margin-top: 2px;">${task.error}</div>` : ''}
+    </div>
+  `;
+  
+  // Add event listeners for buttons
+  const cancelBtn = div.querySelector('.cancel-task-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showConfirmModal('取消下载', '确定要取消这个下载任务吗？', async () => {
+        try {
+          await CancelDownloadTask(task.id);
+          showNotification('任务已取消', 'info');
+        } catch (err) {
+          console.error('取消任务失败:', err);
+          showError('取消失败: ' + err);
+        }
+      });
+    });
+  }
+
+  const retryBtn = div.querySelector('.retry-task-btn');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await RetryDownloadTask(task.id);
+        showNotification('任务已重试', 'success');
+      } catch (err) {
+        console.error('重试任务失败:', err);
+        showError('重试失败: ' + err);
+      }
+    });
+  }
+
+  return div;
+}
+
+// 确认对话框逻辑
+function showConfirmModal(title, message, onConfirm) {
+  const modal = document.getElementById('confirm-modal');
+  const titleEl = document.getElementById('confirm-title');
+  const messageEl = document.getElementById('confirm-message');
+  const okBtn = document.getElementById('confirm-ok-btn');
+  const cancelBtn = document.getElementById('confirm-cancel-btn');
+  const closeBtn = document.getElementById('close-confirm-modal-btn');
+
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+  modal.classList.remove('hidden');
+
+  const cleanup = () => {
+    modal.classList.add('hidden');
+    okBtn.onclick = null;
+    cancelBtn.onclick = null;
+    closeBtn.onclick = null;
+  };
+
+  okBtn.onclick = () => {
+    cleanup();
+    onConfirm();
+  };
+
+  cancelBtn.onclick = cleanup;
+  closeBtn.onclick = cleanup;
+}
+
+function updateTaskInList(task) {
+  const existing = document.getElementById(`task-${task.id}`);
+  if (existing) {
+    // Simple update: replace content or just update specific fields
+    // For simplicity, replace the whole element to ensure state consistency
+    const newItem = createTaskElement(task);
+    existing.replaceWith(newItem);
+  } else {
+    // New task, refresh list to insert in correct order
+    refreshTaskList();
+  }
+  
+  // If completed, refresh file list
+  if (task.status === 'completed') {
+     if (typeof refreshFilesKeepFilter === 'function') {
+        refreshFilesKeepFilter();
+    } else if (typeof loadFiles === 'function') {
+        loadFiles();
+    }
+  }
+}
+
+function updateTaskProgress(task) {
+  const el = document.getElementById(`task-${task.id}`);
+  if (el) {
+    const fill = el.querySelector('.progress-fill');
+    const percentText = el.querySelector('.task-percent');
+    const sizeText = el.querySelector('.task-size');
+    
+    if (fill) fill.style.width = `${task.progress}%`;
+    if (percentText) percentText.textContent = `${task.progress}%`;
+    if (sizeText) sizeText.textContent = `${formatBytes(task.downloaded_size)} / ${formatBytes(task.total_size)} ${task.speed ? `(${task.speed})` : ''}`;
+  }
+}
+
+document.getElementById('clear-completed-tasks-btn').addEventListener('click', async () => {
+  await ClearCompletedTasks();
+});
+
+// Helper for file size
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }

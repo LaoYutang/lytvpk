@@ -51,6 +51,7 @@ type App struct {
 	mu            sync.RWMutex
 	rootDir       string
 	goroutinePool *ants.Pool
+	forceClose    bool
 }
 
 // NewApp creates a new App application struct
@@ -65,6 +66,25 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+// ForceExit forces the application to exit
+func (a *App) ForceExit() {
+	a.forceClose = true
+	runtime.Quit(a.ctx)
+}
+
+// beforeClose is called when the application is about to close
+func (a *App) beforeClose(ctx context.Context) (prevent bool) {
+	if a.forceClose {
+		return false
+	}
+
+	if a.HasActiveDownloads() {
+		runtime.EventsEmit(a.ctx, "show_exit_confirmation", nil)
+		return true
+	}
+	return false
 }
 
 // SetRootDirectory 设置根目录

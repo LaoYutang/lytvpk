@@ -378,6 +378,18 @@ body {
   to { transform: rotate(360deg); }
 }
 
+.btn-spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.75s linear infinite;
+  vertical-align: text-bottom;
+  margin-right: 0.5em;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(1.05); }
@@ -513,6 +525,11 @@ body {
 }
 
 #launch-l4d2-btn .icon-svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+#workshop-btn .icon-svg {
   width: 1.125rem;
   height: 1.125rem;
 }
@@ -1882,4 +1899,163 @@ body {
   .file-list-container {
     overflow: visible;
   }
+}
+
+/* 创意工坊模态框样式优化 */
+.workshop-modal-content {
+  max-width: 800px;
+  width: 90%;
+}
+
+.url-input-container {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: var(--bg-surface);
+  padding: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.url-input-container:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.url-input-container input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  outline: none;
+  width: 100%;
+}
+
+.url-input-container input::placeholder {
+  color: var(--text-muted);
+}
+
+.url-input-container button {
+  padding: 8px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  margin-right: 0;
+  transition: all 0.2s ease;
+}
+
+.url-input-container button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.url-input-container button:active {
+  transform: translateY(0);
+}
+
+/* 任务列表样式优化 */
+.task-list-container {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  border: 1px solid var(--border-light);
+}
+
+.download-tasks-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-300) transparent;
+}
+
+.download-tasks-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.download-tasks-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.download-tasks-list::-webkit-scrollbar-thumb {
+  background-color: var(--gray-300);
+  border-radius: 20px;
+}
+
+.task-item {
+  background: var(--bg-app);
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.task-item:hover {
+  border-color: var(--primary-light) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 任务操作按钮 */
+.task-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.task-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.task-action-btn.cancel-btn:hover {
+  background: var(--danger-light);
+  color: white;
+  border-color: var(--danger);
+}
+
+.task-action-btn.retry-btn:hover {
+  background: var(--primary-light);
+  color: white;
+  border-color: var(--primary);
+}
+
+.task-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 确认对话框样式 */
+.confirm-modal-content {
+  max-width: 500px;
+  width: 90%;
+}
+
+.confirm-message {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 20px 0;
+  line-height: 1.5;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.task-item:hover {
+  border-color: var(--primary-light) !important;
+  box-shadow: var(--shadow-sm);
 }

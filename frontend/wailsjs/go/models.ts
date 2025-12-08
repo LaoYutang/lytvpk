@@ -1,3 +1,72 @@
+export namespace main {
+	
+	export class DownloadTask {
+	    id: string;
+	    workshop_id: string;
+	    title: string;
+	    filename: string;
+	    preview_url: string;
+	    file_url: string;
+	    status: string;
+	    progress: number;
+	    total_size: number;
+	    downloaded_size: number;
+	    speed: string;
+	    error: string;
+	    created_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DownloadTask(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.workshop_id = source["workshop_id"];
+	        this.title = source["title"];
+	        this.filename = source["filename"];
+	        this.preview_url = source["preview_url"];
+	        this.file_url = source["file_url"];
+	        this.status = source["status"];
+	        this.progress = source["progress"];
+	        this.total_size = source["total_size"];
+	        this.downloaded_size = source["downloaded_size"];
+	        this.speed = source["speed"];
+	        this.error = source["error"];
+	        this.created_at = source["created_at"];
+	    }
+	}
+	export class WorkshopFileDetails {
+	    result: number;
+	    publishedfileid: string;
+	    creator: string;
+	    filename: string;
+	    file_size: string;
+	    file_url: string;
+	    preview_url: string;
+	    title: string;
+	    file_description: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkshopFileDetails(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.result = source["result"];
+	        this.publishedfileid = source["publishedfileid"];
+	        this.creator = source["creator"];
+	        this.filename = source["filename"];
+	        this.file_size = source["file_size"];
+	        this.file_url = source["file_url"];
+	        this.preview_url = source["preview_url"];
+	        this.title = source["title"];
+	        this.file_description = source["file_description"];
+	    }
+	}
+
+}
+
 export namespace parser {
 	
 	export class ChapterInfo {
