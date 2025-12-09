@@ -136,6 +136,9 @@
   --z-popover: 1060;
   --z-tooltip: 1070;
   --z-toast: 1080;
+
+  /* Wails 拖拽配置 */
+  --wails-drop-target: drop;
 }
 
 /* 动画定义 */
@@ -163,6 +166,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  --wails-drop-target: drop; /* 允许整个body接收拖拽 */
 }
 
 #app {

@@ -25,6 +25,8 @@ export function GetVPKFiles():Promise<Array<parser.VPKFile>>;
 
 export function GetWorkshopDetails(arg1:string):Promise<main.WorkshopFileDetails>;
 
+export function HandleFileDrop(arg1:Array<string>):Promise<void>;
+
 export function HasActiveDownloads():Promise<boolean>;
 
 export function LaunchL4D2():Promise<void>;

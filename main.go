@@ -29,6 +29,9 @@ func main() {
 		Bind: []any{
 			app,
 		},
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
+		},
 	})
 
 	if err != nil {

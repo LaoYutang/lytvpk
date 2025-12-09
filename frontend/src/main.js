@@ -23,9 +23,10 @@ import {
   RetryDownloadTask,
   ForceExit,
   DeleteVPKFile,
+  HandleFileDrop,
 } from '../wailsjs/go/main/App';
 
-import { EventsOn } from '../wailsjs/runtime/runtime';
+import { EventsOn, OnFileDrop } from '../wailsjs/runtime/runtime';
 
 // LocalStorage 配置管理
 const CONFIG_KEY = 'vpk-manager-config';
@@ -99,6 +100,15 @@ function setupEventListeners() {
 
   // 关于信息按钮
   document.getElementById('info-btn').addEventListener('click', showInfoModal);
+
+  // 阻止浏览器默认的拖拽行为（防止打开文件或下载）
+  window.addEventListener('dragover', function(e) {
+    e.preventDefault();
+  });
+  
+  window.addEventListener('drop', function(e) {
+    e.preventDefault();
+  });
 
   // 退出确认模态框事件
   document.getElementById('close-exit-modal-btn').addEventListener('click', closeExitModal);
@@ -409,6 +419,8 @@ function setupEventListeners() {
 
 // 设置Wails事件监听
 function setupWailsEvents() {
+  console.log("正在初始化 Wails 事件监听...");
+
   // 监听错误事件
   EventsOn('error', handleError);
   
@@ -430,6 +442,43 @@ function setupWailsEvents() {
   // 监听退出确认
   EventsOn("show_exit_confirmation", () => {
     showExitModal();
+  });
+
+  // 监听文件拖拽 (使用 OnFileDrop API)
+  OnFileDrop((x, y, paths) => {
+    console.log("OnFileDrop检测到文件拖拽:", paths);
+    if (paths && paths.length > 0) {
+        updateLoadingMessage('正在处理拖入的文件...');
+        showLoadingScreen();
+        HandleFileDrop(paths).then(() => {
+             // 处理完成后的逻辑，通常后端会发送 refresh_files 事件
+             // 这里可以做一个保底的关闭加载屏
+             setTimeout(() => {
+                showMainScreen();
+             }, 1000);
+        }).catch((err) => {
+            showError("处理文件失败: " + err);
+            showMainScreen();
+        });
+    }
+  }, true);
+
+  // 监听刷新文件列表
+  EventsOn("refresh_files", () => {
+      if (typeof refreshFilesKeepFilter === 'function') {
+          refreshFilesKeepFilter();
+      } else if (typeof performSearch === 'function') {
+          performSearch();
+      }
+  });
+
+  // 监听Toast消息
+  EventsOn("show_toast", (data) => {
+      if (data.type === 'error') {
+          showError(data.message);
+      } else {
+          showNotification(data.message, data.type || 'success');
+      }
   });
 }
 
@@ -2158,4 +2207,21 @@ function formatBytes(bytes, decimals = 2) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+function handleDroppedPaths(paths) {
+    if (typeof HandleFileDrop === 'function') {
+        updateLoadingMessage('正在处理拖入的文件...');
+        showLoadingScreen();
+        
+        HandleFileDrop(paths).then(() => {
+            showMainScreen();
+        }).catch(err => {
+            showMainScreen();
+            showError('处理文件失败: ' + err);
+        });
+    } else {
+        console.error("HandleFileDrop function not found");
+        showError("请重新构建应用以启用拖拽功能");
+    }
 }

@@ -639,14 +639,6 @@ func (a *App) ExtractVPKFromZip(zipPath string, destDir string) error {
 			// 注意：这里我们只取文件名，忽略ZIP中的目录结构，直接解压到destDir
 			targetPath := filepath.Join(destDir, filepath.Base(f.Name))
 
-			// 检查目标文件是否已存在，如果存在则重命名（避免覆盖）
-			if _, err := os.Stat(targetPath); err == nil {
-				fileName := filepath.Base(f.Name)
-				ext := filepath.Ext(fileName)
-				name := strings.TrimSuffix(fileName, ext)
-				targetPath = filepath.Join(destDir, fmt.Sprintf("%s_%d%s", name, time.Now().Unix(), ext))
-			}
-
 			// 打开ZIP中的文件
 			rc, err := f.Open()
 			if err != nil {
@@ -684,5 +676,77 @@ func (a *App) ExtractVPKFromZip(zipPath string, destDir string) error {
 		return fmt.Errorf("ZIP文件中未找到VPK文件")
 	}
 
+	return nil
+}
+
+// HandleFileDrop 处理文件拖拽
+func (a *App) HandleFileDrop(paths []string) {
+	if a.rootDir == "" {
+		a.LogError("拖拽安装", "请先设置游戏根目录", "")
+		return
+	}
+
+	successCount := 0
+	failCount := 0
+
+	for _, path := range paths {
+		lowerPath := strings.ToLower(path)
+		if strings.HasSuffix(lowerPath, ".vpk") {
+			// Copy VPK to rootDir
+			err := a.installVPKFile(path)
+			if err != nil {
+				a.LogError("安装VPK失败", err.Error(), filepath.Base(path))
+				failCount++
+			} else {
+				successCount++
+			}
+		} else if strings.HasSuffix(lowerPath, ".zip") {
+			// Extract ZIP to rootDir
+			err := a.ExtractVPKFromZip(path, a.rootDir)
+			if err != nil {
+				a.LogError("解压ZIP失败", err.Error(), filepath.Base(path))
+				failCount++
+			} else {
+				successCount++
+			}
+		}
+	}
+
+	if successCount > 0 {
+		// 刷新文件列表
+		runtime.EventsEmit(a.ctx, "refresh_files", nil)
+
+		msg := fmt.Sprintf("成功处理 %d 个文件", successCount)
+		if failCount > 0 {
+			msg += fmt.Sprintf("，失败 %d 个", failCount)
+		}
+		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "success", "message": msg})
+	} else if failCount > 0 {
+		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "error", "message": fmt.Sprintf("处理失败 %d 个文件", failCount)})
+	}
+}
+
+// installVPKFile 安装VPK文件（复制到根目录）
+func (a *App) installVPKFile(srcPath string) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	destPath := filepath.Join(a.rootDir, filepath.Base(srcPath))
+
+	dst, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("已安装: %s -> %s", srcPath, destPath)
 	return nil
 }
