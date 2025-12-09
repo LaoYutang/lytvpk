@@ -499,9 +499,12 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, url s
 			// 解压失败不影响下载成功的状态，但记录错误
 			fmt.Printf("解压ZIP失败: %v\n", err)
 		} else {
-			// 解压成功，可以选择删除ZIP文件，或者保留
-			// 这里我们保留ZIP文件，让用户自己决定
-			fmt.Printf("自动解压完成: %s\n", targetPath)
+			// 解压成功，删除ZIP文件
+			if err := os.Remove(targetPath); err != nil {
+				fmt.Printf("删除ZIP文件失败: %v\n", err)
+			} else {
+				fmt.Printf("已删除ZIP文件: %s\n", targetPath)
+			}
 		}
 	}
 
