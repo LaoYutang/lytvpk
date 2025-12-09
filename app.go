@@ -15,6 +15,7 @@ import (
 
 	"vpk-manager/parser"
 
+	"github.com/hymkor/trash-go"
 	"github.com/panjf2000/ants/v2"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -592,6 +593,26 @@ func (a *App) OpenFileLocation(filePath string) error {
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("打开文件位置失败: %s", err.Error())
+	}
+
+	return nil
+}
+
+// DeleteVPKFile 删除VPK文件到回收站
+func (a *App) DeleteVPKFile(filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("文件路径为空")
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("文件不存在: %s", filePath)
+	}
+
+	// 使用 trash 库删除文件到回收站
+	err := trash.Throw(filePath)
+	if err != nil {
+		return fmt.Errorf("删除文件失败: %s", err.Error())
 	}
 
 	return nil

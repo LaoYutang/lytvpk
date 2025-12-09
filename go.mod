@@ -4,6 +4,7 @@ go 1.23.0
 
 require (
 	git.lubar.me/ben/valve v0.0.0-20240812171112-ca00f6e951f7
+	github.com/hymkor/trash-go v0.3.0
 	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/wailsapp/wails/v2 v2.10.2
 )

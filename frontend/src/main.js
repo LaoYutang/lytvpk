@@ -22,6 +22,7 @@ import {
   CancelDownloadTask,
   RetryDownloadTask,
   ForceExit,
+  DeleteVPKFile,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn } from '../wailsjs/runtime/runtime';
@@ -161,6 +162,44 @@ function setupEventListeners() {
   document.addEventListener('click', function (e) {
     console.log('全局点击事件触发:', e.target);
 
+    // 处理更多按钮点击
+    const moreBtn = e.target.closest('.more-btn');
+    if (moreBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const dropdown = moreBtn.nextElementSibling;
+      const fileItem = moreBtn.closest('.file-item');
+      
+      // 关闭其他所有打开的下拉菜单
+      document.querySelectorAll('.dropdown-content').forEach(d => {
+        if (d !== dropdown) {
+          d.classList.add('hidden');
+          // 移除其他 file-item 的 active 状态
+          const otherFileItem = d.closest('.file-item');
+          if (otherFileItem) otherFileItem.classList.remove('active-dropdown');
+        }
+      });
+      
+      dropdown.classList.toggle('hidden');
+      if (fileItem) {
+        if (dropdown.classList.contains('hidden')) {
+          fileItem.classList.remove('active-dropdown');
+        } else {
+          fileItem.classList.add('active-dropdown');
+        }
+      }
+      return;
+    }
+
+    // 点击其他地方关闭所有下拉菜单
+    if (!e.target.closest('.more-actions-dropdown')) {
+      document.querySelectorAll('.dropdown-content').forEach(d => {
+        d.classList.add('hidden');
+        const fileItem = d.closest('.file-item');
+        if (fileItem) fileItem.classList.remove('active-dropdown');
+      });
+    }
+
     // 处理详情按钮点击
     const detailBtn = e.target.closest('.detail-btn');
     if (detailBtn) {
@@ -186,6 +225,14 @@ function setupEventListeners() {
         console.log('调用 openFileLocation:', filePath);
         e.preventDefault();
         e.stopPropagation();
+        
+        // 关闭下拉菜单
+        document.querySelectorAll('.dropdown-content').forEach(d => {
+          d.classList.add('hidden');
+          const fileItem = d.closest('.file-item');
+          if (fileItem) fileItem.classList.remove('active-dropdown');
+        });
+
         openFileLocation(filePath);
       }
     }
@@ -213,6 +260,27 @@ function setupEventListeners() {
         e.preventDefault();
         e.stopPropagation();
         moveFileToAddons(filePath);
+      }
+    }
+
+    // 处理删除按钮点击
+    const deleteBtn = e.target.closest('.delete-btn[data-action="delete"]');
+    if (deleteBtn) {
+      console.log('找到删除按钮:', deleteBtn);
+      const filePath = deleteBtn.getAttribute('data-file-path');
+      if (filePath) {
+        console.log('调用 deleteFile:', filePath);
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 关闭下拉菜单
+        document.querySelectorAll('.dropdown-content').forEach(d => {
+          d.classList.add('hidden');
+          const fileItem = d.closest('.file-item');
+          if (fileItem) fileItem.classList.remove('active-dropdown');
+        });
+
+        deleteFile(filePath);
       }
     }
   });
@@ -1067,11 +1135,22 @@ function createFileItem(file) {
                 <span class="btn-icon">🔍</span>
                 <span class="btn-text">详情</span>
             </button>
-            <button class="btn-small action-btn open-location-btn" data-file-path="${file.path}" data-action="open-location" title="打开文件所在位置">
-                <span class="btn-icon">📂</span>
-                <span class="btn-text">位置</span>
-            </button>
             ${getActionButton(file)}
+            <div class="more-actions-dropdown">
+                <button class="btn-small action-btn more-btn" title="更多操作">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                    </svg>
+                </button>
+                <div class="dropdown-content hidden">
+                    <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
+                        <span class="btn-icon">📂</span> 位置
+                    </button>
+                    <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
+                        <span class="btn-icon">🗑️</span> 删除
+                    </button>
+                </div>
+            </div>
         </div>
     `;
 
@@ -1521,6 +1600,21 @@ window.moveFileToAddons = async function (filePath) {
     console.error('转移文件失败:', error);
     showError('转移失败: ' + error);
   }
+};
+
+// 删除文件（全局函数）
+window.deleteFile = function (filePath) {
+  showConfirmModal('确认删除', '确定要将此文件移至回收站吗？', async () => {
+    try {
+      console.log('删除文件:', filePath);
+      await DeleteVPKFile(filePath);
+      await refreshFilesKeepFilter();
+      showNotification('文件已移至回收站', 'success');
+    } catch (error) {
+      console.error('删除文件失败:', error);
+      showError('删除失败: ' + error);
+    }
+  });
 };
 
 // 打开文件所在位置（全局函数）

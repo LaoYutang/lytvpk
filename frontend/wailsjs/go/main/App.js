@@ -10,6 +10,10 @@ export function ClearCompletedTasks() {
   return window['go']['main']['App']['ClearCompletedTasks']();
 }
 
+export function DeleteVPKFile(arg1) {
+  return window['go']['main']['App']['DeleteVPKFile'](arg1);
+}
+
 export function ForceExit() {
   return window['go']['main']['App']['ForceExit']();
 }

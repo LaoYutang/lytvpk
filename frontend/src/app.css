@@ -743,7 +743,7 @@ body {
 /* 现代化文件项 */
 .file-item {
   display: grid;
-  grid-template-columns: 3rem minmax(13rem, 1.75fr) 7rem 6rem 7rem minmax(18rem, 1.5fr) 8rem;
+  grid-template-columns: 3rem minmax(13rem, 1.75fr) 7rem 6rem 7rem minmax(18rem, 1.5fr) auto;
   gap: var(--spacing-3);
   padding: var(--spacing-3);
   border-bottom: 1px solid var(--border-default);
@@ -991,6 +991,20 @@ body {
 .open-location-btn:hover {
   background: linear-gradient(135deg, #22D3EE 0%, #67E8F9 100%) !important;
   box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 删除按钮 */
+.delete-btn {
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%) !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3) !important;
+  cursor: pointer !important;
+}
+
+.delete-btn:hover {
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%) !important;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4) !important;
   transform: translateY(-1px) !important;
 }
 
@@ -2058,4 +2072,78 @@ body {
 .task-item:hover {
   border-color: var(--primary-light) !important;
   box-shadow: var(--shadow-sm);
+}
+
+/* 激活下拉菜单时的文件项样式 */
+.file-item.active-dropdown {
+  z-index: 20 !important;
+  background: var(--bg-surface) !important;
+  box-shadow: var(--shadow-md);
+}
+
+/* 更多操作下拉菜单 */
+.more-actions-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.more-btn {
+  padding: 0.4rem !important;
+  min-width: 2rem !important;
+  justify-content: center;
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-default) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+}
+
+.more-btn:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+.dropdown-content {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background-color: var(--bg-app);
+  min-width: 90px;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  z-index: 100;
+  padding: 4px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: var(--bg-hover);
+  color: var(--primary);
+}
+
+.dropdown-item .btn-icon {
+  font-size: 1.1em;
 }
