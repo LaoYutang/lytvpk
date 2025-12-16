@@ -26,9 +26,10 @@ import {
   DeleteVPKFiles,
   HandleFileDrop,
   ConnectToServer,
+  FetchServerInfo,
 } from '../wailsjs/go/main/App';
 
-import { EventsOn, OnFileDrop } from '../wailsjs/runtime/runtime';
+import { EventsOn, OnFileDrop, BrowserOpenURL } from '../wailsjs/runtime/runtime';
 
 // LocalStorage 配置管理
 const CONFIG_KEY = 'vpk-manager-config';
@@ -2272,18 +2273,74 @@ function handleDroppedPaths(paths) {
 const SERVER_CONFIG_KEY = 'vpk-manager-servers';
 
 function getServers() {
-  const servers = localStorage.getItem(SERVER_CONFIG_KEY);
-  return servers ? JSON.parse(servers) : [];
+  try {
+    const servers = localStorage.getItem(SERVER_CONFIG_KEY);
+    const parsed = servers ? JSON.parse(servers) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.error('读取服务器列表失败:', e);
+    return [];
+  }
 }
 
 function saveServers(servers) {
   localStorage.setItem(SERVER_CONFIG_KEY, JSON.stringify(servers));
 }
 
+const STEAM_API_KEY_STORAGE = 'steam-api-key';
+
+function getSteamApiKey() {
+  return localStorage.getItem(STEAM_API_KEY_STORAGE) || '';
+}
+
+function saveSteamApiKey(key) {
+  localStorage.setItem(STEAM_API_KEY_STORAGE, key);
+}
+
 function setupServerModalListeners() {
   document.getElementById('close-server-modal-btn').addEventListener('click', closeServerModal);
   document.getElementById('add-server-btn').addEventListener('click', addServer);
   
+  // API Key 设置相关
+  document.getElementById('toggle-api-key-btn').addEventListener('click', () => {
+    const container = document.getElementById('api-key-container');
+    const icon = document.querySelector('#toggle-api-key-btn .icon');
+    container.classList.toggle('hidden');
+    icon.textContent = container.classList.contains('hidden') ? '▼' : '▲';
+  });
+
+  document.getElementById('save-api-key-btn').addEventListener('click', () => {
+    const input = document.getElementById('steam-api-key-input');
+    const key = input.value.trim();
+    
+    saveSteamApiKey(key);
+    
+    const refreshBtn = document.getElementById('refresh-all-servers-btn');
+    if (refreshBtn) {
+        if (key) {
+            refreshBtn.classList.remove('hidden');
+        } else {
+            refreshBtn.classList.add('hidden');
+        }
+    }
+
+    if (!key) {
+        showNotification('Steam API Key 已清除', 'info');
+    } else {
+        showNotification('Steam API Key 已保存', 'success');
+    }
+    
+    renderServers(); // 重新渲染以更新显示状态
+  });
+
+  // 获取 API Key 按钮
+  const getApiKeyBtn = document.getElementById('get-api-key-btn');
+  if (getApiKeyBtn) {
+      getApiKeyBtn.addEventListener('click', () => {
+          BrowserOpenURL('https://steamcommunity.com/dev/apikey');
+      });
+  }
+
   // 全局删除按钮事件
   document.getElementById('global-delete-server-btn').addEventListener('click', (e) => {
     const dropdown = document.getElementById('global-dropdown');
@@ -2293,6 +2350,12 @@ function setupServerModalListeners() {
       dropdown.classList.add('hidden');
     }
   });
+
+  // 刷新所有按钮
+  const refreshAllBtn = document.getElementById('refresh-all-servers-btn');
+  if (refreshAllBtn) {
+      refreshAllBtn.addEventListener('click', refreshAllServers);
+  }
 
   // 点击模态框外部关闭
   window.addEventListener('click', (event) => {
@@ -2316,7 +2379,27 @@ function setupServerModalListeners() {
 function openServerModal() {
   const modal = document.getElementById('server-modal');
   modal.classList.remove('hidden');
+  
+  // 填充 API Key
+  const apiKey = getSteamApiKey();
+  document.getElementById('steam-api-key-input').value = apiKey;
+  
+  // 控制刷新按钮显示
+  const refreshBtn = document.getElementById('refresh-all-servers-btn');
+  if (refreshBtn) {
+      if (apiKey) {
+          refreshBtn.classList.remove('hidden');
+      } else {
+          refreshBtn.classList.add('hidden');
+      }
+  }
+  
   renderServers();
+
+  // 如果有API Key，自动刷新所有服务器信息
+  if (apiKey) {
+      refreshAllServers();
+  }
 }
 
 function closeServerModal() {
@@ -2327,15 +2410,42 @@ function closeServerModal() {
 function renderServers() {
   const servers = getServers();
   const list = document.getElementById('server-list');
+  const apiKey = getSteamApiKey();
   list.innerHTML = '';
 
   servers.forEach((server, index) => {
+    const li = createServerListItem(server, index, apiKey);
+    list.appendChild(li);
+    
+    // 初始渲染时，如果有API Key，也需要获取信息
+    if (apiKey) {
+        fetchServerInfo(server.address, index);
+    }
+  });
+}
+
+function createServerListItem(server, index, apiKey) {
     const li = document.createElement('li');
     li.className = 'server-item';
+    li.dataset.address = server.address;
+    
+    let detailsHtml = '';
+
+    if (apiKey) {
+      detailsHtml = `
+        <div class="server-details" id="server-details-${index}">
+          <span style="font-size: 0.85em; color: var(--text-tertiary);">加载中...</span>
+        </div>
+      `;
+    }
+
     li.innerHTML = `
       <div class="server-info">
-        <span class="server-name">${server.name}</span>
+        <span class="server-name" id="server-name-${index}">
+          ${server.name}
+        </span>
         <span class="server-address">${server.address}</span>
+        ${detailsHtml}
       </div>
       <div class="server-actions">
         <button class="btn btn-small btn-success connect-server-btn" data-address="${server.address}">
@@ -2353,71 +2463,211 @@ function renderServers() {
         </button>
       </div>
     `;
-    list.appendChild(li);
-  });
+    
+    // 绑定连接按钮事件
+    const connectBtn = li.querySelector('.connect-server-btn');
+    if (connectBtn) {
+        connectBtn.addEventListener('click', (e) => {
+            const target = e.target.closest('.connect-server-btn');
+            const address = target.dataset.address;
+            connectServer(address);
+        });
+    }
+    
+    // 绑定更多按钮事件
+    const moreBtn = li.querySelector('.server-more-btn');
+    if (moreBtn) {
+        moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const idx = moreBtn.dataset.index;
+            const dropdown = document.getElementById('global-dropdown');
+            
+            if (!dropdown.classList.contains('hidden') && dropdown.dataset.index === idx) {
+                dropdown.classList.add('hidden');
+                return;
+            }
 
-  // 添加事件监听
-  document.querySelectorAll('.connect-server-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const target = e.target.closest('.connect-server-btn');
-      const address = target.dataset.address;
-      connectServer(address);
+            const rect = moreBtn.getBoundingClientRect();
+            dropdown.style.top = `${rect.bottom + 5}px`;
+            dropdown.style.left = `${rect.right - 100}px`;
+            
+            dropdown.dataset.index = idx;
+            dropdown.classList.remove('hidden');
+        });
+    }
+
+    return li;
+}
+
+// 全局函数以便在HTML中调用
+// window.refreshServerInfo 已废弃，因为移除了单个刷新按钮
+
+function refreshAllServers() {
+    const servers = getServers();
+    const apiKey = getSteamApiKey();
+    if (!apiKey) return;
+    
+    const btn = document.getElementById('refresh-all-servers-btn');
+    if(btn) {
+        const icon = btn.querySelector('.icon');
+        if(icon) icon.classList.add('spinning');
+        btn.disabled = true;
+    }
+
+    const promises = servers.map((server, index) => fetchServerInfo(server.address, index));
+    
+    Promise.allSettled(promises).finally(() => {
+        if(btn) {
+            const icon = btn.querySelector('.icon');
+            if(icon) icon.classList.remove('spinning');
+            btn.disabled = false;
+        }
     });
-  });
+}
 
-  // 更多按钮点击事件
-  document.querySelectorAll('.server-more-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const index = btn.dataset.index;
-          const dropdown = document.getElementById('global-dropdown');
-          
-          // 如果已经显示且是同一个按钮触发的，则隐藏
-          if (!dropdown.classList.contains('hidden') && dropdown.dataset.index === index) {
-              dropdown.classList.add('hidden');
-              return;
-          }
+async function fetchServerInfo(address, index) {
+  const apiKey = getSteamApiKey();
+  if (!apiKey) return;
 
-          // 计算位置
-          const rect = btn.getBoundingClientRect();
-          dropdown.style.top = `${rect.bottom + 5}px`;
-          dropdown.style.left = `${rect.right - 100}px`; // 假设宽度约100px，右对齐
-          
-          // 存储当前操作的索引
-          dropdown.dataset.index = index;
-          dropdown.classList.remove('hidden');
-      });
-  });
+  let detailsContainer = null;
+  
+  // 优先通过地址查找，以避免索引变化导致的错位
+  // 遍历查找比querySelector更安全（防止特殊字符破坏选择器）
+  const listItems = document.querySelectorAll('li.server-item');
+  for (const li of listItems) {
+      if (li.dataset.address === address) {
+          detailsContainer = li.querySelector('.server-details');
+          break;
+      }
+  }
+
+  // 回退到通过ID查找
+  if (!detailsContainer) {
+      detailsContainer = document.getElementById(`server-details-${index}`);
+  }
+
+  if (!detailsContainer) return;
+
+  try {
+    const info = await FetchServerInfo(address, apiKey);
+    
+    // 再次检查元素是否存在（防止异步期间被删除）
+    if (!document.body.contains(detailsContainer)) return;
+
+    detailsContainer.innerHTML = `
+      <div class="server-stats-grid">
+        <span class="stat-badge name-badge" title="${info.name}">🏠 ${info.name}</span>
+        <span class="stat-badge mode-badge" title="游戏模式">🎮 ${info.mode}</span>
+        <span class="stat-badge map-badge" title="地图">🗺️ ${info.map}</span>
+        <span class="stat-badge players-badge" title="在线人数">👥 ${info.players}/${info.max_players}</span>
+      </div>
+    `;
+  } catch (err) {
+    console.error('获取服务器信息失败:', err);
+    if (document.body.contains(detailsContainer)) {
+        detailsContainer.innerHTML = `<span class="error-text">获取失败</span>`;
+    }
+  }
 }
 
 function addServer() {
-  const nameInput = document.getElementById('server-name-input');
-  const addressInput = document.getElementById('server-address-input');
-  
-  const name = nameInput.value.trim();
-  const address = addressInput.value.trim();
+  console.log('addServer called');
+  try {
+    const nameInput = document.getElementById('server-name-input');
+    const addressInput = document.getElementById('server-address-input');
+    
+    if (!nameInput || !addressInput) {
+        console.error('Input elements not found');
+        return;
+    }
+    
+    const name = nameInput.value.trim();
+    const address = addressInput.value.trim();
 
-  if (!name || !address) {
-    alert('请输入服务器名称和地址');
-    return;
+    if (!name || !address) {
+      showError('请输入服务器名称和地址');
+      return;
+    }
+
+    const servers = getServers();
+    servers.push({ name, address });
+    saveServers(servers);
+    
+    nameInput.value = '';
+    addressInput.value = '';
+    
+    // 仅添加新服务器到列表，而不是重新渲染所有
+    const list = document.getElementById('server-list');
+    const index = servers.length - 1;
+    const server = servers[index];
+    const apiKey = getSteamApiKey();
+    
+    const li = createServerListItem(server, index, apiKey);
+    list.appendChild(li);
+    
+    // 如果有API Key，获取新服务器的信息
+    if (apiKey) {
+        fetchServerInfo(server.address, index);
+    }
+
+    showNotification('服务器添加成功', 'success');
+  } catch (e) {
+    console.error('添加服务器失败:', e);
+    showError('添加服务器失败: ' + e.message);
   }
-
-  const servers = getServers();
-  servers.push({ name, address });
-  saveServers(servers);
-  
-  nameInput.value = '';
-  addressInput.value = '';
-  
-  renderServers();
 }
 
 function deleteServer(index) {
-  showConfirmModal('删除服务器', '确定要删除这个服务器吗？', () => {
-    const servers = getServers();
-    servers.splice(index, 1);
-    saveServers(servers);
-    renderServers();
+  console.log('deleteServer called with index:', index);
+  const servers = getServers();
+  const server = servers[index];
+  
+  if (!server) {
+    console.error('Server not found at index:', index);
+    showError('无法找到要删除的服务器');
+    return;
+  }
+
+  showConfirmModal('删除服务器', `确定要删除服务器 "${server.name}" 吗？`, () => {
+    console.log('Confirm callback executed for index:', index);
+    const currentServers = getServers();
+    // 确保 index 是数字
+    const idx = parseInt(index);
+    
+    if (!isNaN(idx) && idx >= 0 && idx < currentServers.length) {
+        currentServers.splice(idx, 1);
+        saveServers(currentServers);
+        
+        // 直接从DOM中移除元素，而不是重新渲染整个列表
+        const list = document.getElementById('server-list');
+        const itemToRemove = list.children[idx];
+        if (itemToRemove) {
+            list.removeChild(itemToRemove);
+            
+            // 更新剩余项的索引
+            Array.from(list.children).forEach((li, newIndex) => {
+                // 更新更多按钮的索引
+                const moreBtn = li.querySelector('.server-more-btn');
+                if (moreBtn) moreBtn.dataset.index = newIndex;
+                
+                // 更新详情容器ID (如果需要的话，虽然不更新也不影响显示，但为了保持一致性)
+                const details = li.querySelector('.server-details');
+                if (details) details.id = `server-details-${newIndex}`;
+                
+                // 更新名称ID
+                const nameEl = li.querySelector('.server-name');
+                if (nameEl) nameEl.id = `server-name-${newIndex}`;
+            });
+        } else {
+            // 如果DOM操作失败，回退到重新渲染（但不自动刷新信息）
+            renderServers(false);
+        }
+        
+        showNotification('服务器已删除', 'success');
+    } else {
+        console.error('Invalid index in callback:', idx);
+        showError('删除失败：索引无效');
+    }
   });
 }
 

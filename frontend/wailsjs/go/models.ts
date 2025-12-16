@@ -36,6 +36,28 @@ export namespace main {
 	        this.created_at = source["created_at"];
 	    }
 	}
+	export class ServerInfo {
+	    name: string;
+	    map: string;
+	    players: number;
+	    max_players: number;
+	    gamedir: string;
+	    mode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.map = source["map"];
+	        this.players = source["players"];
+	        this.max_players = source["max_players"];
+	        this.gamedir = source["gamedir"];
+	        this.mode = source["mode"];
+	    }
+	}
 	export class WorkshopFileDetails {
 	    result: number;
 	    publishedfileid: string;

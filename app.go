@@ -17,6 +17,10 @@ import (
 
 	"vpk-manager/parser"
 
+	"encoding/json"
+	"net/http"
+	"net/url"
+
 	"github.com/hymkor/trash-go"
 	"github.com/panjf2000/ants/v2"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -24,6 +28,31 @@ import (
 
 // VPKFile 类型别名,用于Wails绑定
 type VPKFile = parser.VPKFile
+
+// ServerInfo 服务器信息
+type ServerInfo struct {
+	Name       string `json:"name"`
+	Map        string `json:"map"`
+	Players    int    `json:"players"`
+	MaxPlayers int    `json:"max_players"`
+	GameDir    string `json:"gamedir"`
+	Mode       string `json:"mode"`
+}
+
+// SteamServerResponse Steam API 响应结构
+type SteamServerResponse struct {
+	Response struct {
+		Servers []struct {
+			Addr       string `json:"addr"`
+			Name       string `json:"name"`
+			Players    int    `json:"players"`
+			MaxPlayers int    `json:"max_players"`
+			Map        string `json:"map"`
+			GameDir    string `json:"gamedir"`
+			Gametype   string `json:"gametype"`
+		} `json:"servers"`
+	} `json:"response"`
+}
 
 // ProgressInfo 加载进度信息
 type ProgressInfo struct {
@@ -55,6 +84,7 @@ type App struct {
 	rootDir       string
 	goroutinePool *ants.Pool
 	forceClose    bool
+	httpClient    *http.Client
 }
 
 // NewApp creates a new App application struct
@@ -62,6 +92,17 @@ func NewApp() *App {
 	pool, _ := ants.NewPool(rt.GOMAXPROCS(0)) // 创建协程池
 	return &App{
 		goroutinePool: pool,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second, // 设置10秒超时
+			Transport: &http.Transport{
+				Proxy:                 http.ProxyFromEnvironment,
+				ForceAttemptHTTP2:     true,
+				MaxIdleConns:          100,
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
 	}
 }
 
@@ -761,6 +802,169 @@ func (a *App) HandleFileDrop(paths []string) {
 		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "success", "message": msg})
 	} else if failCount > 0 {
 		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "error", "message": fmt.Sprintf("处理失败 %d 个文件", failCount)})
+	}
+}
+
+// FetchServerInfo 获取服务器详细信息
+func (a *App) FetchServerInfo(address string, apiKey string) (*ServerInfo, error) {
+	if apiKey == "" {
+		return nil, fmt.Errorf("API Key为空")
+	}
+
+	baseURL := "https://api.steampowered.com/IGameServersService/GetServerList/v1/"
+	params := url.Values{}
+	params.Add("key", apiKey)
+	params.Add("filter", fmt.Sprintf("\\addr\\%s", address))
+
+	resp, err := a.httpClient.Get(baseURL + "?" + params.Encode())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("steam API返回错误状态: %d", resp.StatusCode)
+	}
+
+	var steamResp SteamServerResponse
+	if err := json.NewDecoder(resp.Body).Decode(&steamResp); err != nil {
+		return nil, err
+	}
+
+	if len(steamResp.Response.Servers) == 0 {
+		return nil, fmt.Errorf("未找到服务器信息")
+	}
+
+	server := steamResp.Response.Servers[0]
+
+	// 解析游戏模式
+	mode := parseGameMode(server.Gametype)
+
+	return &ServerInfo{
+		Name:       server.Name,
+		Map:        server.Map,
+		Players:    server.Players,
+		MaxPlayers: server.MaxPlayers,
+		GameDir:    server.GameDir,
+		Mode:       mode,
+	}, nil
+}
+
+func parseGameMode(gametypeStr string) string {
+	gametypeStr = strings.ToLower(gametypeStr)
+	tags := strings.Split(gametypeStr, ",")
+	var modeTag string
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, "m:") {
+			modeTag = strings.TrimPrefix(tag, "m:")
+			break
+		}
+	}
+
+	// 如果没有找到 m: 标签，尝试使用启发式匹配
+	if modeTag == "" {
+		if strings.Contains(gametypeStr, "realismversus") {
+			return "写实对抗"
+		}
+		if strings.Contains(gametypeStr, "coop") {
+			return "战役"
+		}
+		if strings.Contains(gametypeStr, "versus") {
+			return "对抗"
+		}
+		if strings.Contains(gametypeStr, "realism") {
+			return "写实"
+		}
+		if strings.Contains(gametypeStr, "survival") {
+			return "生存"
+		}
+		if strings.Contains(gametypeStr, "scavenge") {
+			return "清道夫"
+		}
+		if strings.Contains(gametypeStr, "mutation") {
+			return "突变"
+		}
+		return "未知模式"
+	}
+
+	// 映射常见的模式名称
+	switch modeTag {
+	case "coop":
+		return "战役"
+	case "versus":
+		return "对抗"
+	case "realism":
+		return "写实"
+	case "survival":
+		return "生存"
+	case "scavenge":
+		return "清道夫"
+	case "realismversus":
+		return "写实对抗"
+	case "teamversus":
+		return "对抗"
+	case "teamscavenge":
+		return "清道夫"
+	case "dash":
+		return "生存跑酷 (Dash)"
+	case "holdout":
+		return "死守 (Holdout)"
+	case "shootzones":
+		return "射击禁区 (Shootzones)"
+	// 突变模式映射
+	case "mutation1":
+		return "吉布节 (Gib Fest)"
+	case "mutation2":
+		return "大流血 (Bleed Out)"
+	case "mutation3":
+		return "血流不止"
+	case "mutation4":
+		return "绝境求生"
+	case "mutation5":
+		return "四剑客 (Four Swordsmen)"
+	case "mutation6":
+		return "铁人 (Iron Man)"
+	case "mutation7":
+		return "最后一人 (Last Man on Earth)"
+	case "mutation8":
+		return "链锯惊魂 (Chainsaw Massacre)"
+	case "mutation9":
+		return "房间清理 (Room for One)"
+	case "mutation10":
+		return "猎头者 (Headshot!)"
+	case "mutation11":
+		return "对抗生存 (Versus Survival)"
+	case "mutation12":
+		return "写实对抗 (Realism Versus)"
+	case "mutation13":
+		return "跟随 (Follow the Liter)"
+	case "mutation14":
+		return "猎人包围 (Hunting Party)"
+	case "mutation15":
+		return "孤胆枪手 (Lone Gunman)"
+	case "mutation16":
+		return "特感速递 (Special Delivery)"
+	case "mutation17":
+		return "流感季节 (Flu Season)"
+	case "mutation18":
+		return "骑师派对 (Riding My Survivor)"
+	case "mutation19":
+		return "噩梦 (Nightmare)"
+	case "mutation20":
+		return "死亡之门"
+	default:
+		// 如果是社区突变或其他未映射的模式
+		if strings.HasPrefix(modeTag, "mutation") {
+			return fmt.Sprintf("突变 (%s)", modeTag)
+		}
+		if strings.HasPrefix(modeTag, "community") {
+			return fmt.Sprintf("社区突变 (%s)", modeTag)
+		}
+		// 首字母大写
+		if len(modeTag) > 0 {
+			return strings.ToUpper(modeTag[:1]) + modeTag[1:]
+		}
+		return modeTag
 	}
 }
 

@@ -2182,8 +2182,18 @@ body {
 }
 
 .server-list-container {
-  max-height: 400px;
+  /* max-height: 400px; */
+  /* overflow-y: auto; */
+  flex: 1;
   overflow-y: auto;
+  min-height: 200px;
+}
+
+.server-modal-content .modal-body {
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+    overflow: hidden;
 }
 
 .server-list {
@@ -2210,22 +2220,125 @@ body {
 .server-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  margin-right: 10px;
 }
 
 .server-name {
   font-weight: 600;
-  color: var(--gray-800);
+  font-size: 1.1em;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
 }
 
 .server-address {
-  font-size: 0.85em;
-  color: var(--gray-500);
+  font-size: 0.8em;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.server-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.real-server-name {
+  color: var(--text-tertiary);
+  font-size: 0.95em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.server-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-light);
 }
 
 .server-actions {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.api-key-section {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-light);
+}
+
+.api-key-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.api-key-header h3 {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.api-key-content {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.api-key-content .form-input {
+  flex: 1;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  transition: all var(--duration-200) var(--ease-out);
+  height: 2.5rem;
+}
+
+.api-key-content .form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.refresh-btn {
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-light);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  background: var(--bg-hover);
+  color: var(--primary);
+  transform: rotate(180deg);
 }
 
 .server-more-btn {
@@ -2273,4 +2386,65 @@ body {
 /* 提高确认对话框的层级，使其在其他模态框之上 */
 #confirm-modal {
   z-index: 1100; /* 比默认模态框层级(1050)高 */
+}
+
+/* Server List Styles */
+.server-stats-grid {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+
+.mode-badge {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--primary);
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
+.map-badge {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--accent);
+  border-color: rgba(6, 182, 212, 0.2);
+}
+
+.players-badge {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.name-badge {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-secondary);
+  border-color: rgba(107, 114, 128, 0.2);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 0.9em;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }

@@ -337,11 +337,30 @@
               <input type="text" id="server-name-input" placeholder="服务器名称" class="form-input">
               <input type="text" id="server-address-input" placeholder="服务器地址 (IP:Port)" class="form-input">
               <button id="add-server-btn" class="btn btn-success">添加</button>
+              <button id="refresh-all-servers-btn" class="btn btn-outline hidden" title="刷新所有服务器">
+                  <span class="icon">↻</span> 刷新
+              </button>
             </div>
             <div class="server-list-container">
               <ul id="server-list" class="server-list">
                 <!-- 动态生成服务器列表 -->
               </ul>
+            </div>
+            
+            <div class="api-key-section">
+              <div class="api-key-header" id="toggle-api-key-btn">
+                <h3>Steam API 设置 (可选)</h3>
+                <span class="icon">▼</span>
+              </div>
+              <div id="api-key-container" class="api-key-content hidden">
+                <div style="display: flex; gap: 8px; width: 100%; align-items: center;">
+                    <input type="password" id="steam-api-key-input" placeholder="输入 Steam Web API Key (留空可清除)" class="form-input" style="flex: 1;">
+                    <button id="save-api-key-btn" class="btn btn-primary">保存</button>
+                    <button id="get-api-key-btn" class="btn btn-outline" title="获取 API Key">
+                        <span class="icon">🔑</span> 获取
+                    </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

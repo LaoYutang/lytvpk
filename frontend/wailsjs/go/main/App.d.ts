@@ -15,6 +15,8 @@ export function DeleteVPKFiles(arg1:Array<string>):Promise<void>;
 
 export function ExtractVPKFromZip(arg1:string,arg2:string):Promise<void>;
 
+export function FetchServerInfo(arg1:string,arg2:string):Promise<main.ServerInfo>;
+
 export function ForceExit():Promise<void>;
 
 export function GetDownloadTasks():Promise<Array<main.DownloadTask>>;
