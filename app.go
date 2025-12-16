@@ -562,6 +562,13 @@ func (a *App) LaunchL4D2() error {
 	return nil
 }
 
+// ConnectToServer 连接到指定服务器
+func (a *App) ConnectToServer(address string) error {
+	steamURL := fmt.Sprintf("steam://connect/%s", address)
+	runtime.BrowserOpenURL(a.ctx, steamURL)
+	return nil
+}
+
 // OpenFileLocation 打开文件所在位置
 func (a *App) OpenFileLocation(filePath string) error {
 	if filePath == "" {

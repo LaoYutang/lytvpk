@@ -43,6 +43,12 @@
               </svg>
               <span>下载</span>
             </button>
+            <button id="server-favorites-btn" class="btn btn-primary" title="收藏服务器">
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+              <span>收藏服务器</span>
+            </button>
             <button id="info-btn" class="btn-icon" title="关于">
               <span class="icon">🛈</span>
             </button>
@@ -317,6 +323,35 @@
             <button id="confirm-ok-btn" class="btn btn-primary">确定</button>
           </div>
         </div>
+      </div>
+
+      <!-- 服务器收藏对话框 -->
+      <div id="server-modal" class="modal hidden">
+        <div class="modal-content server-modal-content">
+          <div class="modal-header">
+            <h2>服务器收藏</h2>
+            <button id="close-server-modal-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="server-add-form">
+              <input type="text" id="server-name-input" placeholder="服务器名称" class="form-input">
+              <input type="text" id="server-address-input" placeholder="服务器地址 (IP:Port)" class="form-input">
+              <button id="add-server-btn" class="btn btn-success">添加</button>
+            </div>
+            <div class="server-list-container">
+              <ul id="server-list" class="server-list">
+                <!-- 动态生成服务器列表 -->
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 全局下拉菜单 -->
+      <div id="global-dropdown" class="dropdown-content fixed-dropdown hidden">
+        <button id="global-delete-server-btn" class="dropdown-item danger">
+          <span class="icon">🗑️</span> 删除
+        </button>
       </div>
 
       <!-- 退出确认对话框 -->

@@ -25,6 +25,7 @@ import {
   DeleteVPKFile,
   DeleteVPKFiles,
   HandleFileDrop,
+  ConnectToServer,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn, OnFileDrop } from '../wailsjs/runtime/runtime';
@@ -96,6 +97,11 @@ function setupEventListeners() {
 
   // 重置筛选按钮
   document.getElementById('reset-filter-btn').addEventListener('click', resetFilters);
+
+  // 服务器收藏按钮
+  document.getElementById('server-favorites-btn').addEventListener('click', openServerModal);
+  
+  setupServerModalListeners();
 
   // 启动L4D2按钮
   document.getElementById('launch-l4d2-btn').addEventListener('click', launchL4D2);
@@ -2259,4 +2265,167 @@ function handleDroppedPaths(paths) {
         console.error("HandleFileDrop function not found");
         showError("请重新构建应用以启用拖拽功能");
     }
+}
+
+// --- 服务器收藏功能 ---
+
+const SERVER_CONFIG_KEY = 'vpk-manager-servers';
+
+function getServers() {
+  const servers = localStorage.getItem(SERVER_CONFIG_KEY);
+  return servers ? JSON.parse(servers) : [];
+}
+
+function saveServers(servers) {
+  localStorage.setItem(SERVER_CONFIG_KEY, JSON.stringify(servers));
+}
+
+function setupServerModalListeners() {
+  document.getElementById('close-server-modal-btn').addEventListener('click', closeServerModal);
+  document.getElementById('add-server-btn').addEventListener('click', addServer);
+  
+  // 全局删除按钮事件
+  document.getElementById('global-delete-server-btn').addEventListener('click', (e) => {
+    const dropdown = document.getElementById('global-dropdown');
+    const index = parseInt(dropdown.dataset.index);
+    if (!isNaN(index)) {
+      deleteServer(index);
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  // 点击模态框外部关闭
+  window.addEventListener('click', (event) => {
+    const modal = document.getElementById('server-modal');
+    if (event.target === modal) {
+      closeServerModal();
+    }
+    
+    // 点击任意位置关闭全局下拉菜单
+    if (!event.target.closest('.server-more-btn') && !event.target.closest('#global-dropdown')) {
+      document.getElementById('global-dropdown').classList.add('hidden');
+    }
+  });
+  
+  // 滚动时关闭下拉菜单
+  window.addEventListener('scroll', () => {
+      document.getElementById('global-dropdown').classList.add('hidden');
+  }, true);
+}
+
+function openServerModal() {
+  const modal = document.getElementById('server-modal');
+  modal.classList.remove('hidden');
+  renderServers();
+}
+
+function closeServerModal() {
+  const modal = document.getElementById('server-modal');
+  modal.classList.add('hidden');
+}
+
+function renderServers() {
+  const servers = getServers();
+  const list = document.getElementById('server-list');
+  list.innerHTML = '';
+
+  servers.forEach((server, index) => {
+    const li = document.createElement('li');
+    li.className = 'server-item';
+    li.innerHTML = `
+      <div class="server-info">
+        <span class="server-name">${server.name}</span>
+        <span class="server-address">${server.address}</span>
+      </div>
+      <div class="server-actions">
+        <button class="btn btn-small btn-success connect-server-btn" data-address="${server.address}">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 1em; height: 1em; margin-right: 4px;">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          连接
+        </button>
+        <button class="btn btn-small btn-outline server-more-btn" title="更多操作" data-index="${index}">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="12" cy="5" r="1"></circle>
+                <circle cx="12" cy="19" r="1"></circle>
+            </svg>
+        </button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+
+  // 添加事件监听
+  document.querySelectorAll('.connect-server-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const target = e.target.closest('.connect-server-btn');
+      const address = target.dataset.address;
+      connectServer(address);
+    });
+  });
+
+  // 更多按钮点击事件
+  document.querySelectorAll('.server-more-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const index = btn.dataset.index;
+          const dropdown = document.getElementById('global-dropdown');
+          
+          // 如果已经显示且是同一个按钮触发的，则隐藏
+          if (!dropdown.classList.contains('hidden') && dropdown.dataset.index === index) {
+              dropdown.classList.add('hidden');
+              return;
+          }
+
+          // 计算位置
+          const rect = btn.getBoundingClientRect();
+          dropdown.style.top = `${rect.bottom + 5}px`;
+          dropdown.style.left = `${rect.right - 100}px`; // 假设宽度约100px，右对齐
+          
+          // 存储当前操作的索引
+          dropdown.dataset.index = index;
+          dropdown.classList.remove('hidden');
+      });
+  });
+}
+
+function addServer() {
+  const nameInput = document.getElementById('server-name-input');
+  const addressInput = document.getElementById('server-address-input');
+  
+  const name = nameInput.value.trim();
+  const address = addressInput.value.trim();
+
+  if (!name || !address) {
+    alert('请输入服务器名称和地址');
+    return;
+  }
+
+  const servers = getServers();
+  servers.push({ name, address });
+  saveServers(servers);
+  
+  nameInput.value = '';
+  addressInput.value = '';
+  
+  renderServers();
+}
+
+function deleteServer(index) {
+  showConfirmModal('删除服务器', '确定要删除这个服务器吗？', () => {
+    const servers = getServers();
+    servers.splice(index, 1);
+    saveServers(servers);
+    renderServers();
+  });
+}
+
+function connectServer(address) {
+  ConnectToServer(address).then(() => {
+    // 可以添加一些提示，比如“正在启动...”
+  }).catch(err => {
+    console.error('连接服务器失败:', err);
+    alert('连接服务器失败: ' + err);
+  });
 }

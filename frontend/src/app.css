@@ -528,6 +528,11 @@ body {
   height: 1.125rem;
 }
 
+#server-favorites-btn .icon-svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 .icon {
   display: inline-flex;
   width: 1.25rem;
@@ -2140,4 +2145,132 @@ body {
 
 .dropdown-item .btn-icon {
   font-size: 1.1em;
+}
+
+/* Server Modal Styles */
+.server-modal-content {
+  width: 600px;
+  max-width: 90%;
+}
+
+.server-add-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-light);
+  align-items: center;
+}
+
+.server-add-form .form-input {
+  flex: 1;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  transition: all var(--duration-200) var(--ease-out);
+  height: 2.5rem;
+}
+
+.server-add-form .form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.server-list-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.server-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.server-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background-color: var(--bg-card);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  transition: background-color 0.2s;
+}
+
+.server-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.server-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.server-name {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.server-address {
+  font-size: 0.85em;
+  color: var(--gray-500);
+}
+
+.server-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.server-more-btn {
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+}
+
+.server-more-btn .icon-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.fixed-dropdown {
+  position: fixed;
+  z-index: 9999;
+  background-color: var(--bg-app);
+  min-width: 100px;
+  width: 120px; /* 限制宽度 */
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item.danger {
+  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.dropdown-item.danger:hover {
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4) !important;
+}
+
+/* 提高确认对话框的层级，使其在其他模态框之上 */
+#confirm-modal {
+  z-index: 1100; /* 比默认模态框层级(1050)高 */
 }
