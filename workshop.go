@@ -491,19 +491,20 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, url s
 		return
 	}
 
-	// 如果是直连下载且是ZIP文件，自动解压
-	if strings.HasPrefix(task.WorkshopID, "direct-") && strings.HasSuffix(strings.ToLower(targetPath), ".zip") {
+	// 如果是直连下载且是压缩文件，自动解压
+	ext := strings.ToLower(filepath.Ext(targetPath))
+	if strings.HasPrefix(task.WorkshopID, "direct-") && (ext == ".zip" || ext == ".rar" || ext == ".7z") {
 		updateStatus("downloading", "正在解压...")
-		err := a.ExtractVPKFromZip(targetPath, a.rootDir)
+		err := a.ExtractVPKFromArchive(targetPath, a.rootDir)
 		if err != nil {
 			// 解压失败不影响下载成功的状态，但记录错误
-			fmt.Printf("解压ZIP失败: %v\n", err)
+			fmt.Printf("解压压缩包失败: %v\n", err)
 		} else {
-			// 解压成功，删除ZIP文件
+			// 解压成功，删除压缩文件
 			if err := os.Remove(targetPath); err != nil {
-				fmt.Printf("删除ZIP文件失败: %v\n", err)
+				fmt.Printf("删除压缩文件失败: %v\n", err)
 			} else {
-				fmt.Printf("已删除ZIP文件: %s\n", targetPath)
+				fmt.Printf("已删除压缩文件: %s\n", targetPath)
 			}
 		}
 	}

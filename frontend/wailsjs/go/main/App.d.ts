@@ -15,6 +15,12 @@ export function DeleteVPKFiles(arg1:Array<string>):Promise<void>;
 
 export function ExportServersToFile(arg1:string):Promise<string>;
 
+export function ExtractVPKFrom7z(arg1:string,arg2:string):Promise<void>;
+
+export function ExtractVPKFromArchive(arg1:string,arg2:string):Promise<void>;
+
+export function ExtractVPKFromRar(arg1:string,arg2:string):Promise<void>;
+
 export function ExtractVPKFromZip(arg1:string,arg2:string):Promise<void>;
 
 export function FetchServerInfo(arg1:string,arg2:string):Promise<main.ServerInfo>;

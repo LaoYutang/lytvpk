@@ -21,13 +21,17 @@ import (
 
 	"bytes"
 
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 	"net/http"
 	"net/url"
 
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
+
 	"github.com/hymkor/trash-go"
 	"github.com/panjf2000/ants/v2"
+
+	"github.com/bodgit/sevenzip"
+	"github.com/nwaples/rardecode"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -775,6 +779,126 @@ func (a *App) ExtractVPKFromZip(zipPath string, destDir string) error {
 	return nil
 }
 
+// ExtractVPKFromRar 从RAR文件中解压所有VPK文件到指定目录
+func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
+	f, err := os.Open(rarPath)
+	if err != nil {
+		return fmt.Errorf("无法打开RAR文件: %v", err)
+	}
+	defer f.Close()
+
+	r, err := rardecode.NewReader(f, "")
+	if err != nil {
+		return fmt.Errorf("无法创建RAR读取器: %v", err)
+	}
+
+	extractedCount := 0
+	for {
+		header, err := r.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("读取RAR内容失败: %v", err)
+		}
+
+		if header.IsDir {
+			continue
+		}
+
+		filename := header.Name
+		if strings.HasSuffix(strings.ToLower(filename), ".vpk") {
+			targetPath := filepath.Join(destDir, filepath.Base(filename))
+
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				log.Printf("无法创建目标文件 %s: %v", targetPath, err)
+				continue
+			}
+
+			_, err = io.Copy(outFile, r)
+			outFile.Close()
+
+			if err != nil {
+				log.Printf("解压文件 %s 失败: %v", filename, err)
+				os.Remove(targetPath)
+				continue
+			}
+
+			extractedCount++
+			log.Printf("已解压: %s -> %s", filename, targetPath)
+		}
+	}
+
+	if extractedCount == 0 {
+		return fmt.Errorf("RAR文件中未找到VPK文件")
+	}
+	return nil
+}
+
+// ExtractVPKFrom7z 从7z文件中解压所有VPK文件到指定目录
+func (a *App) ExtractVPKFrom7z(sevenZPath string, destDir string) error {
+	r, err := sevenzip.OpenReader(sevenZPath)
+	if err != nil {
+		return fmt.Errorf("无法打开7z文件: %v", err)
+	}
+	defer r.Close()
+
+	extractedCount := 0
+	for _, f := range r.File {
+		filename := f.Name
+		if strings.HasSuffix(strings.ToLower(filename), ".vpk") {
+			targetPath := filepath.Join(destDir, filepath.Base(filename))
+
+			rc, err := f.Open()
+			if err != nil {
+				log.Printf("无法打开7z中的文件 %s: %v", filename, err)
+				continue
+			}
+
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				rc.Close()
+				log.Printf("无法创建目标文件 %s: %v", targetPath, err)
+				continue
+			}
+
+			_, err = io.Copy(outFile, rc)
+			outFile.Close()
+			rc.Close()
+
+			if err != nil {
+				log.Printf("解压文件 %s 失败: %v", filename, err)
+				os.Remove(targetPath)
+				continue
+			}
+
+			extractedCount++
+			log.Printf("已解压: %s -> %s", filename, targetPath)
+		}
+	}
+
+	if extractedCount == 0 {
+		return fmt.Errorf("7z文件中未找到VPK文件")
+	}
+	return nil
+}
+
+// ExtractVPKFromArchive 根据文件扩展名自动选择解压方式
+func (a *App) ExtractVPKFromArchive(archivePath string, destDir string) error {
+	ext := strings.ToLower(filepath.Ext(archivePath))
+	switch ext {
+	case ".zip":
+		return a.ExtractVPKFromZip(archivePath, destDir)
+	case ".rar":
+		return a.ExtractVPKFromRar(archivePath, destDir)
+	case ".7z":
+		return a.ExtractVPKFrom7z(archivePath, destDir)
+	default:
+		return fmt.Errorf("不支持的压缩格式: %s", ext)
+	}
+}
+
 // HandleFileDrop 处理文件拖拽
 func (a *App) HandleFileDrop(paths []string) {
 	if a.rootDir == "" {
@@ -796,15 +920,18 @@ func (a *App) HandleFileDrop(paths []string) {
 			} else {
 				successCount++
 			}
-		} else if strings.HasSuffix(lowerPath, ".zip") {
-			// Extract ZIP to rootDir
-			err := a.ExtractVPKFromZip(path, a.rootDir)
+		} else if strings.HasSuffix(lowerPath, ".zip") || strings.HasSuffix(lowerPath, ".rar") || strings.HasSuffix(lowerPath, ".7z") {
+			// Extract Archive to rootDir
+			err := a.ExtractVPKFromArchive(path, a.rootDir)
 			if err != nil {
-				a.LogError("解压ZIP失败", err.Error(), filepath.Base(path))
+				a.LogError("解压压缩包失败", err.Error(), filepath.Base(path))
 				failCount++
 			} else {
 				successCount++
 			}
+		} else {
+			a.LogError("不支持的文件格式", "仅支持 .vpk, .zip, .rar, .7z 文件", filepath.Base(path))
+			failCount++
 		}
 	}
 
@@ -817,8 +944,6 @@ func (a *App) HandleFileDrop(paths []string) {
 			msg += fmt.Sprintf("，失败 %d 个", failCount)
 		}
 		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "success", "message": msg})
-	} else if failCount > 0 {
-		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "error", "message": fmt.Sprintf("处理失败 %d 个文件", failCount)})
 	}
 }
 

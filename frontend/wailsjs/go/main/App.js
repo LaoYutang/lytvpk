@@ -26,6 +26,18 @@ export function ExportServersToFile(arg1) {
   return window['go']['main']['App']['ExportServersToFile'](arg1);
 }
 
+export function ExtractVPKFrom7z(arg1, arg2) {
+  return window['go']['main']['App']['ExtractVPKFrom7z'](arg1, arg2);
+}
+
+export function ExtractVPKFromArchive(arg1, arg2) {
+  return window['go']['main']['App']['ExtractVPKFromArchive'](arg1, arg2);
+}
+
+export function ExtractVPKFromRar(arg1, arg2) {
+  return window['go']['main']['App']['ExtractVPKFromRar'](arg1, arg2);
+}
+
 export function ExtractVPKFromZip(arg1, arg2) {
   return window['go']['main']['App']['ExtractVPKFromZip'](arg1, arg2);
 }
