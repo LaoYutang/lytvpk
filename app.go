@@ -17,18 +17,17 @@ import (
 
 	"vpk-manager/parser"
 
-	"encoding/json"
-
 	"bytes"
 
 	"net/http"
-	"net/url"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 
 	"github.com/hymkor/trash-go"
 	"github.com/panjf2000/ants/v2"
+
+	"github.com/go-resty/resty/v2"
 
 	"github.com/bodgit/sevenzip"
 	"github.com/nwaples/rardecode"
@@ -94,23 +93,37 @@ type App struct {
 	goroutinePool *ants.Pool
 	forceClose    bool
 	httpClient    *http.Client
+	restyClient   *resty.Client
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	pool, _ := ants.NewPool(rt.GOMAXPROCS(0)) // 创建协程池
+
+	// 共享的 Transport 配置，确保连接池复用
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// 初始化 Resty 客户端
+	client := resty.New()
+	client.SetTransport(transport) // 设置 Transport 以使用连接池
+	client.SetTimeout(10 * time.Second)
+	client.SetRetryCount(3)
+	client.SetRetryWaitTime(1 * time.Second)
+	client.SetRetryMaxWaitTime(5 * time.Second)
+
 	return &App{
 		goroutinePool: pool,
+		restyClient:   client,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second, // 设置10秒超时
-			Transport: &http.Transport{
-				Proxy:                 http.ProxyFromEnvironment,
-				ForceAttemptHTTP2:     true,
-				MaxIdleConns:          100,
-				IdleConnTimeout:       90 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			},
+			Timeout:   10 * time.Second,
+			Transport: transport,
 		},
 	}
 }
@@ -954,23 +967,21 @@ func (a *App) FetchServerInfo(address string, apiKey string) (*ServerInfo, error
 	}
 
 	baseURL := "https://api.steampowered.com/IGameServersService/GetServerList/v1/"
-	params := url.Values{}
-	params.Add("key", apiKey)
-	params.Add("filter", fmt.Sprintf("\\addr\\%s", address))
 
-	resp, err := a.httpClient.Get(baseURL + "?" + params.Encode())
+	var steamResp SteamServerResponse
+
+	resp, err := a.restyClient.R().
+		SetQueryParam("key", apiKey).
+		SetQueryParam("filter", fmt.Sprintf("\\addr\\%s", address)).
+		SetResult(&steamResp).
+		Get(baseURL)
+
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("steam API返回错误状态: %d", resp.StatusCode)
-	}
-
-	var steamResp SteamServerResponse
-	if err := json.NewDecoder(resp.Body).Decode(&steamResp); err != nil {
-		return nil, err
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("steam API返回错误状态: %d", resp.StatusCode())
 	}
 
 	if len(steamResp.Response.Servers) == 0 {
