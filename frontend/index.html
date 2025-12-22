@@ -374,12 +374,55 @@
 
       <!-- 全局下拉菜单 -->
       <div id="global-dropdown" class="dropdown-content fixed-dropdown hidden">
+        <button id="global-details-server-btn" class="dropdown-item">
+          <span class="icon">ℹ️</span> 详情
+        </button>
         <button id="global-edit-server-btn" class="dropdown-item">
           <span class="icon">✏️</span> 编辑
         </button>
         <button id="global-delete-server-btn" class="dropdown-item danger">
           <span class="icon">🗑️</span> 删除
         </button>
+      </div>
+
+      <!-- 服务器详情模态框 -->
+      <div id="server-details-modal" class="modal hidden" style="z-index: 1070;">
+        <div class="modal-content server-modal-content" style="max-width: 600px;">
+          <div class="modal-header">
+            <h2 id="details-server-name">服务器详情</h2>
+            <button id="close-server-details-modal-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div id="server-details-loading" class="loading-text" style="text-align: center; padding: 20px;">正在获取玩家信息...</div>
+            <div id="server-details-content" class="hidden">
+                <div class="server-info-summary">
+                    <div class="server-info-item">
+                        <span class="server-info-label">地图</span>
+                        <span class="server-info-value" id="details-map"></span>
+                    </div>
+                    <div class="server-info-item">
+                        <span class="server-info-label">玩家</span>
+                        <span class="server-info-value" id="details-players"></span>
+                    </div>
+                </div>
+                <h3 style="font-size: 1rem; margin-bottom: 10px; color: var(--text-secondary);">玩家列表</h3>
+                <div class="player-list-container" style="max-height: 300px; overflow-y: auto;">
+                    <table class="player-table">
+                        <thead>
+                            <tr>
+                                <th>名称</th>
+                                <th class="text-right">分数</th>
+                                <th class="text-right">时长</th>
+                            </tr>
+                        </thead>
+                        <tbody id="details-player-list">
+                            <!-- 动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 编辑/添加服务器模态框 -->

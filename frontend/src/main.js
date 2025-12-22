@@ -2391,6 +2391,27 @@ function setupServerModalListeners() {
       }
   });
 
+  // 详情按钮
+  document.getElementById('global-details-server-btn').addEventListener('click', () => {
+      const dropdown = document.getElementById('global-dropdown');
+      const index = parseInt(dropdown.dataset.index);
+      if (!isNaN(index)) {
+          openServerDetailsModal(index);
+          dropdown.classList.add('hidden');
+      }
+  });
+
+  document.getElementById('close-server-details-modal-btn').addEventListener('click', () => {
+      document.getElementById('server-details-modal').classList.add('hidden');
+  });
+  
+  // 点击详情模态框外部关闭
+  document.getElementById('server-details-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+          this.classList.add('hidden');
+      }
+  });
+
   // 数据管理折叠
   document.getElementById('toggle-data-mgmt-btn').addEventListener('click', () => {
     const container = document.getElementById('server-data-container');
@@ -2518,6 +2539,13 @@ function createServerListItem(server, index) {
         </button>
       </div>
     `;
+    
+    // 双击进入详情
+    li.addEventListener('dblclick', (e) => {
+        // 如果点击的是按钮，不触发详情
+        if (e.target.closest('button')) return;
+        openServerDetailsModal(index);
+    });
     
     // 绑定连接按钮事件
     const connectBtn = li.querySelector('.connect-server-btn');
@@ -2765,4 +2793,76 @@ function importServers(jsonStr) {
     console.error('导入失败:', e);
     showError('导入失败: ' + e.message);
   }
+}
+
+async function openServerDetailsModal(index) {
+    const servers = getServers();
+    const server = servers[index];
+    if (!server) return;
+
+    const modal = document.getElementById('server-details-modal');
+    const title = document.getElementById('details-server-name');
+    const loading = document.getElementById('server-details-loading');
+    const content = document.getElementById('server-details-content');
+    const mapEl = document.getElementById('details-map');
+    const playersEl = document.getElementById('details-players');
+    const listEl = document.getElementById('details-player-list');
+
+    title.textContent = server.name;
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+    modal.classList.remove('hidden');
+
+    try {
+        // Fetch basic info first
+        const info = await FetchServerInfo(server.address);
+        mapEl.textContent = info.map;
+        playersEl.textContent = `${info.players}/${info.max_players}`;
+
+        // Fetch players
+        // Using window.go.main.App.FetchPlayerList because it might not be imported yet
+        const players = await window.go.main.App.FetchPlayerList(server.address);
+        
+        listEl.innerHTML = '';
+        if (players && players.length > 0) {
+            // Sort by score desc
+            players.sort((a, b) => b.score - a.score);
+            
+            players.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="player-name">${escapeHtml(p.name)}</td>
+                    <td class="text-right">${p.score}</td>
+                    <td class="text-right">${formatDuration(p.duration)}</td>
+                `;
+                listEl.appendChild(tr);
+            });
+        } else {
+            listEl.innerHTML = '<tr><td colspan="3" class="empty-state">暂无玩家信息</td></tr>';
+        }
+        
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+
+    } catch (err) {
+        console.error(err);
+        loading.textContent = '获取失败: ' + err;
+    }
+}
+
+function formatDuration(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    
+    if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

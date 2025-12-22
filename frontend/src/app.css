@@ -2452,3 +2452,99 @@ body {
 .spinning {
   animation: spin 1s linear infinite;
 }
+
+/* 服务器详情模态框样式 */
+.server-info-summary {
+  display: flex;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  margin-bottom: var(--spacing-4);
+}
+
+.server-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.server-info-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.server-info-value {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.player-list-container {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-app);
+  box-shadow: var(--shadow-sm);
+}
+
+.player-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.player-table thead {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.player-table th {
+  padding: var(--spacing-3) var(--spacing-4);
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.player-table th.text-right {
+  text-align: right;
+}
+
+.player-table tbody tr {
+  border-bottom: 1px solid var(--border-light);
+  transition: background-color var(--duration-150);
+}
+
+.player-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.player-table tbody tr:hover {
+  background-color: var(--bg-hover);
+}
+
+.player-table td {
+  padding: var(--spacing-3) var(--spacing-4);
+  color: var(--text-primary);
+}
+
+.player-table td.text-right {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.player-name {
+  font-weight: 500;
+}
+
+.empty-state {
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-style: italic;
+}

@@ -36,6 +36,22 @@ export namespace main {
 	        this.created_at = source["created_at"];
 	    }
 	}
+	export class PlayerInfo {
+	    name: string;
+	    score: number;
+	    duration: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PlayerInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.score = source["score"];
+	        this.duration = source["duration"];
+	    }
+	}
 	export class ServerInfo {
 	    name: string;
 	    map: string;

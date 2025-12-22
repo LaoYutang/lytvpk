@@ -947,6 +947,130 @@ func (a *App) HandleFileDrop(paths []string) {
 }
 
 // queryA2S 使用 UDP 协议直接查询 Source 引擎服务器信息
+// PlayerInfo 玩家信息
+type PlayerInfo struct {
+	Name     string  `json:"name"`
+	Score    int32   `json:"score"`
+	Duration float32 `json:"duration"`
+}
+
+// FetchPlayerList 获取服务器玩家列表
+func (a *App) FetchPlayerList(address string) ([]PlayerInfo, error) {
+	return queryA2SPlayers(address)
+}
+
+// queryA2SPlayers 使用 UDP 协议查询服务器玩家列表
+func queryA2SPlayers(address string) ([]PlayerInfo, error) {
+	conn, err := net.DialTimeout("udp", address, 3*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
+
+	// A2S_PLAYER Request: FF FF FF FF 55 FF FF FF FF (Initial request with -1 challenge)
+	req := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF}
+	_, err = conn.Write(req)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := make([]byte, 65535)
+	n, err := conn.Read(resp)
+	if err != nil {
+		return nil, err
+	}
+	resp = resp[:n]
+
+	// Parse response header
+	if n < 5 || !bytes.Equal(resp[:4], []byte{0xFF, 0xFF, 0xFF, 0xFF}) {
+		return nil, fmt.Errorf("invalid response header")
+	}
+
+	// Handle Challenge (0x41 'A') - This is expected for A2S_PLAYER
+	if resp[4] == 0x41 {
+		if n < 9 {
+			return nil, fmt.Errorf("invalid challenge response length")
+		}
+		challenge := resp[5:9]
+
+		// Resend query with challenge
+		// Request: FF FF FF FF 55 <Challenge>
+		reqWithChallenge := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0x55}
+		reqWithChallenge = append(reqWithChallenge, challenge...)
+		_, err = conn.Write(reqWithChallenge)
+		if err != nil {
+			return nil, err
+		}
+
+		// Read response again
+		resp = make([]byte, 65535)
+		n, err = conn.Read(resp)
+		if err != nil {
+			return nil, err
+		}
+		resp = resp[:n]
+
+		// Check header again
+		if n < 5 || !bytes.Equal(resp[:4], []byte{0xFF, 0xFF, 0xFF, 0xFF}) {
+			return nil, fmt.Errorf("invalid response header after challenge")
+		}
+	}
+
+	if resp[4] != 0x44 { // 'D' for Players
+		return nil, fmt.Errorf("invalid response type: %x", resp[4])
+	}
+
+	reader := bytes.NewBuffer(resp[5:])
+
+	// Number of players
+	numPlayers, err := reader.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+
+	var players []PlayerInfo
+	for i := 0; i < int(numPlayers); i++ {
+		// Index
+		_, err := reader.ReadByte()
+		if err != nil {
+			break
+		}
+
+		// Name
+		name, err := reader.ReadString(0x00)
+		if err != nil {
+			break
+		}
+		name = name[:len(name)-1]
+
+		// Score
+		var score int32
+		err = binary.Read(reader, binary.LittleEndian, &score)
+		if err != nil {
+			break
+		}
+
+		// Duration
+		var duration float32
+		err = binary.Read(reader, binary.LittleEndian, &duration)
+		if err != nil {
+			break
+		}
+
+		if name != "" {
+			players = append(players, PlayerInfo{
+				Name:     name,
+				Score:    score,
+				Duration: duration,
+			})
+		}
+	}
+
+	return players, nil
+}
+
 func queryA2S(address string) (*ServerInfo, error) {
 	conn, err := net.DialTimeout("udp", address, 3*time.Second)
 	if err != nil {
