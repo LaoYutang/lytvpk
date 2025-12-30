@@ -28,6 +28,7 @@ import {
   ConnectToServer,
   FetchServerInfo,
   ExportServersToFile,
+  SelectFiles,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn, OnFileDrop, BrowserOpenURL } from '../wailsjs/runtime/runtime';
@@ -138,6 +139,10 @@ function setupEventListeners() {
 
   // 创意工坊按钮
   document.getElementById('workshop-btn').addEventListener('click', openWorkshopModal);
+  
+  // 上传按钮
+  document.getElementById('upload-btn').addEventListener('click', handleUpload);
+
   document.getElementById('close-workshop-modal-btn').addEventListener('click', closeWorkshopModal);
   document.getElementById('check-workshop-btn').addEventListener('click', checkWorkshopUrl);
   document.getElementById('download-url').addEventListener('input', (e) => {
@@ -579,6 +584,29 @@ async function selectDirectory() {
   } catch (error) {
     console.error('选择目录失败:', error);
     showError('设置目录失败: ' + error);
+  }
+}
+
+// 处理上传文件
+async function handleUpload() {
+  try {
+    const paths = await SelectFiles();
+    if (paths && paths.length > 0) {
+      updateLoadingMessage('正在处理选中的文件...');
+      showLoadingScreen();
+      try {
+        await HandleFileDrop(paths);
+        // HandleFileDrop 会触发 refresh_files 事件，但我们也可以等待一下确保 UI 更新
+        setTimeout(() => {
+            showMainScreen();
+        }, 1000);
+      } catch (err) {
+        showError("处理文件失败: " + err);
+        showMainScreen();
+      }
+    }
+  } catch (err) {
+    console.error("选择文件失败:", err);
   }
 }
 

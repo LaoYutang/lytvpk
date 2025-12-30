@@ -560,6 +560,35 @@ func (a *App) SelectDirectory() (string, error) {
 	return directory, nil
 }
 
+// SelectFiles 选择文件对话框 (支持多选)
+func (a *App) SelectFiles() ([]string, error) {
+	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择文件 (VPK, ZIP, RAR, 7Z)",
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "支持的文件 (*.vpk;*.zip;*.rar;*.7z)",
+				Pattern:     "*.vpk;*.zip;*.rar;*.7z",
+			},
+			{
+				DisplayName: "VPK 文件 (*.vpk)",
+				Pattern:     "*.vpk",
+			},
+			{
+				DisplayName: "压缩包 (*.zip;*.rar;*.7z)",
+				Pattern:     "*.zip;*.rar;*.7z",
+			},
+			{
+				DisplayName: "所有文件 (*.*)",
+				Pattern:     "*.*",
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
 // LogError 记录错误
 func (a *App) LogError(errorType, message, file string) {
 	errorInfo := ErrorInfo{

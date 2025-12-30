@@ -122,6 +122,10 @@ export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }
 
+export function SelectFiles() {
+  return window['go']['main']['App']['SelectFiles']();
+}
+
 export function SetRootDirectory(arg1) {
   return window['go']['main']['App']['SetRootDirectory'](arg1);
 }
