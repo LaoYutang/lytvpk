@@ -122,6 +122,17 @@ function setupEventListeners() {
   // 关于信息按钮
   document.getElementById('info-btn').addEventListener('click', showInfoModal);
 
+  // 处理关于页面的外部链接
+  document.querySelectorAll('.info-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = link.getAttribute('href');
+      if (url) {
+        BrowserOpenURL(url);
+      }
+    });
+  });
+
   // 阻止浏览器默认的拖拽行为（防止打开文件或下载）
   window.addEventListener('dragover', function(e) {
     e.preventDefault();
