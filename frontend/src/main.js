@@ -31,6 +31,7 @@ import {
   SelectFiles,
   CheckUpdate,
   DoUpdate,
+  GetMirrors,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn, OnFileDrop, BrowserOpenURL } from '../wailsjs/runtime/runtime';
@@ -3101,7 +3102,7 @@ async function manualCheckUpdate() {
 }
 
 // 显示更新弹窗
-function showUpdateModal(info) {
+async function showUpdateModal(info) {
     const modal = document.getElementById('update-modal');
     const newVer = document.getElementById('new-version-number');
     const curVer = document.getElementById('current-version-number');
@@ -3120,6 +3121,26 @@ function showUpdateModal(info) {
     curVer.textContent = info.current_ver;
     notes.textContent = info.release_note || '暂无更新日志';
     
+    // 加载镜像列表
+    try {
+        const mirrors = await GetMirrors();
+        mirrorSelect.innerHTML = '<option value="">GitHub 直连</option>';
+        if (mirrors && mirrors.length > 0) {
+            mirrors.forEach(mirror => {
+                const option = document.createElement('option');
+                option.value = mirror;
+                option.textContent = mirror;
+                mirrorSelect.appendChild(option);
+            });
+        }
+        const customOption = document.createElement('option');
+        customOption.value = 'custom';
+        customOption.textContent = '自定义镜像源...';
+        mirrorSelect.appendChild(customOption);
+    } catch (e) {
+        console.error("Failed to load mirrors:", e);
+    }
+
     // 重置状态
     mirrorSelect.value = "";
     customInput.classList.add('hidden');

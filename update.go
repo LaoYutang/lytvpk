@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -39,7 +38,15 @@ type GithubRelease struct {
 	} `json:"assets"`
 }
 
-// fetchLatestRelease 获取最新版本信息
+// MirrorList 镜像源列表 (与前端保持一致)
+var MirrorList = []string{
+	"https://edgeone.gh-proxy.com/",
+	"https://hk.gh-proxy.com/",
+	"https://gh-proxy.com/",
+	"https://gh.llkk.cc/",
+}
+
+// fetchLatestRelease 获取最新版本信息 (直连 API)
 func fetchLatestRelease(repo string) (*GithubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -49,7 +56,6 @@ func fetchLatestRelease(repo string) (*GithubRelease, error) {
 		return nil, err
 	}
 
-	// 必须设置 User-Agent，否则 GitHub API 会拒绝
 	req.Header.Set("User-Agent", "vpk-manager-updater")
 
 	resp, err := client.Do(req)
@@ -59,7 +65,7 @@ func fetchLatestRelease(repo string) (*GithubRelease, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned status: %s", resp.Status)
+		return nil, fmt.Errorf("status: %s", resp.Status)
 	}
 
 	var release GithubRelease
@@ -70,6 +76,33 @@ func fetchLatestRelease(repo string) (*GithubRelease, error) {
 	return &release, nil
 }
 
+// fetchLatestTagFromMirror 通过镜像获取最新 Tag (解析重定向)
+func fetchLatestTagFromMirror(repo, mirror string) (string, error) {
+	// 构造 URL: mirror + https://github.com/user/repo/releases/latest
+	target := fmt.Sprintf("%shttps://github.com/%s/releases/latest", mirror, repo)
+
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		// 默认会自动跟随重定向
+	}
+
+	resp, err := client.Get(target)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// 检查最终 URL
+	finalURL := resp.Request.URL.String()
+	// 预期格式: .../releases/tag/v1.0.0
+	parts := strings.Split(finalURL, "/tag/")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("无法从 URL 解析版本号: %s", finalURL)
+	}
+
+	return parts[len(parts)-1], nil
+}
+
 // CheckUpdate 检查更新
 func (a *App) CheckUpdate() UpdateInfo {
 	// 1. 解析当前版本
@@ -78,25 +111,66 @@ func (a *App) CheckUpdate() UpdateInfo {
 		return UpdateInfo{Error: "当前版本号格式错误: " + err.Error()}
 	}
 
-	// 2. 检测 GitHub 最新版本
-	release, err := fetchLatestRelease(GithubRepo)
-	if err != nil {
-		return UpdateInfo{Error: "检查更新失败: " + err.Error()}
+	var release *GithubRelease
+	var fetchErr error
+
+	// 2. 尝试直连 GitHub API
+	release, fetchErr = fetchLatestRelease(GithubRepo)
+
+	// 3. 如果直连失败，尝试遍历镜像源
+	if fetchErr != nil {
+		fmt.Printf("直连失败: %v，尝试使用镜像源...\n", fetchErr)
+
+		for _, mirror := range MirrorList {
+			tag, err := fetchLatestTagFromMirror(GithubRepo, mirror)
+			if err == nil && tag != "" {
+				fmt.Printf("通过镜像 %s 获取到版本: %s\n", mirror, tag)
+				// 构造一个伪造的 release 对象
+				release = &GithubRelease{
+					TagName: tag,
+					Body:    "由于网络原因，无法获取详细更新日志。\n(通过镜像源检测)",
+				}
+				// 构造下载地址 (假设文件名格式)
+				// LytVPK-MOD-Manager_v1.0.0_windows_amd64.zip
+				filename := fmt.Sprintf("LytVPK-MOD-Manager_%s_windows_amd64.zip", tag)
+				release.Assets = []struct {
+					BrowserDownloadURL string `json:"browser_download_url"`
+					Name               string `json:"name"`
+				}{
+					{
+						Name:               filename,
+						BrowserDownloadURL: fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", GithubRepo, tag, filename),
+					},
+				}
+				fetchErr = nil // 清除错误
+				break
+			} else {
+				fmt.Printf("镜像 %s 失败: %v\n", mirror, err)
+			}
+		}
 	}
 
-	// 3. 解析最新版本号
+	if fetchErr != nil {
+		return UpdateInfo{Error: "检查更新失败(所有源均不可用): " + fetchErr.Error()}
+	}
+
+	// 4. 解析最新版本号
 	vLatest, err := semver.ParseTolerant(release.TagName)
 	if err != nil {
 		return UpdateInfo{Error: "最新版本号格式错误: " + err.Error()}
 	}
 
-	// 4. 比较版本
+	// 5. 比较版本
 	if vLatest.GT(vCurrent) {
 		// 预先解析下载地址
 		var url string
-		suffix := fmt.Sprintf("%s_%s.zip", runtime.GOOS, runtime.GOARCH)
 
-		// 优先匹配精确架构
+		// 优先匹配精确架构 (兼容旧的命名方式和新的命名方式)
+		// 新: LytVPK-MOD-Manager_v1.0.0_windows_amd64.zip
+		// 旧: lytvpk_v1.0.0_windows_amd64.zip
+		// 通用匹配: windows_amd64.zip
+		suffix := "windows_amd64.zip"
+
 		for _, asset := range release.Assets {
 			if strings.HasSuffix(asset.Name, suffix) {
 				url = asset.BrowserDownloadURL
@@ -133,33 +207,26 @@ func (a *App) CheckUpdate() UpdateInfo {
 	}
 }
 
+// GetMirrors 获取镜像列表
+func (a *App) GetMirrors() []string {
+	return MirrorList
+}
+
 // DoUpdate 执行更新
 func (a *App) DoUpdate(mirror string) string {
 	downloadURL := pendingUpdateURL
 
 	// 如果缓存为空，尝试重新获取
 	if downloadURL == "" {
-		release, err := fetchLatestRelease(GithubRepo)
-		if err != nil {
-			return "更新检测失败: " + err.Error()
+		// 复用 CheckUpdate 的逻辑 (这里简化处理，直接调用 CheckUpdate)
+		info := a.CheckUpdate()
+		if info.Error != "" {
+			return "更新检测失败: " + info.Error
 		}
-
-		suffix := fmt.Sprintf("%s_%s.zip", runtime.GOOS, runtime.GOARCH)
-		for _, asset := range release.Assets {
-			if strings.HasSuffix(asset.Name, suffix) {
-				downloadURL = asset.BrowserDownloadURL
-				break
-			}
+		if !info.HasUpdate {
+			return "当前已是最新版本"
 		}
-
-		if downloadURL == "" {
-			for _, asset := range release.Assets {
-				if strings.HasSuffix(asset.Name, ".zip") {
-					downloadURL = asset.BrowserDownloadURL
-					break
-				}
-			}
-		}
+		downloadURL = info.DownloadURL
 	}
 
 	if downloadURL == "" {

@@ -66,6 +66,10 @@ export function GetDownloadTasks() {
   return window['go']['main']['App']['GetDownloadTasks']();
 }
 
+export function GetMirrors() {
+  return window['go']['main']['App']['GetMirrors']();
+}
+
 export function GetPrimaryTags() {
   return window['go']['main']['App']['GetPrimaryTags']();
 }

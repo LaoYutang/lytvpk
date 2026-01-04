@@ -35,6 +35,8 @@ export function ForceExit():Promise<void>;
 
 export function GetDownloadTasks():Promise<Array<main.DownloadTask>>;
 
+export function GetMirrors():Promise<Array<string>>;
+
 export function GetPrimaryTags():Promise<Array<string>>;
 
 export function GetRootDirectory():Promise<string>;
