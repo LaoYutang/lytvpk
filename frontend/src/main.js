@@ -795,13 +795,14 @@ async function loadFiles() {
 
     // 保存完整的文件列表和当前显示的列表
     appState.allVpkFiles = files;
-    appState.vpkFiles = [...files]; // 复制已排序的数组
+    // appState.vpkFiles 将由 performSearch 更新
     appState.primaryTags = primaryTags;
 
     // 更新UI
     await renderTagFilters();
-    renderFileList();
-    updateStatusBar();
+    
+    // 应用当前的筛选条件（包括隐藏文件过滤）
+    await performSearch();
 
     console.log('扫描完成，找到', files.length, '个文件');
   } catch (error) {
