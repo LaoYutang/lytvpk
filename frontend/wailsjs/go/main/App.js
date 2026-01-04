@@ -158,6 +158,10 @@ export function ToggleVPKFile(arg1) {
   return window['go']['main']['App']['ToggleVPKFile'](arg1);
 }
 
+export function ToggleVPKVisibility(arg1) {
+  return window['go']['main']['App']['ToggleVPKVisibility'](arg1);
+}
+
 export function ValidateDirectory(arg1) {
   return window['go']['main']['App']['ValidateDirectory'](arg1);
 }

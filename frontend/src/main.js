@@ -70,6 +70,7 @@ let appState = {
   selectedFiles: new Set(),
   currentDirectory: '',
   isLoading: false, // 是否正在加载中
+  showHidden: false, // 是否显示隐藏文件
 };
 
 // 初始化应用
@@ -95,12 +96,68 @@ function setupEventListeners() {
   // 搜索框
   document.getElementById('search-input').addEventListener('input', handleSearch);
 
+  // 显示隐藏文件复选框
+  const showHiddenCheckbox = document.getElementById('show-hidden-checkbox');
+  if (showHiddenCheckbox) {
+      showHiddenCheckbox.checked = appState.showHidden;
+      showHiddenCheckbox.addEventListener('change', (e) => {
+          appState.showHidden = e.target.checked;
+          performSearch();
+      });
+  }
+
   // 批量操作按钮
   document.getElementById('select-all-btn').addEventListener('click', selectAll);
   document.getElementById('deselect-all-btn').addEventListener('click', deselectAll);
   document.getElementById('enable-selected-btn').addEventListener('click', enableSelected);
   document.getElementById('disable-selected-btn').addEventListener('click', disableSelected);
-  document.getElementById('delete-selected-btn').addEventListener('click', deleteSelected);
+  
+  // 批量操作下拉菜单
+  const batchMoreBtn = document.getElementById('batch-more-btn');
+  if (batchMoreBtn) {
+      batchMoreBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          
+          // 关闭其他所有打开的下拉菜单
+          document.querySelectorAll('.dropdown-content').forEach(d => {
+            if (d.id !== 'batch-dropdown-content') {
+              d.classList.add('hidden');
+              const fileItem = d.closest('.file-item');
+              if (fileItem) fileItem.classList.remove('active-dropdown');
+            }
+          });
+
+          const dropdown = document.getElementById('batch-dropdown-content');
+          dropdown.classList.toggle('hidden');
+      });
+  }
+
+  // 批量操作下拉项点击后关闭菜单
+  const closeBatchDropdown = () => {
+      const dropdown = document.getElementById('batch-dropdown-content');
+      if (dropdown) dropdown.classList.add('hidden');
+  };
+
+  document.getElementById('delete-selected-btn').addEventListener('click', () => {
+      closeBatchDropdown();
+      deleteSelected();
+  });
+
+  // 批量隐藏/取消隐藏
+  const hideSelectedBtn = document.getElementById('hide-selected-btn');
+  if (hideSelectedBtn) {
+      hideSelectedBtn.addEventListener('click', () => {
+          closeBatchDropdown();
+          batchToggleVisibility(false);
+      });
+  }
+  const unhideSelectedBtn = document.getElementById('unhide-selected-btn');
+  if (unhideSelectedBtn) {
+      unhideSelectedBtn.addEventListener('click', () => {
+          closeBatchDropdown();
+          batchToggleVisibility(true);
+      });
+  }
 
   // 检查更新按钮
   const checkUpdateBtn = document.getElementById('check-update-btn');
@@ -264,7 +321,7 @@ function setupEventListeners() {
     }
 
     // 点击其他地方关闭所有下拉菜单
-    if (!e.target.closest('.more-actions-dropdown')) {
+    if (!e.target.closest('.more-actions-dropdown') && !e.target.closest('.batch-actions-dropdown-container')) {
       document.querySelectorAll('.dropdown-content').forEach(d => {
         d.classList.add('hidden');
         const fileItem = d.closest('.file-item');
@@ -306,6 +363,25 @@ function setupEventListeners() {
         });
 
         openFileLocation(filePath);
+      }
+    }
+
+    // 处理隐藏按钮点击
+    const hideBtn = e.target.closest('.hide-btn[data-action="hide"]');
+    if (hideBtn) {
+      const filePath = hideBtn.getAttribute('data-file-path');
+      if (filePath) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // 关闭下拉菜单
+        document.querySelectorAll('.dropdown-content').forEach(d => {
+          d.classList.add('hidden');
+          const fileItem = d.closest('.file-item');
+          if (fileItem) fileItem.classList.remove('active-dropdown');
+        });
+
+        toggleFileVisibility(filePath);
       }
     }
 
@@ -1213,6 +1289,11 @@ async function performSearch() {
       );
     }
 
+    // 应用隐藏文件过滤
+    if (!appState.showHidden) {
+        appState.vpkFiles = appState.vpkFiles.filter(file => !file.name.startsWith('_'));
+    }
+
     // 确保结果按名称排序，保持稳定顺序
     sortFilesByName(appState.vpkFiles);
 
@@ -1254,6 +1335,10 @@ function createFileItem(file) {
   const locationIcon = getLocationIcon(file.location);
   const displayTitle = file.title || file.name;
 
+  const isHidden = file.name.startsWith('_');
+  const hideBtnText = isHidden ? '取消隐藏' : '隐藏';
+  const hideBtnIcon = isHidden ? '👁️' : '👁️‍🗨️';
+
   item.innerHTML = `
         <div class="file-checkbox-container"></div>
         <div class="file-name" title="${file.path}">
@@ -1277,6 +1362,9 @@ function createFileItem(file) {
                     </svg>
                 </button>
                 <div class="dropdown-content hidden">
+                    <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
+                        <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+                    </button>
                     <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
                         <span class="btn-icon">📂</span> 位置
                     </button>
@@ -1731,6 +1819,76 @@ function showInfoModal() {
 // 关闭关于信息弹窗
 function closeInfoModal() {
   document.getElementById('info-modal').classList.add('hidden');
+}
+
+// 切换文件隐藏状态
+window.toggleFileVisibility = async function (filePath) {
+    try {
+        console.log('切换文件隐藏状态:', filePath);
+        await window.go.main.App.ToggleVPKVisibility(filePath);
+        await refreshFilesKeepFilter();
+        showNotification('文件隐藏状态已更新', 'success');
+    } catch (error) {
+        console.error('切换隐藏状态失败:', error);
+        showError('操作失败: ' + error);
+    }
+};
+
+// 批量切换隐藏状态
+async function batchToggleVisibility(hide) {
+    const selectedFiles = Array.from(appState.selectedFiles);
+    if (selectedFiles.length === 0) {
+        showNotification('请先选择文件', 'info');
+        return;
+    }
+
+    const actionName = hide ? '取消隐藏' : '隐藏';
+    
+    showConfirmModal(
+        `批量${actionName}`, 
+        `确定要${actionName}选中的 ${selectedFiles.length} 个文件吗？`, 
+        async () => {
+            updateLoadingMessage(`正在批量${actionName}...`);
+            showLoadingScreen();
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const filePath of selectedFiles) {
+                try {
+                    // 检查当前状态
+                    const fileName = filePath.split(/[\\/]/).pop();
+                    const isHidden = fileName.startsWith('_');
+                    
+                    // 如果目标是隐藏(hide=false)且当前未隐藏，或者目标是取消隐藏(hide=true)且当前已隐藏
+                    // 注意：hide参数为true表示要"取消隐藏"（即显示），false表示要"隐藏"
+                    // 修正逻辑：
+                    // hide=false (隐藏操作): 只有当 !isHidden 时才执行
+                    // hide=true (取消隐藏操作): 只有当 isHidden 时才执行
+                    
+                    if ((!hide && !isHidden) || (hide && isHidden)) {
+                        await window.go.main.App.ToggleVPKVisibility(filePath);
+                        successCount++;
+                    }
+                } catch (err) {
+                    console.error(`处理文件 ${filePath} 失败:`, err);
+                    failCount++;
+                }
+            }
+            
+            await refreshFilesKeepFilter();
+            showMainScreen();
+            
+            if (failCount > 0) {
+                showNotification(`操作完成: 成功 ${successCount} 个, 失败 ${failCount} 个`, 'warning');
+            } else {
+                showNotification(`成功${actionName} ${successCount} 个文件`, 'success');
+            }
+            
+            // 清空选择
+            deselectAll();
+        }
+    );
 }
 
 // 切换文件状态（全局函数）

@@ -81,4 +81,6 @@ export function StartDownloadTask(arg1:main.WorkshopFileDetails,arg2:boolean):Pr
 
 export function ToggleVPKFile(arg1:string):Promise<void>;
 
+export function ToggleVPKVisibility(arg1:string):Promise<string>;
+
 export function ValidateDirectory(arg1:string):Promise<void>;

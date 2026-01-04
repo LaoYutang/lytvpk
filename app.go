@@ -1527,3 +1527,32 @@ func (a *App) RestartApplication() error {
 	runtime.Quit(a.ctx)
 	return nil
 }
+
+// ToggleVPKVisibility 切换VPK文件的隐藏状态（添加/移除 _ 前缀）
+func (a *App) ToggleVPKVisibility(filePath string) (string, error) {
+	dir := filepath.Dir(filePath)
+	filename := filepath.Base(filePath)
+
+	var newFilename string
+	if strings.HasPrefix(filename, "_") {
+		// Unhide: remove prefix
+		newFilename = strings.TrimPrefix(filename, "_")
+	} else {
+		// Hide: add prefix
+		newFilename = "_" + filename
+	}
+
+	newPath := filepath.Join(dir, newFilename)
+
+	// Check if target exists
+	if _, err := os.Stat(newPath); err == nil {
+		return "", fmt.Errorf("目标文件已存在: %s", newFilename)
+	}
+
+	err := os.Rename(filePath, newPath)
+	if err != nil {
+		return "", err
+	}
+
+	return newPath, nil
+}

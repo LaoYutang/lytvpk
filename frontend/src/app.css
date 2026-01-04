@@ -1892,7 +1892,7 @@ body {
 .tag-group {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 4px;
   margin-bottom: 0.4rem;
 }
 
@@ -1901,7 +1901,8 @@ body {
 }
 
 .tag-group label {
-  min-width: 60px;
+  min-width: auto;
+  margin-right: 4px;
   font-weight: 500;
   color: var(--text-secondary);
   font-size: 0.875rem;
@@ -2202,7 +2203,7 @@ body {
   right: 0;
   top: 100%;
   background-color: var(--bg-app);
-  min-width: 90px;
+  min-width: 120px;
   box-shadow: var(--shadow-lg);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
@@ -2237,6 +2238,34 @@ body {
 
 .dropdown-item .btn-icon {
   font-size: 1.1em;
+}
+
+/* Override button styles inside dropdown */
+.dropdown-content .dropdown-item.delete-btn,
+.dropdown-content .dropdown-item.open-location-btn,
+.dropdown-content .dropdown-item.hide-btn {
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 6px 10px !important;
+  min-width: 0 !important;
+  justify-content: flex-start !important;
+  transform: none !important;
+}
+
+.dropdown-content .dropdown-item.delete-btn:hover,
+.dropdown-content .dropdown-item.open-location-btn:hover,
+.dropdown-content .dropdown-item.hide-btn:hover {
+  background-color: var(--bg-hover) !important;
+  color: var(--primary) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.dropdown-content .dropdown-item.delete-btn:hover {
+  color: var(--danger) !important;
+  background-color: rgba(239, 68, 68, 0.1) !important;
 }
 
 /* Server Modal Styles */

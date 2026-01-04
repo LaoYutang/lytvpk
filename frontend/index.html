@@ -93,6 +93,13 @@
           
           <!-- 第二行：标签筛选 -->
           <div class="filter-row filter-row-tags">
+            <div class="hidden-filter-container" style="display: flex; align-items: center; margin-right: 16px; border-right: 1px solid var(--border-color); padding-right: 16px;">
+                <label class="toggle-switch" style="gap: 6px;">
+                    <input type="checkbox" id="show-hidden-checkbox">
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label">显示隐藏VPK</span>
+                </label>
+            </div>
             <div id="tag-filters" class="tag-filters">
               <!-- 动态生成标签筛选按钮 -->
             </div>
@@ -136,9 +143,23 @@
             <button id="disable-selected-btn" class="btn btn-small btn-danger">
               <span class="icon">✗</span> 禁用选中
             </button>
-            <button id="delete-selected-btn" class="btn btn-small btn-danger">
-              <span class="icon">🗑️</span> 删除选中
-            </button>
+            
+            <div class="batch-actions-dropdown-container" style="position: relative;">
+                <button id="batch-more-btn" class="btn btn-small btn-outline">
+                    <span class="icon">⚡</span> 更多操作
+                </button>
+                <div id="batch-dropdown-content" class="dropdown-content hidden" style="bottom: 100%; top: auto; right: 0; margin-bottom: 5px; min-width: 140px;">
+                    <button id="hide-selected-btn" class="dropdown-item">
+                        <span class="btn-icon">👁️‍🗨️</span> 隐藏选中
+                    </button>
+                    <button id="unhide-selected-btn" class="dropdown-item">
+                        <span class="btn-icon">👁️</span> 取消隐藏
+                    </button>
+                    <button id="delete-selected-btn" class="dropdown-item delete-btn">
+                        <span class="btn-icon">🗑️</span> 删除选中
+                    </button>
+                </div>
+            </div>
           </div>
         </footer>
       </div>
