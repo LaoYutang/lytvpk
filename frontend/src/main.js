@@ -3047,6 +3047,12 @@ async function checkAndInstallUpdate() {
         }
 
         if (info.has_update) {
+            // 检查是否已忽略此版本
+            const config = getConfig();
+            if (config.ignoredVersion === info.latest_ver) {
+                console.log("已忽略版本:", info.latest_ver);
+                return;
+            }
             showUpdateModal(info);
         } else {
             console.log("当前已是最新版本");
@@ -3116,6 +3122,7 @@ async function showUpdateModal(info) {
     const progressFill = document.getElementById('update-progress-fill');
     const progressText = document.getElementById('update-progress-text');
     const modalFooter = document.getElementById('update-modal-footer');
+    const ignoreBtn = document.getElementById('ignore-update-btn');
 
     newVer.textContent = info.latest_ver;
     curVer.textContent = info.current_ver;
@@ -3168,6 +3175,15 @@ async function showUpdateModal(info) {
             cancelProgress = null;
         }
         modal.classList.add('hidden');
+    };
+
+    // 不再提醒
+    ignoreBtn.onclick = () => {
+        const config = getConfig();
+        config.ignoredVersion = info.latest_ver;
+        saveConfig(config);
+        console.log("已设置忽略版本:", info.latest_ver);
+        cleanup();
     };
 
     // 确认更新
@@ -3252,6 +3268,11 @@ async function performUpdate(mirrorUrl) {
     const result = await window.go.main.App.DoUpdate(mirrorUrl || "");
     
     if (result === "success") {
+        // 清除忽略版本设置，以便下次更新提醒
+        const config = getConfig();
+        config.ignoredVersion = "";
+        saveConfig(config);
+
         showMessageModal("更新成功", "程序将自动关闭，请手动重启以应用更新。", () => {
             window.runtime.Quit();
         });

@@ -299,6 +299,20 @@ body {
   color: var(--primary-light);
 }
 
+/* 危险轮廓按钮 */
+.btn-outline-danger {
+  background: var(--bg-app);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.btn-outline-danger:hover {
+  background: var(--danger-50, rgba(239, 68, 68, 0.05));
+  border-color: var(--danger-dark);
+  color: var(--danger-dark);
+  box-shadow: var(--shadow-sm);
+}
+
 /* 按钮尺寸 */
 .btn-small {
   padding: var(--spacing-1) var(--spacing-3);
@@ -2602,6 +2616,11 @@ body {
   text-align: right;
   font-family: var(--font-mono);
   color: var(--text-secondary);
+}
+
+/* 更新弹窗样式调整 */
+.modal-small {
+  max-width: 550px; /* 加宽弹窗 */
 }
 
 .player-name {
