@@ -1220,6 +1220,8 @@ body {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  word-break: break-word;
+  margin-right: var(--spacing-4);
 }
 
 .close-btn {
@@ -1235,6 +1237,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .close-btn:hover {
