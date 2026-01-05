@@ -118,6 +118,25 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// 清理旧版本文件
+	go func() {
+		// 稍微延迟一下，确保旧进程完全退出
+		time.Sleep(2 * time.Second)
+
+		exe, err := os.Executable()
+		if err != nil {
+			return
+		}
+		oldExe := exe + ".old"
+		if _, err := os.Stat(oldExe); err == nil {
+			if err := os.Remove(oldExe); err != nil {
+				log.Printf("清理旧版本失败: %v", err)
+			} else {
+				log.Printf("已清理旧版本文件: %s", oldExe)
+			}
+		}
+	}()
 }
 
 // ForceExit forces the application to exit
@@ -1545,9 +1564,10 @@ func (a *App) RestartApplication() error {
 		return err
 	}
 
-	// 使用 cmd /c start "" "exe_path" 启动新进程
-	// start 命令的第一个参数是窗口标题，留空即可
-	cmd := exec.Command("cmd", "/c", "start", "", self)
+	// 直接启动新进程
+	// 之前的 cmd /c start 会导致弹黑框，因为 cmd.exe 本身是控制台程序
+	// 直接运行编译为 GUI 的 exe 不会弹框
+	cmd := exec.Command(self)
 
 	// 启动但不等待
 	if err := cmd.Start(); err != nil {

@@ -3,7 +3,6 @@ package main
 import (
 	"embed"
 	"fmt"
-	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -22,11 +21,6 @@ const (
 )
 
 func main() {
-	// 启动时清理 .old 文件
-	if exe, err := os.Executable(); err == nil {
-		os.Remove(exe + ".old")
-	}
-
 	// Create an instance of the app structure
 	app := NewApp()
 
