@@ -1504,11 +1504,27 @@ body {
   transform: translateY(-1px);
 }
 
+.chapter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-1);
+}
+
 .chapter-name {
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: var(--spacing-1);
+}
+
+.chapter-code {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  border: 1px solid var(--border-default);
 }
 
 .chapter-modes {

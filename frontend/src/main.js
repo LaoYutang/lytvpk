@@ -1970,7 +1970,10 @@ window.showFileDetail = function (filePath) {
         const modes = chapterInfo.modes || [];
         chaptersHtml += `
           <div class="chapter-item">
-            <div class="chapter-name">${chapterName}</div>
+            <div class="chapter-header">
+              <div class="chapter-name">${chapterName}</div>
+              <div class="chapter-code">${chapterCode}</div>
+            </div>
             <div class="chapter-modes">${modes.length > 0 ? modes.join(' | ') : '未知模式'}</div>
           </div>
         `;
