@@ -33,6 +33,7 @@ import {
   DoUpdate,
   GetMirrors,
   AutoDiscoverAddons,
+  ExportVPKFilesToZip,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn, OnFileDrop, BrowserOpenURL } from '../wailsjs/runtime/runtime';
@@ -143,6 +144,15 @@ function setupEventListeners() {
       closeBatchDropdown();
       deleteSelected();
   });
+
+  // 批量导出ZIP
+  const exportZipSelectedBtn = document.getElementById('export-zip-selected-btn');
+  if (exportZipSelectedBtn) {
+      exportZipSelectedBtn.addEventListener('click', () => {
+          closeBatchDropdown();
+          exportZipSelected();
+      });
+  }
 
   // 批量隐藏/取消隐藏
   const hideSelectedBtn = document.getElementById('hide-selected-btn');
@@ -1639,6 +1649,43 @@ async function disableSelected() {
   } catch (error) {
     console.error('批量禁用失败:', error);
     showError('批量禁用失败: ' + error);
+  }
+}
+
+// 批量导出ZIP
+async function exportZipSelected() {
+  const selectedFiles = Array.from(appState.selectedFiles);
+  if (selectedFiles.length === 0) {
+    showError('请先选择要导出的文件');
+    return;
+  }
+
+  // 监听进度事件
+  const cleanup = EventsOn('export-progress', (progress) => {
+    updateLoadingMessage(`${progress.message} (${progress.current}/${progress.total})`);
+  });
+
+  showLoadingScreen();
+  updateLoadingMessage('正在准备导出...');
+
+  try {
+    const result = await ExportVPKFilesToZip(selectedFiles);
+    if (result === 'cancelled') {
+      return;
+    }
+    showSuccess(result);
+  } catch (error) {
+    console.error('导出ZIP失败:', error);
+    showError('导出ZIP失败: ' + error);
+  } finally {
+    showMainScreen();
+    // 清理事件监听（虽然 EventsOn 返回的不是清理函数，但这里我们不需要手动清理，因为下次会重新注册或者覆盖）
+    // 注意：Wails 的 EventsOn 返回的是一个清理函数，如果版本较新。
+    // 如果 EventsOn 不返回清理函数，可能需要手动管理，但这里简单处理即可。
+    // 实际上 Wails v2 的 EventsOn 返回一个取消订阅的函数。
+    if (typeof cleanup === 'function') {
+      cleanup();
+    }
   }
 }
 

@@ -42,6 +42,10 @@ export function ExportServersToFile(arg1) {
   return window['go']['main']['App']['ExportServersToFile'](arg1);
 }
 
+export function ExportVPKFilesToZip(arg1) {
+  return window['go']['main']['App']['ExportVPKFilesToZip'](arg1);
+}
+
 export function ExtractVPKFrom7z(arg1, arg2) {
   return window['go']['main']['App']['ExtractVPKFrom7z'](arg1, arg2);
 }

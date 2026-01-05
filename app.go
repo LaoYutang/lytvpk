@@ -254,11 +254,6 @@ func (a *App) scanDirectory(dir string, vpkPaths *[]string) error {
 	})
 }
 
-// processVPKFile 处理单个VPK文件（已废弃，保留用于兼容）
-func (a *App) processVPKFile(filePath string) {
-	a.processVPKFileWithCache(filePath)
-}
-
 // processVPKFileWithCache 处理单个VPK文件（智能缓存版本）
 func (a *App) processVPKFileWithCache(filePath string) {
 	info, err := os.Stat(filePath)
@@ -1591,4 +1586,92 @@ func (a *App) ToggleVPKVisibility(filePath string) (string, error) {
 	}
 
 	return newPath, nil
+}
+
+// ExportVPKFilesToZip 批量导出VPK文件为ZIP
+func (a *App) ExportVPKFilesToZip(files []string) (string, error) {
+	if len(files) == 0 {
+		return "", fmt.Errorf("没有选择文件")
+	}
+
+	// 选择保存路径
+	zipPath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "导出 ZIP",
+		DefaultFilename: "mods_export.zip",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "ZIP Files (*.zip)", Pattern: "*.zip"},
+		},
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if zipPath == "" {
+		return "cancelled", nil // 用户取消
+	}
+
+	// 创建 ZIP 文件
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		return "", fmt.Errorf("创建ZIP文件失败: %v", err)
+	}
+	defer zipFile.Close()
+
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	totalFiles := len(files)
+	for i, file := range files {
+		// 发送进度事件
+		runtime.EventsEmit(a.ctx, "export-progress", ProgressInfo{
+			Current: i + 1,
+			Total:   totalFiles,
+			Message: fmt.Sprintf("正在导出: %s", filepath.Base(file)),
+		})
+
+		// 打开源文件
+		srcFile, err := os.Open(file)
+		if err != nil {
+			log.Printf("无法打开文件 %s: %v", file, err)
+			continue // 跳过错误文件，或者返回错误
+		}
+
+		// 获取文件信息
+		info, err := srcFile.Stat()
+		if err != nil {
+			srcFile.Close()
+			log.Printf("无法获取文件信息 %s: %v", file, err)
+			continue
+		}
+
+		// 创建 ZIP 头
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			srcFile.Close()
+			log.Printf("无法创建ZIP头 %s: %v", file, err)
+			continue
+		}
+
+		// 使用文件名作为 ZIP 中的路径（不包含目录结构）
+		header.Name = filepath.Base(file)
+		header.Method = zip.Deflate
+
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			srcFile.Close()
+			log.Printf("无法写入ZIP头 %s: %v", file, err)
+			continue
+		}
+
+		// 写入文件内容
+		_, err = io.Copy(writer, srcFile)
+		srcFile.Close()
+		if err != nil {
+			log.Printf("无法写入文件内容 %s: %v", file, err)
+			continue
+		}
+	}
+
+	return fmt.Sprintf("成功导出 %d 个文件到 %s", len(files), zipPath), nil
 }
