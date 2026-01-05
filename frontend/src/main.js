@@ -1949,8 +1949,8 @@ async function batchToggleVisibility(hide) {
                     
                     if ((!hide && !isHidden) || (hide && isHidden)) {
                         await window.go.main.App.ToggleVPKVisibility(filePath);
-                        successCount++;
                     }
+                    successCount++;
                 } catch (err) {
                     console.error(`处理文件 ${filePath} 失败:`, err);
                     failCount++;
