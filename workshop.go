@@ -198,6 +198,11 @@ func (a *App) GetWorkshopDetails(workshopUrl string) ([]WorkshopFileDetails, err
 			return nil, fmt.Errorf("failed to fetch children details: %v", err)
 		}
 
+		// If the parent item is also a valid file, include it
+		if details[0].Result == 1 {
+			childrenDetails = append([]WorkshopFileDetails{details[0]}, childrenDetails...)
+		}
+
 		return a.processDetails(childrenDetails)
 	}
 
