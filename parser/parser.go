@@ -38,6 +38,9 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 	// 第一步:确定VPK的主要类型
 	vpkType := DetermineVPKType(archive)
 
+	// 提前提取资源信息（预览图和addoninfo），为后续处理提供元数据支持
+	ExtractVPKResources(opener, archive, vpkFile, filePath)
+
 	secondaryTags := make(map[string]bool)
 	chapters := make(map[string]ChapterInfo)
 
@@ -64,9 +67,6 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 	}
 
 	vpkFile.Chapters = chapters
-
-	// 一次性提取预览图和addoninfo信息
-	ExtractVPKResources(opener, archive, vpkFile, filePath)
 
 	return vpkFile, nil
 }
@@ -354,87 +354,6 @@ func parseAddonInfoFromFile(opener *vpk.Opener, addonInfoFile *vpk.File, vpkFile
 	// 解析文件内容
 	content := string(data)
 	lines := strings.Split(content, "\n")
-
-	// 解析每一行
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// 跳过空行、注释和括号
-		if line == "" || strings.HasPrefix(line, "//") || line == "{" || line == "}" || strings.HasPrefix(line, "\"") {
-			continue
-		}
-
-		// VDF格式: key "value" 或 key		"value"
-		// 查找第一个和最后一个引号
-		firstQuote := strings.Index(line, "\"")
-		if firstQuote == -1 {
-			continue
-		}
-
-		lastQuote := strings.LastIndex(line, "\"")
-		if lastQuote <= firstQuote {
-			continue
-		}
-
-		// 提取键和值
-		key := strings.TrimSpace(line[:firstQuote])
-		value := line[firstQuote+1 : lastQuote]
-
-		// 根据键设置对应的值
-		switch strings.ToLower(key) {
-		case "addontitle":
-			vpkFile.Title = value
-		case "addonauthor":
-			vpkFile.Author = value
-		case "addonversion":
-			vpkFile.Version = value
-		case "addondescription":
-			vpkFile.Desc = value
-		}
-	}
-}
-
-// ParseAddonInfo 解析 addoninfo.txt 文件
-func ParseAddonInfo(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKFile) {
-	// 查找 addoninfo.txt 文件
-	addonInfoFile := findFileInArchive(archive, "addoninfo.txt")
-	if addonInfoFile == nil {
-		// 如果没有找到，设置默认值
-		vpkFile.Title = ""
-		vpkFile.Author = ""
-		vpkFile.Version = ""
-		vpkFile.Desc = ""
-		return
-	}
-
-	// 读取文件内容
-	reader, err := addonInfoFile.Open(opener)
-	if err != nil {
-		vpkFile.Title = ""
-		vpkFile.Author = ""
-		vpkFile.Version = ""
-		vpkFile.Desc = ""
-		return
-	}
-	defer reader.Close()
-
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		vpkFile.Title = ""
-		vpkFile.Author = ""
-		vpkFile.Version = ""
-		vpkFile.Desc = ""
-		return
-	}
-
-	// 解析文件内容
-	content := string(data)
-	lines := strings.Split(content, "\n")
-
-	// 初始化默认值
-	vpkFile.Title = ""
-	vpkFile.Author = ""
-	vpkFile.Version = ""
-	vpkFile.Desc = ""
 
 	// 解析每一行
 	for _, line := range lines {
