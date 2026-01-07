@@ -41,6 +41,8 @@ export function ForceExit():Promise<void>;
 
 export function GetDownloadTasks():Promise<Array<main.DownloadTask>>;
 
+export function GetMapName(arg1:string):Promise<string>;
+
 export function GetMirrors():Promise<Array<string>>;
 
 export function GetPrimaryTags():Promise<Array<string>>;

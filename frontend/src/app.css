@@ -2860,3 +2860,23 @@ body {
   background: var(--primary);
   transition: width 0.2s ease;
 }
+
+.map-badge {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.map-badge:hover {
+    background-color: var(--primary-50);
+    border-color: var(--primary-light);
+    color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.map-badge:active {
+    transform: translateY(0);
+    background-color: var(--primary-100);
+}
+

@@ -78,6 +78,10 @@ export function GetDownloadTasks() {
   return window['go']['main']['App']['GetDownloadTasks']();
 }
 
+export function GetMapName(arg1) {
+  return window['go']['main']['App']['GetMapName'](arg1);
+}
+
 export function GetMirrors() {
   return window['go']['main']['App']['GetMirrors']();
 }

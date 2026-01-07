@@ -35,6 +35,7 @@ import {
   AutoDiscoverAddons,
   ExportVPKFilesToZip,
   RenameVPKFile,
+  GetMapName,
 } from '../wailsjs/go/main/App';
 
 import { EventsOn, OnFileDrop, BrowserOpenURL } from '../wailsjs/runtime/runtime';
@@ -3232,6 +3233,28 @@ function refreshAllServers() {
     });
 }
 
+async function resolveMapName(mapCode) {
+    if (!mapCode) return mapCode;
+    try {
+        // 使用后端 Go 方法获取地图名，解决 CORS 问题
+        if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetMapName) {
+             const name = await window.go.main.App.GetMapName(mapCode);
+             if (name && name.length > 0) {
+                 return name;
+             }
+        } else if (typeof GetMapName === 'function') {
+            // 尝试使用导入的函数
+             const name = await GetMapName(mapCode);
+             if (name && name.length > 0) {
+                 return name;
+             }
+        }
+    } catch (e) {
+        console.error("Failed to resolve map name via backend", e);
+    }
+    return mapCode; // Fallback to original
+}
+
 async function fetchServerInfo(address, index) {
   let detailsContainer = null;
   
@@ -3262,10 +3285,43 @@ async function fetchServerInfo(address, index) {
       <div class="server-stats-grid">
         <span class="stat-badge name-badge" title="${info.name}">🏠 ${info.name}</span>
         <span class="stat-badge mode-badge" title="游戏模式">🎮 ${info.mode}</span>
-        <span class="stat-badge map-badge" title="地图">🗺️ ${info.map}</span>
+        <span class="stat-badge map-badge" title="地图: ${info.map} (点击解析)" data-map-code="${info.map}">🗺️ ${info.map}</span>
         <span class="stat-badge players-badge" title="在线人数">👥 ${info.players}/${info.max_players}</span>
       </div>
     `;
+
+    // 绑定地图点击事件
+    const mapBadge = detailsContainer.querySelector('.map-badge');
+    if (mapBadge) {
+        mapBadge.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (mapBadge.dataset.resolved === 'true') return;
+
+            const originalText = mapBadge.textContent;
+            mapBadge.textContent = '🗺️ 解析中...';
+            mapBadge.style.cursor = 'wait';
+            
+            try {
+                const realName = await resolveMapName(info.map);
+                if (realName && realName !== info.map) {
+                    mapBadge.textContent = `🗺️ ${realName}`;
+                    mapBadge.dataset.resolved = 'true';
+                    mapBadge.title = `地图: ${info.map}`;
+                    mapBadge.style.cursor = 'default';
+                    // 移除 hover 效果
+                    mapBadge.style.textDecoration = 'none';
+                    mapBadge.style.color = 'inherit';
+                } else {
+                    mapBadge.textContent = originalText;
+                    mapBadge.style.cursor = 'pointer';
+                }
+            } catch (err) {
+                mapBadge.textContent = originalText;
+                mapBadge.style.cursor = 'pointer';
+            }
+        });
+    }
+
   } catch (err) {
     console.error('获取服务器信息失败:', err);
     if (document.body.contains(detailsContainer)) {
@@ -3443,7 +3499,16 @@ async function openServerDetailsModal(index) {
         // Fetch basic info first
         const info = await FetchServerInfo(server.address);
         mapEl.textContent = info.map;
+        mapEl.title = `地图: ${info.map}`;
         playersEl.textContent = `${info.players}/${info.max_players}`;
+
+        // 异步尝试解析地图名
+        resolveMapName(info.map).then(realName => {
+            if (realName !== info.map && document.body.contains(mapEl)) {
+                mapEl.textContent = realName;
+                mapEl.title = `地图: ${info.map}`;
+            }
+        });
 
         // Fetch players
         // Using window.go.main.App.FetchPlayerList because it might not be imported yet
