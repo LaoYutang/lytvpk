@@ -324,12 +324,28 @@ function setupEventListeners() {
         }
       });
       
+      // 每次打开前先重置样式
+      dropdown.classList.remove('dropup');
+
       dropdown.classList.toggle('hidden');
       if (fileItem) {
         if (dropdown.classList.contains('hidden')) {
           fileItem.classList.remove('active-dropdown');
         } else {
           fileItem.classList.add('active-dropdown');
+          
+          // 检查菜单位置，如果超出底部则向上弹出
+          const rect = dropdown.getBoundingClientRect();
+          const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+          
+          // 获取状态栏高度，确保不被遮挡
+          const statusBar = document.querySelector('.status-bar');
+          const bottomMargin = statusBar ? statusBar.offsetHeight + 10 : 20; // 增加默认边距
+          
+          // 留出一点边距
+          if (rect.bottom > windowHeight - bottomMargin) {
+            dropdown.classList.add('dropup');
+          }
         }
       }
       return;

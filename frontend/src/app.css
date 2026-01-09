@@ -2258,6 +2258,13 @@ body {
   gap: 2px;
 }
 
+.dropdown-content.dropup {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
 .dropdown-item {
   display: flex;
   align-items: center;
