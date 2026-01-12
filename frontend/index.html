@@ -534,12 +534,19 @@
                   id="workshop-url"
                   placeholder="粘贴 Steam 创意工坊链接..."
                 />
+                <button
+                  id="paste-workshop-url-btn"
+                  class="btn btn-ghost btn-icon-only"
+                  title="粘贴"
+                >
+                  <span class="icon">📋</span>
+                </button>
                 <button id="check-workshop-btn" class="btn btn-primary">
                   <span class="icon">🔍</span> 解析
                 </button>
                 <button
                   id="open-browser-btn"
-                  class="btn btn-primary"
+                  class="btn btn-success"
                   title="浏览工坊"
                 >
                   <span class="icon">⚙️</span> 工坊
@@ -555,10 +562,14 @@
                   id="download-url"
                   placeholder="解析后自动填充，或手动输入直链..."
                 />
-                <button id="copy-url-btn" class="btn btn-secondary">
-                  <span class="icon">📋</span> 复制
+                <button
+                  id="paste-download-url-btn"
+                  class="btn btn-ghost btn-icon-only"
+                  title="粘贴"
+                >
+                  <span class="icon">📋</span>
                 </button>
-                <button id="download-workshop-btn" class="btn btn-success">
+                <button id="download-workshop-btn" class="btn btn-primary">
                   <svg
                     class="icon-svg"
                     viewBox="0 0 24 24"
@@ -573,6 +584,9 @@
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                   </svg>
                   <span>下载</span>
+                </button>
+                <button id="copy-url-btn" class="btn btn-success">
+                  <span class="icon">📄</span> 复制
                 </button>
               </div>
               <div id="optimized-ip-container" class="hidden mt-12">

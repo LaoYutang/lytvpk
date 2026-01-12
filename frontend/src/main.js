@@ -101,8 +101,54 @@ document.addEventListener("DOMContentLoaded", function () {
 function initializeApp() {
   setupEventListeners();
   setupWailsEvents();
+  setupInputContextMenu(); // 添加右键菜单支持
+  disableGlobalContextMenu(); // 全局禁用右键菜单
   checkInitialDirectory();
   checkAndInstallUpdate();
+}
+
+// 全局禁用右键菜单
+function disableGlobalContextMenu() {
+  document.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    return false;
+  });
+}
+
+// 为输入框添加右键菜单支持
+function setupInputContextMenu() {
+  const inputs = ["workshop-url", "download-url"];
+
+  inputs.forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    // 阻止默认右键菜单（已由全局处理）
+    input.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    // 确保标准快捷键工作
+    input.addEventListener("keydown", (e) => {
+      // Ctrl+V 粘贴
+      if (e.ctrlKey && e.key === "v") {
+        e.stopPropagation();
+      }
+      // Ctrl+C 复制
+      if (e.ctrlKey && e.key === "c") {
+        e.stopPropagation();
+      }
+      // Ctrl+X 剪切
+      if (e.ctrlKey && e.key === "x") {
+        e.stopPropagation();
+      }
+      // Ctrl+A 全选
+      if (e.ctrlKey && e.key === "a") {
+        e.stopPropagation();
+      }
+    });
+  });
 }
 
 // 设置事件监听器
@@ -333,6 +379,36 @@ function setupEventListeners() {
   document
     .getElementById("check-workshop-btn")
     .addEventListener("click", checkWorkshopUrl);
+
+  // 粘贴按钮事件
+  document
+    .getElementById("paste-workshop-url-btn")
+    .addEventListener("click", async function () {
+      try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById("workshop-url").value = text;
+        showNotification("已粘贴", "success");
+      } catch (err) {
+        console.error("粘贴失败:", err);
+        showError("粘贴失败，请使用 Ctrl+V");
+      }
+    });
+
+  document
+    .getElementById("paste-download-url-btn")
+    .addEventListener("click", async function () {
+      try {
+        const text = await navigator.clipboard.readText();
+        const input = document.getElementById("download-url");
+        input.value = text;
+        input.dispatchEvent(new Event("input")); // 触发 input 事件
+        showNotification("已粘贴", "success");
+      } catch (err) {
+        console.error("粘贴失败:", err);
+        showError("粘贴失败，请使用 Ctrl+V");
+      }
+    });
+
   document.getElementById("download-url").addEventListener("input", (e) => {
     const val = e.target.value;
     const optimizedIpContainer = document.getElementById(

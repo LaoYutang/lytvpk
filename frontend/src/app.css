@@ -147,7 +147,7 @@
   --z-modal: 1050;
   --z-popover: 1060;
   --z-tooltip: 1070;
-  --z-toast: 1080;
+  --z-toast: 10000; /* 确保通知在所有内容之上 */
 
   /* Wails 拖拽配置 */
   --wails-drop-target: drop;
@@ -211,6 +211,25 @@ body {
   overflow: hidden;
   white-space: nowrap;
   min-height: 2.5rem;
+}
+
+/* 纯图标按钮 - 宽度为常规按钮的一半 */
+.btn-icon-only {
+  padding: var(--spacing-2);
+  min-width: 2.5rem;
+  width: 2.5rem;
+  gap: 0;
+}
+
+.btn-icon-only svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  opacity: 0.7;
+}
+
+.btn-icon-only:hover svg {
+  opacity: 1;
 }
 
 .btn:focus-visible {
@@ -327,6 +346,46 @@ body {
   );
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+/* 辅助色按钮 */
+.btn-accent {
+  background: linear-gradient(
+    135deg,
+    var(--accent) 0%,
+    var(--accent-light) 100%
+  );
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-accent:hover {
+  background: linear-gradient(
+    135deg,
+    var(--accent-light) 0%,
+    var(--accent-dark) 100%
+  );
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* 幽灵按钮 - 轻量透明 */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  box-shadow: none;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-ghost:active {
+  background: var(--bg-active);
 }
 
 /* 轮廓按钮 */
