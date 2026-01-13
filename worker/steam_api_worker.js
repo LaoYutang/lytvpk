@@ -101,21 +101,43 @@ export default {
         // 策略：优先寻找 requiredItemsContainer，如果找不到则在看似是侧边栏的区域搜索，最后尝试全文
         const startMarker = '<div class="requiredItemsContainer">';
         let startIndex = pageHtml.indexOf(startMarker);
-        let searchScope = pageHtml;
+        let searchScope = "";
 
         if (startIndex !== -1) {
           debugInfo.containerFound = true;
           // 找到了容器，就在之后的内容中搜索，截取一段足够长的
-          searchScope = pageHtml.substring(startIndex, startIndex + 10000);
-        } else {
-          // 没找到容器，尝试寻找 "Required items" 文本 (可能是英文界面)
-          // 或者 "id=\"RequiredItems\"" 这种可能的 ID
-          const backupStart = pageHtml.indexOf("RequiredItems");
-          if (backupStart !== -1) {
-            // 找到了类似的 ID 或 class 名
-            searchScope = pageHtml.substring(backupStart, backupStart + 10000);
+          // 缩小范围以减少误判，5000字符通常足够包含所有依赖项
+          let tempScope = pageHtml.substring(startIndex, startIndex + 5000);
+
+          // 尝试寻找结束标志以截断，防止匹配到后续无关内容
+          const stopMarkers = [
+            '<div class="workshopItemDescriptionTitle">', // 描述标题
+            '<div id="Comments_Area">', // 评论区
+            '<div class="see_all_collections">', // 合集
+            '<div class="game_area_purchase_game_wrapper">', // 购买区
+            '<div style="clear: left;"></div>', // 常见的清除浮动
+            '<div class="share_block">', // 分享区域
+          ];
+
+          let minStopIndex = tempScope.length;
+          for (const marker of stopMarkers) {
+            const idx = tempScope.indexOf(marker);
+            if (idx !== -1 && idx < minStopIndex) {
+              minStopIndex = idx;
+            }
           }
-          // 如果都没找到，searchScope 依然是 pageHtml (全文搜索模式)
+
+          searchScope = tempScope.substring(0, minStopIndex);
+        } else {
+          // 没找到容器，尝试寻找 id="RequiredItems" 这种更明确的 ID
+          // 原来的 "RequiredItems" 文本搜索太宽泛，容易匹配到无关内容
+          const backupStart = pageHtml.indexOf('id="RequiredItems"');
+          if (backupStart !== -1) {
+            // 找到了类似的 ID
+            searchScope = pageHtml.substring(backupStart, backupStart + 5000);
+          }
+          // 如果都没找到，searchScope 保持为空，不进行全文搜索
+          // 避免匹配到页面上的其他链接（如推荐、侧边栏等）
         }
 
         debugInfo.block = searchScope.substring(0, 200); // 调试看开头
