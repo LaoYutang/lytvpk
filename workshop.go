@@ -31,16 +31,20 @@ type WorkshopChild struct {
 }
 
 type WorkshopFileDetails struct {
-	Result          int             `json:"result"`
-	PublishedFileId string          `json:"publishedfileid"`
-	Creator         string          `json:"creator"`
-	Filename        string          `json:"filename"`
-	FileSize        string          `json:"file_size"`
-	FileUrl         string          `json:"file_url"`
-	PreviewUrl      string          `json:"preview_url"`
-	Title           string          `json:"title"`
-	Description     string          `json:"file_description"`
-	Children        []WorkshopChild `json:"children"`
+	Result          int    `json:"result"`
+	PublishedFileId string `json:"publishedfileid"`
+	Creator         string `json:"creator"`
+	Filename        string `json:"filename"`
+	FileSize        string `json:"file_size"`
+	FileUrl         string `json:"file_url"`
+	PreviewUrl      string `json:"preview_url"`
+	Previews        []struct {
+		PreviewUrl  string `json:"preview_url"`
+		PreviewType int    `json:"preview_type"`
+	} `json:"previews"`
+	Title       string          `json:"title"`
+	Description string          `json:"file_description"`
+	Children    []WorkshopChild `json:"children"`
 }
 
 type DownloadTask struct {
@@ -407,8 +411,8 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 				host, port, _ := net.SplitHostPort(addr)
 
 				// Check if the host matches the download URL's host
-				u, err := url.Parse(downloadUrl)
-				if err == nil && u.Hostname() == host {
+				u, parseErr := url.Parse(downloadUrl)
+				if parseErr == nil && u.Hostname() == host {
 					return dialer.DialContext(ctx, network, net.JoinHostPort(bestIP, port))
 				}
 				return dialer.DialContext(ctx, network, addr)
@@ -443,7 +447,8 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			fmt.Printf("[Download] Retrying task %s (%d/%d)...\n", task.ID, i+1, maxRetries)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
+		var req *http.Request
+		req, err = http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
 		if err != nil {
 			updateStatus("failed", err.Error())
 			return
@@ -486,7 +491,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	// Try to get filename from Content-Disposition
 	cd := resp.Header.Get("Content-Disposition")
 	if cd != "" {
-		if _, params, err := mime.ParseMediaType(cd); err == nil {
+		if _, params, mimeErr := mime.ParseMediaType(cd); mimeErr == nil {
 			if filename, ok := params["filename"]; ok && filename != "" {
 				// Clean filename
 				filename = cleanFilename(filename)

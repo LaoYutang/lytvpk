@@ -4939,6 +4939,76 @@ function formatNumber(num) {
   return num;
 }
 
+// 切换预览图
+window.switchPreview = function (url, element) {
+  const mainImg = document.getElementById("main-preview-img");
+  if (mainImg) {
+    mainImg.src = url;
+  }
+  document
+    .querySelectorAll(".thumbnail-item")
+    .forEach((el) => el.classList.remove("active"));
+  if (element) {
+    element.classList.add("active");
+  }
+};
+
+// 全屏图片预览
+window.openFullImage = function (src) {
+  const modal = document.getElementById("image-preview-modal");
+  const modalImg = document.getElementById("full-image");
+  if (modal && modalImg) {
+    modal.style.display = "flex"; // 修改为 flex 以配合 CSS 居中
+    modalImg.src = src;
+  }
+};
+
+// 初始化全屏图片模态框事件
+document.addEventListener("DOMContentLoaded", () => {
+  const modal = document.getElementById("image-preview-modal");
+  const span = document.getElementsByClassName("image-modal-close")[0];
+
+  if (modal && span) {
+    span.onclick = function () {
+      modal.style.display = "none";
+    };
+
+    modal.onclick = function (event) {
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    };
+  }
+});
+
+function renderThumbnails(detail) {
+  let images = detail.previews || [];
+  // 提取 URL (处理 previews 是对象数组的情况)
+  images = images.map((p) => p.preview_url || p);
+
+  // 去重
+  images = [...new Set(images)];
+
+  // 如果没有 previews 列表，或者列表为空，且只有单张预览图，则不显示缩略图栏
+  if (images.length <= 1) return "";
+
+  return `
+    <div class="detail-thumbnails">
+        ${images
+          .map(
+            (img, index) => `
+            <div class="thumbnail-item ${
+              index === 0 ? "active" : ""
+            }" onclick="window.switchPreview('${img}', this)">
+                <img src="${img}" loading="lazy">
+            </div>
+        `
+          )
+          .join("")}
+    </div>
+    `;
+}
+
 async function openWorkshopDetail(item) {
   const detailView = document.getElementById("browser-detail-view");
   detailView.classList.remove("hidden");
@@ -4960,9 +5030,15 @@ async function openWorkshopDetail(item) {
 
                 <div class="detail-top-section">
                     <div class="detail-preview-wrapper">
-                        <img src="${
-                          detail.preview_url
-                        }" class="detail-preview-img-large">
+                        <div class="main-preview-container">
+                             <img src="${
+                               detail.previews && detail.previews.length > 0
+                                 ? detail.previews[0].preview_url ||
+                                   detail.previews[0]
+                                 : detail.preview_url
+                             }" class="detail-preview-img-large" id="main-preview-img" onclick="window.openFullImage(this.src)">
+                        </div>
+                        ${renderThumbnails(detail)}
                     </div>
                     
                     <div class="detail-info-wrapper">
@@ -5048,6 +5124,17 @@ async function openWorkshopDetail(item) {
           `https://steamcommunity.com/sharedfiles/filedetails/?id=${detail.publishedfileid}`
         );
       });
+
+    // 绑定缩略图滚轮事件
+    const thumbContainer = detailView.querySelector(".detail-thumbnails");
+    if (thumbContainer) {
+      thumbContainer.addEventListener("wheel", (evt) => {
+        if (evt.deltaY !== 0) {
+          evt.preventDefault();
+          thumbContainer.scrollLeft += evt.deltaY;
+        }
+      });
+    }
   } catch (err) {
     detailView.innerHTML = `
             <div class="loading-placeholder">

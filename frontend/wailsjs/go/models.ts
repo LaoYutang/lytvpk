@@ -162,6 +162,20 @@ export namespace main {
 	        this.file_type = source["file_type"];
 	    }
 	}
+	export class  {
+	    preview_url: string;
+	    preview_type: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new (source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.preview_url = source["preview_url"];
+	        this.preview_type = source["preview_type"];
+	    }
+	}
 	export class WorkshopFileDetails {
 	    result: number;
 	    publishedfileid: string;
@@ -170,6 +184,7 @@ export namespace main {
 	    file_size: string;
 	    file_url: string;
 	    preview_url: string;
+	    previews: [];
 	    title: string;
 	    file_description: string;
 	    children: WorkshopChild[];
@@ -187,6 +202,7 @@ export namespace main {
 	        this.file_size = source["file_size"];
 	        this.file_url = source["file_url"];
 	        this.preview_url = source["preview_url"];
+	        this.previews = this.convertValues(source["previews"], );
 	        this.title = source["title"];
 	        this.file_description = source["file_description"];
 	        this.children = this.convertValues(source["children"], WorkshopChild);
@@ -222,12 +238,27 @@ export namespace main {
 	        this.tag = source["tag"];
 	    }
 	}
+	export class WorkshopPreviewImage {
+	    preview_url: string;
+	    preview_type: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkshopPreviewImage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.preview_url = source["preview_url"];
+	        this.preview_type = source["preview_type"];
+	    }
+	}
 	export class WorkshopItemDetail {
 	    publishedfileid: string;
 	    title: string;
 	    description: string;
 	    file_url: string;
 	    preview_url: string;
+	    previews: WorkshopPreviewImage[];
 	    file_size: any;
 	    time_created: any;
 	    time_updated: any;
@@ -247,6 +278,7 @@ export namespace main {
 	        this.description = source["description"];
 	        this.file_url = source["file_url"];
 	        this.preview_url = source["preview_url"];
+	        this.previews = this.convertValues(source["previews"], WorkshopPreviewImage);
 	        this.file_size = source["file_size"];
 	        this.time_created = source["time_created"];
 	        this.time_updated = source["time_updated"];
@@ -350,6 +382,7 @@ export namespace main {
 		    return a;
 		}
 	}
+	
 	
 	export class WorkshopQueryOptions {
 	    page: number;

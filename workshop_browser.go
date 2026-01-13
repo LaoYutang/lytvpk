@@ -55,19 +55,26 @@ type WorkshopListResult struct {
 	Total int                   `json:"total"`
 }
 
+// WorkshopPreviewImage 定义预览图结构
+type WorkshopPreviewImage struct {
+	PreviewUrl  string `json:"preview_url"`
+	PreviewType int    `json:"preview_type"`
+}
+
 // WorkshopItemDetail 对应 GetPublishedFileDetails 的单个结果
 type WorkshopItemDetail struct {
-	PublishedFileId string      `json:"publishedfileid"`
-	Title           string      `json:"title"`
-	Description     string      `json:"description"`
-	FileUrl         string      `json:"file_url"`
-	PreviewUrl      string      `json:"preview_url"`
-	FileSize        interface{} `json:"file_size"`
-	TimeCreated     interface{} `json:"time_created"`
-	TimeUpdated     interface{} `json:"time_updated"`
-	Subscriptions   interface{} `json:"subscriptions"`
-	Favorited       interface{} `json:"favorited"`
-	Views           interface{} `json:"views"`
+	PublishedFileId string                 `json:"publishedfileid"`
+	Title           string                 `json:"title"`
+	Description     string                 `json:"description"`
+	FileUrl         string                 `json:"file_url"`
+	PreviewUrl      string                 `json:"preview_url"`
+	Previews        []WorkshopPreviewImage `json:"previews"`
+	FileSize        interface{}            `json:"file_size"`
+	TimeCreated     interface{}            `json:"time_created"`
+	TimeUpdated     interface{}            `json:"time_updated"`
+	Subscriptions   interface{}            `json:"subscriptions"`
+	Favorited       interface{}            `json:"favorited"`
+	Views           interface{}            `json:"views"`
 	Tags            []struct {
 		Tag string `json:"tag"`
 	} `json:"tags"`

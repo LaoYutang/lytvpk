@@ -123,8 +123,8 @@ func (a *App) CheckUpdate() UpdateInfo {
 		found := false
 
 		for _, r := range releases {
-			v, err := semver.ParseTolerant(r.TagName)
-			if err != nil {
+			v, parseErr := semver.ParseTolerant(r.TagName)
+			if parseErr != nil {
 				continue
 			}
 			if !found || v.GT(maxVer) {
@@ -139,8 +139,8 @@ func (a *App) CheckUpdate() UpdateInfo {
 			if maxVer.GT(vCurrent) {
 				var sb strings.Builder
 				for _, r := range releases {
-					v, err := semver.ParseTolerant(r.TagName)
-					if err != nil {
+					v, parseErr := semver.ParseTolerant(r.TagName)
+					if parseErr != nil {
 						continue
 					}
 					if v.GT(vCurrent) {
@@ -166,8 +166,8 @@ func (a *App) CheckUpdate() UpdateInfo {
 		fmt.Printf("直连失败: %v，尝试使用镜像源...\n", fetchErr)
 
 		for _, mirror := range MirrorList {
-			tag, err := fetchLatestTagFromMirror(GithubRepo, mirror)
-			if err == nil && tag != "" {
+			tag, mirrorErr := fetchLatestTagFromMirror(GithubRepo, mirror)
+			if mirrorErr == nil && tag != "" {
 				fmt.Printf("通过镜像 %s 获取到版本: %s\n", mirror, tag)
 				// 构造一个伪造的 release 对象
 				release = &GithubRelease{
@@ -189,7 +189,7 @@ func (a *App) CheckUpdate() UpdateInfo {
 				fetchErr = nil // 清除错误
 				break
 			} else {
-				fmt.Printf("镜像 %s 失败: %v\n", mirror, err)
+				fmt.Printf("镜像 %s 失败: %v\n", mirror, mirrorErr)
 			}
 		}
 	}

@@ -1218,9 +1218,9 @@ func queryA2S(address string) (*ServerInfo, error) {
 	reader := bytes.NewBuffer(resp[5:])
 
 	readString := func() (string, error) {
-		str, err := reader.ReadString(0x00)
-		if err != nil {
-			return "", err
+		str, readErr := reader.ReadString(0x00)
+		if readErr != nil {
+			return "", readErr
 		}
 		return str[:len(str)-1], nil
 	}
