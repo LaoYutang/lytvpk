@@ -3576,9 +3576,20 @@ body {
 
 .card-preview {
   aspect-ratio: 16/9;
-  background-color: var(--gray-800);
+  background-color: var(--gray-100);
   position: relative;
   overflow: hidden;
+}
+
+.card-preview.skeleton-anim {
+  background: var(--gray-100);
+  background: linear-gradient(
+    90deg,
+    var(--gray-100) 25%,
+    var(--bg-app) 50%,
+    var(--gray-100) 75%
+  );
+  background-size: 200% 100%;
 }
 
 .card-preview img {
