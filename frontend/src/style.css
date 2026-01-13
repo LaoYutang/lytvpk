@@ -6,13 +6,6 @@
     url("assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
 }
 
-/*
-#app {
-    height: 100vh;
-    text-align: center;
-}
-*/
-
 /* 冲突检测弹窗样式 */
 .modal-content.conflict-modal-content {
   max-width: 1000px;
@@ -337,7 +330,7 @@
   height: 100%;
   overflow: hidden; /* 防止滚动条 */
   background-color: rgba(0, 0, 0, 0.9);
-  /* display: flex;  Removed to fix auto-open issue, handled by JS */
+  /* display: flex; Removed to fix auto-open issue, handled by JS */
   align-items: center;
   justify-content: center;
 }
@@ -392,4 +385,62 @@
   background: rgba(255, 255, 255, 0.4);
   transform: rotate(90deg);
   color: #fff;
+}
+
+/* BBCode Styles */
+.bbcode-img {
+  max-width: 100%;
+  border-radius: 4px;
+  margin: 8px 0;
+  display: block;
+}
+
+.bbcode-list {
+  padding-left: 20px;
+  margin: 10px 0;
+  list-style-type: disc;
+}
+
+.bbcode-list li {
+  margin-bottom: 4px;
+}
+
+.spoiler {
+  background-color: #000;
+  color: #000;
+  padding: 0 4px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.spoiler:hover {
+  color: #fff;
+}
+
+.bbcode-link {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.bbcode-link:hover {
+  text-decoration: underline;
+}
+
+.detail-description-text blockquote {
+  border-left: 4px solid var(--border-light);
+  margin: 10px 0;
+  padding: 8px 16px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.detail-description-text pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: monospace;
+  margin: 10px 0;
 }

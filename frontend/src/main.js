@@ -51,6 +51,9 @@ import {
   Quit,
 } from "../wailsjs/runtime/runtime";
 
+// 暴露给全局使用，以便在 onclick 中调用
+window.BrowserOpenURL = BrowserOpenURL;
+
 // LocalStorage 配置管理
 const CONFIG_KEY = "vpk-manager-config";
 const DOWNLOAD_ICON_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5146,8 +5149,82 @@ async function openWorkshopDetail(item) {
 
 // Helper to format bbcode-like description roughly or just preserve whitespace
 function formatDescription(text) {
-  // 简单处理换行
-  return text.replace(/\n/g, "<br>");
+  if (!text) return "";
+
+  // 1. 转义 HTML 特殊字符，防止 XSS
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  // 2. 基础 BBCode 替换
+  const tags = [
+    { regex: /\[h1\](.*?)\[\/h1\]/gi, replace: "<h3>$1</h3>" },
+    { regex: /\[h2\](.*?)\[\/h2\]/gi, replace: "<h4>$1</h4>" },
+    { regex: /\[h3\](.*?)\[\/h3\]/gi, replace: "<h5>$1</h5>" },
+    { regex: /\[b\](.*?)\[\/b\]/gi, replace: "<strong>$1</strong>" },
+    { regex: /\[u\](.*?)\[\/u\]/gi, replace: "<u>$1</u>" },
+    { regex: /\[i\](.*?)\[\/i\]/gi, replace: "<em>$1</em>" },
+    { regex: /\[strike\](.*?)\[\/strike\]/gi, replace: "<del>$1</del>" },
+    {
+      regex: /\[spoiler\](.*?)\[\/spoiler\]/gi,
+      replace: '<span class="spoiler">$1</span>',
+    },
+    { regex: /\[hr\]/gi, replace: "<hr>" },
+    {
+      regex: /\[code\](.*?)\[\/code\]/gis,
+      replace: "<pre><code>$1</code></pre>",
+    },
+    {
+      regex: /\[quote\](.*?)\[\/quote\]/gis,
+      replace: "<blockquote>$1</blockquote>",
+    },
+    { regex: /\[noparse\](.*?)\[\/noparse\]/gis, replace: "$1" },
+  ];
+
+  tags.forEach((tag) => {
+    html = html.replace(tag.regex, tag.replace);
+  });
+
+  // 3. 链接替换
+  // [url=...]text[/url]
+  html = html.replace(
+    /\[url=(.*?)\](.*?)\[\/url\]/gi,
+    (match, url, content) => {
+      return `<a href="javascript:void(0)" onclick="window.BrowserOpenURL('${url}')" class="bbcode-link">${content}</a>`;
+    }
+  );
+  // [url]...[/url]
+  html = html.replace(/\[url\](.*?)\[\/url\]/gi, (match, url) => {
+    return `<a href="javascript:void(0)" onclick="window.BrowserOpenURL('${url}')" class="bbcode-link">${url}</a>`;
+  });
+
+  // 4. 图片替换
+  html = html.replace(
+    /\[img\](.*?)\[\/img\]/gi,
+    '<img src="$1" class="bbcode-img" loading="lazy" />'
+  );
+
+  // 5. 列表替换
+  // [list]...[/list]
+  html = html.replace(/\[list\](.*?)\[\/list\]/gis, (match, content) => {
+    const items = content.split("[*]").filter((s) => s.trim().length > 0);
+    const listItems = items.map((item) => `<li>${item.trim()}</li>`).join("");
+    return `<ul class="bbcode-list">${listItems}</ul>`;
+  });
+  // [olist]...[/olist]
+  html = html.replace(/\[olist\](.*?)\[\/olist\]/gis, (match, content) => {
+    const items = content.split("[*]").filter((s) => s.trim().length > 0);
+    const listItems = items.map((item) => `<li>${item.trim()}</li>`).join("");
+    return `<ol class="bbcode-list">${listItems}</ol>`;
+  });
+
+  // 6. 处理换行
+  html = html.replace(/\n/g, "<br>");
+
+  return html;
 }
 
 function startDownloadFromBrowser(id) {
