@@ -78,6 +78,9 @@ type App struct {
 	goroutinePool *ants.Pool
 	forceClose    bool
 	restyClient   *resty.Client
+
+	// 配置项
+	modRotationEnabled bool
 }
 
 // NewApp creates a new App application struct
@@ -666,6 +669,12 @@ func (a *App) ValidateDirectory(path string) error {
 
 // LaunchL4D2 启动L4D2游戏
 func (a *App) LaunchL4D2() error {
+	// 尝试执行 Mod 轮换
+	if err := a.RotateMods(); err != nil {
+		a.LogError("Mod轮换", err.Error(), "")
+		// 即使轮换失败，也继续启动游戏
+	}
+
 	// 使用 Steam 协议启动游戏
 	steamURL := "steam://rungameid/550"
 
@@ -677,6 +686,11 @@ func (a *App) LaunchL4D2() error {
 
 // ConnectToServer 连接到指定服务器
 func (a *App) ConnectToServer(address string) error {
+	// 尝试执行 Mod 轮换
+	if err := a.RotateMods(); err != nil {
+		a.LogError("Mod轮换", err.Error(), "")
+	}
+
 	steamURL := fmt.Sprintf("steam://connect/%s", address)
 	runtime.BrowserOpenURL(a.ctx, steamURL)
 	return nil

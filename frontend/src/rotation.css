@@ -1,0 +1,25 @@
+
+/* Mod轮换按钮样式 */
+.btn-rotation-enabled {
+  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%) !important;
+  color: white !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3) !important;
+}
+
+.btn-rotation-enabled:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%) !important;
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4) !important;
+  transform: translateY(-1px);
+}
+
+.rotation-desc {
+  margin-top: 12px;
+  padding: 10px;
+  background-color: var(--bg-secondary);
+  border-left: 3px solid var(--accent);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  text-align: left;
+}

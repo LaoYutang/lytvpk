@@ -51,6 +51,8 @@ export function GetMapName(arg1:string):Promise<string>;
 
 export function GetMirrors():Promise<Array<string>>;
 
+export function GetModRotation():Promise<boolean>;
+
 export function GetPrimaryTags():Promise<Array<string>>;
 
 export function GetRootDirectory():Promise<string>;
@@ -81,6 +83,8 @@ export function RestartApplication():Promise<void>;
 
 export function RetryDownloadTask(arg1:string):Promise<void>;
 
+export function RotateMods():Promise<void>;
+
 export function ScanVPKFiles():Promise<void>;
 
 export function SearchVPKFiles(arg1:string,arg2:string,arg3:Array<string>):Promise<Array<parser.VPKFile>>;
@@ -88,6 +92,8 @@ export function SearchVPKFiles(arg1:string,arg2:string,arg3:Array<string>):Promi
 export function SelectDirectory():Promise<string>;
 
 export function SelectFiles():Promise<Array<string>>;
+
+export function SetModRotation(arg1:boolean):Promise<void>;
 
 export function SetRootDirectory(arg1:string):Promise<void>;
 

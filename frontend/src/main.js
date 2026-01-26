@@ -1,6 +1,7 @@
 import "./style.css?v=2.7";
 import "./app.css?v=2.7";
 import "./titlebar.css";
+import "./rotation.css";
 
 import {
   SetRootDirectory,
@@ -62,6 +63,13 @@ const DOWNLOAD_ICON_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" fill="none"
     <line x1="12" y1="15" x2="12" y2="3"></line>
 </svg>`;
 
+const ROTATION_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg">
+  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+  <path d="M3 3v5h5"></path>
+  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+  <path d="M16 21h5v-5"></path>
+</svg>`;
+
 function getConfig() {
   const config = localStorage.getItem(CONFIG_KEY);
   return config ? JSON.parse(config) : { defaultDirectory: "" };
@@ -110,6 +118,7 @@ function initializeApp() {
   disableGlobalContextMenu(); // 全局禁用右键菜单
   checkInitialDirectory();
   checkAndInstallUpdate();
+  initModRotationState();
 }
 
 // 全局禁用右键菜单
@@ -425,6 +434,11 @@ function setupBatchActionEvents() {
   document
     .getElementById("start-conflict-check-btn")
     .addEventListener("click", startConflictCheck);
+
+  // Mod随机轮换按钮
+  document
+    .getElementById("mod-rotation-btn")
+    .addEventListener("click", toggleModRotation);
 
   // 服务器收藏按钮
   document
@@ -1002,6 +1016,11 @@ function setupWailsEvents() {
     } else {
       showNotification(data.message, data.type || "success");
     }
+  });
+
+  // 监听轮换日志
+  EventsOn("rotation_log", (msg) => {
+    console.log(`[ModRotation] ${msg}`);
   });
 }
 
@@ -2602,6 +2621,103 @@ window.openFileLocation = async function (filePath) {
   }
 };
 
+// Mod随机轮换逻辑
+async function initModRotationState() {
+  // 检查后端方法是否存在（兼容性检查）
+  if (!window.go?.main?.App?.SetModRotation) {
+    console.warn("后端 SetModRotation 方法不可用");
+    return;
+  }
+
+  // 从配置恢复状态
+  const config = getConfig();
+  const enabled = config.modRotationEnabled || false;
+
+  try {
+    // 同步到后端
+    await window.go.main.App.SetModRotation(enabled);
+
+    // 更新UI
+    updateModRotationUI(enabled);
+  } catch (e) {
+    console.error("初始化Mod轮换状态失败:", e);
+  }
+}
+
+function updateModRotationUI(enabled) {
+  const btn = document.getElementById("mod-rotation-btn");
+  if (!btn) return;
+
+  if (enabled) {
+    btn.classList.add("btn-rotation-enabled");
+    btn.classList.remove("btn-outline");
+    btn.innerHTML = `<span class="icon">${ROTATION_ICON_SVG}</span> 轮换已启用`;
+  } else {
+    btn.classList.remove("btn-rotation-enabled");
+    btn.classList.add("btn-outline");
+    btn.innerHTML = `<span class="icon">${ROTATION_ICON_SVG}</span> 轮换已禁用`;
+  }
+}
+
+async function toggleModRotation() {
+  if (!window.go?.main?.App?.SetModRotation) {
+    showError("功能暂不可用：后端未实现轮换接口");
+    return;
+  }
+
+  const config = getConfig();
+  const currentlyEnabled = config.modRotationEnabled || false;
+
+  if (currentlyEnabled) {
+    // 禁用操作
+    showConfirmModal(
+      "关闭Mod随机轮换",
+      "确定要关闭Mod随机轮换功能吗？\n\n关闭后，启动游戏将不再自动替换Mod。",
+      async () => {
+        try {
+          config.modRotationEnabled = false;
+          saveConfig(config);
+          await window.go.main.App.SetModRotation(false);
+          updateModRotationUI(false);
+          showNotification("Mod随机轮换已禁用", "info");
+        } catch (e) {
+          showError("操作失败: " + e);
+        }
+      }
+    );
+  } else {
+    // 启用操作
+    const description = `
+      <div class="rotation-desc-container">
+        <p>开启 <strong>Mod随机轮换</strong> 功能后，每次从Mod管理器中启动时系统将自动：</p>
+        <ul class="rotation-steps" style="text-align: left; padding-left: 20px; margin: 10px 0;">
+          <li><strong>识别分类：</strong>扫描已启用中存在的人物/武器分类。</li>
+          <li><strong>随机替换：</strong>从所有已安装Mod中随机选择同类替换。</li>
+          <li><strong>自动应用：</strong>保持其他Mod不变，仅轮换指定随机池。</li>
+        </ul>
+        <p class="rotation-note" style="margin-top: 10px; font-size: 0.9em; color: var(--text-tertiary);">这能让您每次游玩时都体验不同的Mod组合。</p>
+      </div>
+    `;
+
+    showConfirmModal(
+      "开启Mod随机轮换",
+      description,
+      async () => {
+        try {
+          config.modRotationEnabled = true;
+          saveConfig(config);
+          await window.go.main.App.SetModRotation(true);
+          updateModRotationUI(true);
+          showNotification("Mod随机轮换已启用", "success");
+        } catch (e) {
+          showError("操作失败: " + e);
+        }
+      },
+      true // useHtml
+    );
+  }
+}
+
 // LytVPK v2.8 - 启用/禁用逻辑重构版
 //
 // 功能特性：
@@ -3303,7 +3419,7 @@ function createTaskElement(task) {
 }
 
 // 确认对话框逻辑
-function showConfirmModal(title, message, onConfirm) {
+function showConfirmModal(title, message, onConfirm, useHtml = false) {
   const modal = document.getElementById("confirm-modal");
   const titleEl = document.getElementById("confirm-title");
   const messageEl = document.getElementById("confirm-message");
@@ -3312,7 +3428,11 @@ function showConfirmModal(title, message, onConfirm) {
   const closeBtn = document.getElementById("close-confirm-modal-btn");
 
   titleEl.textContent = title;
-  messageEl.textContent = message;
+  if (useHtml) {
+    messageEl.innerHTML = message;
+  } else {
+    messageEl.textContent = message;
+  }
   modal.classList.remove("hidden");
 
   const cleanup = () => {

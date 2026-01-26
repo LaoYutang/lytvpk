@@ -98,6 +98,10 @@ export function GetMirrors() {
   return window['go']['main']['App']['GetMirrors']();
 }
 
+export function GetModRotation() {
+  return window['go']['main']['App']['GetModRotation']();
+}
+
 export function GetPrimaryTags() {
   return window['go']['main']['App']['GetPrimaryTags']();
 }
@@ -158,6 +162,10 @@ export function RetryDownloadTask(arg1) {
   return window['go']['main']['App']['RetryDownloadTask'](arg1);
 }
 
+export function RotateMods() {
+  return window['go']['main']['App']['RotateMods']();
+}
+
 export function ScanVPKFiles() {
   return window['go']['main']['App']['ScanVPKFiles']();
 }
@@ -172,6 +180,10 @@ export function SelectDirectory() {
 
 export function SelectFiles() {
   return window['go']['main']['App']['SelectFiles']();
+}
+
+export function SetModRotation(arg1) {
+  return window['go']['main']['App']['SetModRotation'](arg1);
 }
 
 export function SetRootDirectory(arg1) {
