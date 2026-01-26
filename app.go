@@ -85,7 +85,14 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	pool, _ := ants.NewPool(rt.GOMAXPROCS(0)) // 创建协程池
+	cores := rt.GOMAXPROCS(0)
+	// 确保至少有 4 个并发，提升体验
+	if cores < 4 {
+		cores = 4
+	}
+	log.Printf("应用启动，CPU核心数: %d, 协程池大小: %d", rt.GOMAXPROCS(0), cores)
+
+	pool, _ := ants.NewPool(cores) // 创建协程池
 
 	// 初始化 Resty 客户端
 	client := resty.New()
@@ -799,78 +806,110 @@ func (a *App) DeleteVPKFiles(filePaths []string) error {
 	return nil
 }
 
-// ExtractVPKFromZip 从ZIP文件中解压所有VPK文件到指定目录
+// ExtractVPKFromZip 从ZIP文件中解压所有VPK文件到指定目录（多协程并行解压）
 func (a *App) ExtractVPKFromZip(zipPath string, destDir string) error {
-	// 打开ZIP文件
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("无法打开ZIP文件: %v", err)
 	}
 	defer r.Close()
 
-	extractedCount := 0
-
-	// 遍历ZIP中的所有文件
+	// 过滤出所有VPK文件
+	var vpkFiles []*zip.File
 	for _, f := range r.File {
-		// 处理文件名编码
-		filename := f.Name
-		if f.Flags&0x800 == 0 {
-			// 尝试将 GBK 转换为 UTF-8
-			i := bytes.NewReader([]byte(f.Name))
-			decoder := transform.NewReader(i, simplifiedchinese.GB18030.NewDecoder())
-			content, err := io.ReadAll(decoder)
-			if err == nil {
-				filename = string(content)
-			}
-		}
-
-		// 检查是否为VPK文件（忽略大小写）
-		if strings.HasSuffix(strings.ToLower(filename), ".vpk") {
-			// 构建目标路径
-			// 注意：这里我们只取文件名，忽略ZIP中的目录结构，直接解压到destDir
-			targetPath := filepath.Join(destDir, filepath.Base(filename))
-
-			// 打开ZIP中的文件
-			rc, err := f.Open()
-			if err != nil {
-				log.Printf("无法打开ZIP中的文件 %s: %v", filename, err)
-				continue
-			}
-
-			// 创建目标文件
-			outFile, err := os.Create(targetPath)
-			if err != nil {
-				rc.Close()
-				log.Printf("无法创建目标文件 %s: %v", targetPath, err)
-				continue
-			}
-
-			// 复制内容
-			_, err = io.Copy(outFile, rc)
-
-			// 关闭文件
-			outFile.Close()
-			rc.Close()
-
-			if err != nil {
-				log.Printf("解压文件 %s 失败: %v", filename, err)
-				os.Remove(targetPath) // 删除解压失败的文件
-				continue
-			}
-
-			extractedCount++
-			log.Printf("已解压: %s -> %s", filename, targetPath)
+		if strings.HasSuffix(strings.ToLower(f.Name), ".vpk") {
+			vpkFiles = append(vpkFiles, f)
 		}
 	}
 
-	if extractedCount == 0 {
+	if len(vpkFiles) == 0 {
 		return fmt.Errorf("ZIP文件中未找到VPK文件")
+	}
+
+	log.Printf("开始并行解压 ZIP: %s, 包含 %d 个VPK文件, 并发协程池容量: %d", filepath.Base(zipPath), len(vpkFiles), a.goroutinePool.Cap())
+
+	var wg sync.WaitGroup
+	var extractErr error
+	var errMu sync.Mutex
+	extractedCount := 0
+	var countMu sync.Mutex
+
+	for _, f := range vpkFiles {
+		wg.Add(1)
+		file := f // 闭包变量捕获
+
+		err := a.goroutinePool.Submit(func() {
+			log.Printf(">>> 开始解压: %s", file.Name)
+			defer wg.Done()
+
+			// 如果已经有错误发生，提前退出
+			errMu.Lock()
+			if extractErr != nil {
+				errMu.Unlock()
+				return
+			}
+			errMu.Unlock()
+
+			filename := file.Name
+			// 处理编码问题 (CP437 -> UTF-8)
+			if file.Flags&0x800 == 0 { // 如果没有设置UTF-8标志位
+				i := bytes.NewReader([]byte(filename))
+				decoder := transform.NewReader(i, simplifiedchinese.GBK.NewDecoder())
+				content, _ := io.ReadAll(decoder)
+				if len(content) > 0 {
+					filename = string(content)
+				}
+			}
+
+			targetPath := filepath.Join(destDir, filepath.Base(filename))
+
+			rc, err := file.Open()
+			if err != nil {
+				log.Printf("无法打开ZIP中的文件 %s: %v", filename, err)
+				return
+			}
+			defer rc.Close()
+
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				log.Printf("无法创建目标文件 %s: %v", targetPath, err)
+				return
+			}
+			defer outFile.Close()
+
+			_, err = io.Copy(outFile, rc)
+			if err != nil {
+				log.Printf("解压文件 %s 失败: %v", filename, err)
+				os.Remove(targetPath)
+				return
+			}
+
+			countMu.Lock()
+			extractedCount++
+			countMu.Unlock()
+			log.Printf("<<< 完成解压: %s -> %s", filename, targetPath)
+		})
+
+		if err != nil {
+			wg.Done() // 提交失败需要手动 Done
+			log.Printf("提交解压任务失败: %v", err)
+		}
+	}
+
+	wg.Wait()
+
+	if extractErr != nil {
+		return extractErr
+	}
+
+	if extractedCount == 0 {
+		return fmt.Errorf("未成功解压任何VPK文件")
 	}
 
 	return nil
 }
 
-// ExtractVPKFromRar 从RAR文件中解压所有VPK文件到指定目录
+// ExtractVPKFromRar 从RAR文件中解压所有VPK文件到指定目录（串行解压，rardecode库不支持并发读取）
 func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 	f, err := os.Open(rarPath)
 	if err != nil {
@@ -898,6 +937,10 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 		}
 
 		filename := header.Name
+		// 检查是否为GBK编码 (RAR通常使用本地编码)
+		// 这里简单处理，如果包含非UTF-8字符可能需要转换，但rardecode通常处理得不错
+		// 如果需要可以加上类似zip的编码转换逻辑
+
 		if strings.HasSuffix(strings.ToLower(filename), ".vpk") {
 			targetPath := filepath.Join(destDir, filepath.Base(filename))
 
@@ -927,7 +970,7 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 	return nil
 }
 
-// ExtractVPKFrom7z 从7z文件中解压所有VPK文件到指定目录
+// ExtractVPKFrom7z 从7z文件中解压所有VPK文件到指定目录（多协程并行解压）
 func (a *App) ExtractVPKFrom7z(sevenZPath string, destDir string) error {
 	r, err := sevenzip.OpenReader(sevenZPath)
 	if err != nil {
@@ -935,42 +978,91 @@ func (a *App) ExtractVPKFrom7z(sevenZPath string, destDir string) error {
 	}
 	defer r.Close()
 
-	extractedCount := 0
+	// 过滤出所有VPK文件
+	var vpkFiles []*sevenzip.File
 	for _, f := range r.File {
-		filename := f.Name
-		if strings.HasSuffix(strings.ToLower(filename), ".vpk") {
-			targetPath := filepath.Join(destDir, filepath.Base(filename))
-
-			rc, err := f.Open()
-			if err != nil {
-				log.Printf("无法打开7z中的文件 %s: %v", filename, err)
-				continue
-			}
-
-			outFile, err := os.Create(targetPath)
-			if err != nil {
-				rc.Close()
-				log.Printf("无法创建目标文件 %s: %v", targetPath, err)
-				continue
-			}
-
-			_, err = io.Copy(outFile, rc)
-			outFile.Close()
-			rc.Close()
-
-			if err != nil {
-				log.Printf("解压文件 %s 失败: %v", filename, err)
-				os.Remove(targetPath)
-				continue
-			}
-
-			extractedCount++
-			log.Printf("已解压: %s -> %s", filename, targetPath)
+		if strings.HasSuffix(strings.ToLower(f.Name), ".vpk") {
+			vpkFiles = append(vpkFiles, f)
 		}
 	}
 
-	if extractedCount == 0 {
+	if len(vpkFiles) == 0 {
 		return fmt.Errorf("7z文件中未找到VPK文件")
+	}
+
+	log.Printf("开始并行解压 7z: %s, 包含 %d 个VPK文件, 并发协程池容量: %d", filepath.Base(sevenZPath), len(vpkFiles), a.goroutinePool.Cap())
+
+	var wg sync.WaitGroup
+	var extractErr error
+	var errMu sync.Mutex
+	extractedCount := 0
+	var countMu sync.Mutex
+
+	for _, f := range vpkFiles {
+		wg.Add(1)
+		file := f // 闭包变量捕获
+
+		err := a.goroutinePool.Submit(func() {
+			log.Printf(">>> 开始解压: %s", file.Name)
+			defer wg.Done()
+
+			// 如果已经有错误发生，提前退出
+			errMu.Lock()
+			if extractErr != nil {
+				errMu.Unlock()
+				return
+			}
+			errMu.Unlock()
+
+			filename := file.Name
+			targetPath := filepath.Join(destDir, filepath.Base(filename))
+
+			rc, err := file.Open()
+			if err != nil {
+				log.Printf("无法打开7z中的文件 %s: %v", filename, err)
+				return
+			}
+			defer rc.Close()
+
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				log.Printf("无法创建目标文件 %s: %v", targetPath, err)
+				return
+			}
+			defer outFile.Close()
+
+			_, err = io.Copy(outFile, rc)
+			if err != nil {
+				log.Printf("解压文件 %s 失败: %v", filename, err)
+				os.Remove(targetPath)
+				// 记录错误但不中断其他解压，除非是严重错误？这里选择记录错误
+				// 如果希望只要有一个失败就全部失败：
+				// errMu.Lock()
+				// extractErr = err
+				// errMu.Unlock()
+				return
+			}
+
+			countMu.Lock()
+			extractedCount++
+			countMu.Unlock()
+			log.Printf("<<< 完成解压: %s -> %s", filename, targetPath)
+		})
+
+		if err != nil {
+			wg.Done() // 提交失败需要手动 Done
+			log.Printf("提交解压任务失败: %v", err)
+		}
+	}
+
+	wg.Wait()
+
+	if extractErr != nil {
+		return extractErr
+	}
+
+	if extractedCount == 0 {
+		return fmt.Errorf("未成功解压任何VPK文件")
 	}
 	return nil
 }
@@ -999,32 +1091,49 @@ func (a *App) HandleFileDrop(paths []string) {
 
 	successCount := 0
 	failCount := 0
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
 	for _, path := range paths {
-		lowerPath := strings.ToLower(path)
-		if strings.HasSuffix(lowerPath, ".vpk") {
-			// Copy VPK to rootDir
-			err := a.installVPKFile(path)
-			if err != nil {
-				a.LogError("安装VPK失败", err.Error(), filepath.Base(path))
-				failCount++
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+
+			lowerPath := strings.ToLower(p)
+			var err error
+			success := false
+
+			if strings.HasSuffix(lowerPath, ".vpk") {
+				// Copy VPK to rootDir
+				err = a.installVPKFile(p)
+				if err != nil {
+					a.LogError("安装VPK失败", err.Error(), filepath.Base(p))
+				} else {
+					success = true
+				}
+			} else if strings.HasSuffix(lowerPath, ".zip") || strings.HasSuffix(lowerPath, ".rar") || strings.HasSuffix(lowerPath, ".7z") {
+				// Extract Archive to rootDir
+				err = a.ExtractVPKFromArchive(p, a.rootDir)
+				if err != nil {
+					a.LogError("解压压缩包失败", err.Error(), filepath.Base(p))
+				} else {
+					success = true
+				}
 			} else {
-				successCount++
+				a.LogError("不支持的文件格式", "仅支持 .vpk, .zip, .rar, .7z 文件", filepath.Base(p))
 			}
-		} else if strings.HasSuffix(lowerPath, ".zip") || strings.HasSuffix(lowerPath, ".rar") || strings.HasSuffix(lowerPath, ".7z") {
-			// Extract Archive to rootDir
-			err := a.ExtractVPKFromArchive(path, a.rootDir)
-			if err != nil {
-				a.LogError("解压压缩包失败", err.Error(), filepath.Base(path))
-				failCount++
+
+			mu.Lock()
+			if success {
+				successCount++
 			} else {
-				successCount++
+				failCount++
 			}
-		} else {
-			a.LogError("不支持的文件格式", "仅支持 .vpk, .zip, .rar, .7z 文件", filepath.Base(path))
-			failCount++
-		}
+			mu.Unlock()
+		}(path)
 	}
+
+	wg.Wait()
 
 	if successCount > 0 {
 		// 刷新文件列表
