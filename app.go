@@ -1827,23 +1827,11 @@ func (a *App) ToggleVPKVisibility(filePath string) (string, error) {
 // SetWorkshopPreferredIP 开启/关闭工坊优选IP
 func (a *App) SetWorkshopPreferredIP(enabled bool) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.workshopPreferredIP = enabled
+	a.mu.Unlock()
 
 	// 保存配置
-	// 注意：不能直接调用 a.saveConfig()，因为 saveConfig 会获取 RLock，这会导致死锁
-	// 所以我们在这里直接保存
-	config := ConfigFile{
-		ModRotationConfig:   a.modRotationConfig,
-		WorkshopPreferredIP: a.workshopPreferredIP,
-	}
-
-	go func() {
-		data, err := json.MarshalIndent(config, "", "  ")
-		if err == nil {
-			os.WriteFile(a.configPath, data, 0644)
-		}
-	}()
+	a.saveConfig()
 
 	// 如果开启，立即触发一次IP优选（如果尚未优选）
 	if enabled {

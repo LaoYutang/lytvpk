@@ -42,8 +42,10 @@ var officialTags = map[string]bool{
 // SetModRotation 设置Mod随机轮换功能是否开启
 func (a *App) SetModRotation(config RotationConfig) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.modRotationConfig = config
+	a.mu.Unlock()
+
+	a.saveConfig()
 }
 
 // GetModRotation 获取Mod随机轮换功能状态
