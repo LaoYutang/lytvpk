@@ -109,6 +109,7 @@ let appState = {
   showHidden: false, // 是否显示隐藏文件
   sortType: "name", // 'name' | 'date'
   sortOrder: "asc", // 'asc' | 'desc'
+  displayMode: getConfig().displayMode || "list", // 'list' | 'card'
 };
 
 // 初始化应用
@@ -659,15 +660,19 @@ function setupBatchActionEvents() {
       e.preventDefault();
       e.stopPropagation();
       const dropdown = moreBtn.nextElementSibling;
-      const fileItem = moreBtn.closest(".file-item");
+      // 兼容 file-item (列表) 和 file-card (卡片)
+      const fileContainer =
+        moreBtn.closest(".file-item") || moreBtn.closest(".file-card");
 
       // 关闭其他所有打开的下拉菜单
       document.querySelectorAll(".dropdown-content").forEach((d) => {
         if (d !== dropdown) {
           d.classList.add("hidden");
-          // 移除其他 file-item 的 active 状态
-          const otherFileItem = d.closest(".file-item");
-          if (otherFileItem) otherFileItem.classList.remove("active-dropdown");
+          // 移除其他容器的 active 状态
+          const otherContainer =
+            d.closest(".file-item") || d.closest(".file-card");
+          if (otherContainer)
+            otherContainer.classList.remove("active-dropdown");
         }
       });
 
@@ -675,11 +680,11 @@ function setupBatchActionEvents() {
       dropdown.classList.remove("dropup");
 
       dropdown.classList.toggle("hidden");
-      if (fileItem) {
+      if (fileContainer) {
         if (dropdown.classList.contains("hidden")) {
-          fileItem.classList.remove("active-dropdown");
+          fileContainer.classList.remove("active-dropdown");
         } else {
-          fileItem.classList.add("active-dropdown");
+          fileContainer.classList.add("active-dropdown");
 
           // 检查菜单位置，如果超出底部则向上弹出
           const rect = dropdown.getBoundingClientRect();
@@ -706,8 +711,8 @@ function setupBatchActionEvents() {
     ) {
       document.querySelectorAll(".dropdown-content").forEach((d) => {
         d.classList.add("hidden");
-        const fileItem = d.closest(".file-item");
-        if (fileItem) fileItem.classList.remove("active-dropdown");
+        const container = d.closest(".file-item") || d.closest(".file-card");
+        if (container) container.classList.remove("active-dropdown");
       });
     }
 
@@ -1803,12 +1808,33 @@ async function performSearch() {
 // 渲染文件列表
 function renderFileList() {
   const container = document.getElementById("file-list");
+  const listHeader = document.querySelector(".file-list-header");
+  const statusBar = document.querySelector(".status-bar");
+
   container.innerHTML = "";
 
-  appState.vpkFiles.forEach((file) => {
-    const fileItem = createFileItem(file);
-    container.appendChild(fileItem);
-  });
+  // 根据模式调整布局
+  if (appState.displayMode === "card") {
+    container.classList.add("file-list-grid");
+    container.classList.remove("file-list");
+    if (listHeader) listHeader.style.display = "none";
+    if (statusBar) statusBar.style.display = "none";
+
+    appState.vpkFiles.forEach((file) => {
+      const cardItem = createFileCard(file);
+      container.appendChild(cardItem);
+    });
+  } else {
+    container.classList.add("file-list");
+    container.classList.remove("file-list-grid");
+    if (listHeader) listHeader.style.display = "grid";
+    if (statusBar) statusBar.style.display = "flex";
+
+    appState.vpkFiles.forEach((file) => {
+      const fileItem = createFileItem(file);
+      container.appendChild(fileItem);
+    });
+  }
 }
 
 // 创建文件项
@@ -1915,6 +1941,196 @@ function createFileItem(file) {
   });
 
   return item;
+}
+
+// 创建文件卡片
+function createFileCard(file) {
+  const card = document.createElement("div");
+  card.className = "file-card";
+  card.dataset.path = file.path;
+
+  // 状态样式
+  if (!file.enabled) {
+    card.classList.add("disabled");
+  }
+
+  const displayTitle = file.title || file.name;
+  const isHidden = file.name.startsWith("_");
+  const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
+  const hideBtnIcon = isHidden ? "👁️" : "👁️‍🗨️";
+
+  // 预览图处理
+  // 优先使用内存缓存
+  let previewSrc = "";
+  let imgStyle = "";
+  let showPlaceholder = true;
+
+  if (file.previewImage) {
+    previewSrc = file.previewImage;
+    showPlaceholder = false;
+  }
+
+  // 二级标签处理 (最多显示2个)
+  let secondaryTagsHtml = "";
+  if (file.secondaryTags && file.secondaryTags.length > 0) {
+    // 限制显示数量
+    const displayTags = file.secondaryTags.slice(0, 2);
+    const hasMore = file.secondaryTags.length > 2;
+
+    secondaryTagsHtml = displayTags
+      .map(
+        (tag) => `<span class="card-badge secondary-tag-badge">${tag}</span>`
+      )
+      .join("");
+
+    if (hasMore) {
+      secondaryTagsHtml += `<span class="card-badge more-tag-badge">+${
+        file.secondaryTags.length - 2
+      }</span>`;
+    }
+  }
+
+  // 启用/禁用按钮
+  let actionBtn = "";
+  if (file.location === "workshop") {
+    actionBtn = `
+      <button class="btn-small action-btn move-btn" data-file-path="${
+        file.path
+      }" data-action="move" title="转移到addons">
+        <span class="btn-icon">📦</span>
+        <span class="btn-text">转移</span>
+      </button>
+    `;
+  } else {
+    actionBtn = `
+      <button class="btn-small action-btn toggle-btn ${
+        file.enabled ? "toggle-disable" : "toggle-enable"
+      }" 
+              data-file-path="${file.path}" data-action="toggle" 
+              title="${file.enabled ? "点击禁用" : "点击启用"}">
+        <span class="btn-icon">${file.enabled ? "⛔" : "✅"}</span>
+        <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
+      </button>
+    `;
+  }
+
+  card.innerHTML = `
+    <div class="card-preview-container">
+        <div class="card-preview-placeholder ${showPlaceholder ? "" : "hidden"}">
+           <svg class="icon-svg placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+             <circle cx="8.5" cy="8.5" r="1.5"></circle>
+             <polyline points="21 15 16 10 5 21"></polyline>
+           </svg>
+        </div>
+        <img class="card-preview-img ${
+          showPlaceholder ? "hidden" : ""
+        }" src="${previewSrc}" alt="${displayTitle}" style="${imgStyle}" loading="lazy" />
+        <div class="card-badges">
+            <span class="card-badge location-badge">${getLocationDisplayName(
+              file.location
+            )}</span>
+            ${
+              file.primaryTag
+                ? `<span class="card-badge tag-badge">${file.primaryTag}</span>`
+                : ""
+            }
+            ${secondaryTagsHtml}
+        </div>
+    </div>
+    <div class="card-content">
+        <div class="card-title" title="${displayTitle}">${displayTitle}</div>
+        <div class="card-filename" title="${file.name}">${file.name}</div>
+        <div class="card-actions">
+            ${actionBtn}
+            <div class="more-actions-dropdown">
+                <button class="btn-small action-btn more-btn" title="更多操作">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                    </svg>
+                </button>
+                <div class="dropdown-content hidden">
+                    <button class="dropdown-item detail-btn" data-file-path="${
+                      file.path
+                    }">
+                        <span class="btn-icon">🔍</span> 详情
+                    </button>
+                    <button class="dropdown-item hide-btn" data-file-path="${
+                      file.path
+                    }" data-action="hide">
+                        <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+                    </button>
+                    <button class="dropdown-item set-tags-btn" data-file-path="${
+                      file.path
+                    }" data-action="set-tags">
+                        <span class="btn-icon">🏷️</span> 设置标签
+                    </button>
+                    <button class="dropdown-item rename-btn" data-file-path="${
+                      file.path
+                    }" data-action="rename">
+                        <span class="btn-icon">✏️</span> 重命名
+                    </button>
+                    <button class="dropdown-item open-location-btn" data-file-path="${
+                      file.path
+                    }" data-action="open-location">
+                        <span class="btn-icon">📂</span> 位置
+                    </button>
+                    <button class="dropdown-item delete-btn" data-file-path="${
+                      file.path
+                    }" data-action="delete">
+                        <span class="btn-icon">🗑️</span> 删除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+  `;
+
+  // 懒加载预览图
+  const img = card.querySelector(".card-preview-img");
+  const placeholder = card.querySelector(".card-preview-placeholder");
+
+  if (!file.previewImage) {
+    // 使用 IntersectionObserver 实现懒加载
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          loadCardPreview(file, img, placeholder);
+          observer.unobserve(entry.target);
+        }
+      });
+    });
+    observer.observe(card);
+  }
+
+  // 点击卡片显示详情
+  card.addEventListener("click", function (e) {
+    // 忽略按钮点击
+    if (
+      e.target.closest("button") ||
+      e.target.closest(".more-actions-dropdown")
+    ) {
+      return;
+    }
+    showFileDetail(file.path);
+  });
+
+  return card;
+}
+
+async function loadCardPreview(file, imgElement, placeholderElement) {
+  try {
+    const imgData = await GetVPKPreviewImage(file.path);
+    if (imgData) {
+      imgElement.src = imgData;
+      imgElement.classList.remove("hidden");
+      placeholderElement.classList.add("hidden");
+      // 缓存图片数据到 file 对象，避免重复加载
+      file.previewImage = imgData;
+    }
+  } catch (err) {
+    console.warn("加载预览图失败:", file.name);
+  }
 }
 
 // 获取操作按钮
@@ -5229,9 +5445,55 @@ async function showGlobalSettings() {
                     ${ipStatusText}
                 </div>
                 <label class="toggle-switch" style="flex-shrink: 0;">
-                    <input type="checkbox" id="workshop-preferred-ip-check" ${enabled ? "checked" : ""}>
+                    <input type="checkbox" id="workshop-preferred-ip-check" ${
+                      enabled ? "checked" : ""
+                    }>
                     <span class="toggle-slider"></span>
                 </label>
+            </div>
+        </div>
+
+        <div class="settings-section" style="margin-top: 20px;">
+            <h3 class="settings-section-title" style="margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">界面设置</h3>
+            
+            <div class="setting-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div class="setting-info" style="flex: 1; padding-right: 20px;">
+                    <div class="setting-label" style="font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">显示模式</div>
+                    <div class="setting-desc" style="font-size: 0.85em; color: var(--text-secondary);">
+                        切换文件列表的显示布局
+                    </div>
+                    <div style="font-size: 0.8em; color: var(--text-tertiary); margin-top: 4px;">
+                        <span style="color: var(--warning);">⚠</span> 仅列表模式支持批量操作
+                    </div>
+                </div>
+                <div class="mode-toggle-group">
+                    <label class="mode-option ${
+                      appState.displayMode === "list" ? "active" : ""
+                    }">
+                        <input type="radio" name="display-mode" value="list" ${
+                          appState.displayMode === "list" ? "checked" : ""
+                        } style="display: none;">
+                        <span class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+                            </svg>
+                        </span>
+                        <span class="mode-text">列表</span>
+                    </label>
+                    <label class="mode-option ${
+                      appState.displayMode === "card" ? "active" : ""
+                    }">
+                        <input type="radio" name="display-mode" value="card" ${
+                          appState.displayMode === "card" ? "checked" : ""
+                        } style="display: none;">
+                        <span class="mode-icon">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/>
+                            </svg>
+                        </span>
+                        <span class="mode-text">卡片</span>
+                    </label>
+                </div>
             </div>
         </div>
       </div>
@@ -5241,6 +5503,26 @@ async function showGlobalSettings() {
       "应用设置",
       htmlContent,
       async () => {
+        // 处理显示模式设置
+        const modeRadios = document.getElementsByName("display-mode");
+        let newMode = appState.displayMode;
+        for (const radio of modeRadios) {
+          if (radio.checked) {
+            newMode = radio.value;
+            break;
+          }
+        }
+
+        if (newMode !== appState.displayMode) {
+          appState.displayMode = newMode;
+          const config = getConfig();
+          config.displayMode = newMode;
+          saveConfig(config);
+          renderFileList();
+          // showNotification("显示模式已更新", "success");
+        }
+
+        // 处理网络设置
         const checkbox = document.getElementById("workshop-preferred-ip-check");
         if (!checkbox) return;
 
@@ -5276,6 +5558,22 @@ async function showGlobalSettings() {
       },
       true // useHtml
     );
+
+    // 绑定模式切换点击事件，实现即时视觉反馈
+    setTimeout(() => {
+      const modeOptions = document.querySelectorAll(".mode-option");
+      modeOptions.forEach((option) => {
+        option.addEventListener("click", function () {
+          // 移除所有 active
+          modeOptions.forEach((opt) => opt.classList.remove("active"));
+          // 添加当前 active
+          this.classList.add("active");
+          // 选中内部的 radio
+          const radio = this.querySelector('input[type="radio"]');
+          if (radio) radio.checked = true;
+        });
+      });
+    }, 50);
   } catch (err) {
     console.error("获取设置失败:", err);
     showError("无法打开设置: " + err);
