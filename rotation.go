@@ -175,7 +175,17 @@ func (a *App) RotateMods() error {
 		// 但我们需要确保 path 是准确的。
 		// 这里我们重新从缓存获取最新状态
 		if err := a.ToggleVPKFile(path); err != nil {
-			logMsg(fmt.Sprintf("禁用 Mod 失败: %s, 错误: %v", filepath.Base(path), err))
+			// 立即中止并报错
+			fileName := filepath.Base(path)
+			// 精简提示信息，文件名由前端负责显示
+			errMsg := "禁用失败！文件被占用，可能游戏未关闭。已按原先mod启动。"
+
+			logMsg(fmt.Sprintf("禁用 Mod 失败: %s, 错误: %v", fileName, err))
+
+			// 发送错误通知到前端
+			a.LogError("MOD轮换失败", errMsg, path)
+
+			return fmt.Errorf("Mod轮换中止: %s 被占用", fileName)
 		} else {
 			logMsg(fmt.Sprintf("已禁用 Mod: %s", filepath.Base(path)))
 		}
