@@ -85,6 +85,7 @@ type App struct {
 	// 配置项
 	modRotationConfig   RotationConfig
 	workshopPreferredIP bool
+	migrationVersion    int
 	configPath          string
 }
 
@@ -92,9 +93,8 @@ type App struct {
 type ConfigFile struct {
 	ModRotationConfig   RotationConfig `json:"modRotationConfig"`
 	WorkshopPreferredIP bool           `json:"workshopPreferredIP"`
-	// 其他前端管理的配置项不需要在这里定义，因为前端自己管理 LocalStorage
-	// 但为了后端能持久化一些关键设置，我们需要这个文件
-	// 注意：目前前端主要用 LocalStorage，后端用这个文件主要为了启动时能获取状态
+	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
+	MigrationVersion int `json:"migrationVersion"`
 }
 
 // RotationConfig Mod轮换配置
@@ -161,9 +161,10 @@ func (a *App) loadConfig() {
 	a.mu.Lock()
 	a.modRotationConfig = config.ModRotationConfig
 	a.workshopPreferredIP = config.WorkshopPreferredIP
+	a.migrationVersion = config.MigrationVersion
 	a.mu.Unlock()
 
-	log.Printf("已加载配置: 优选IP=%v, 轮换=%v", a.workshopPreferredIP, a.modRotationConfig)
+	log.Printf("已加载配置: 优选IP=%v, 轮换=%v, 迁移版本=%d", a.workshopPreferredIP, a.modRotationConfig, a.migrationVersion)
 }
 
 func (a *App) saveConfig() {
@@ -171,6 +172,7 @@ func (a *App) saveConfig() {
 	config := ConfigFile{
 		ModRotationConfig:   a.modRotationConfig,
 		WorkshopPreferredIP: a.workshopPreferredIP,
+		MigrationVersion:    a.migrationVersion,
 	}
 	a.mu.RUnlock()
 
@@ -301,6 +303,32 @@ func (a *App) ScanVPKFiles() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// 自动迁移：检查并重命名旧的逗号分隔符文件
+	// 仅当迁移版本小于1时执行
+	currentMigrationVersion := 1
+	if a.migrationVersion < currentMigrationVersion {
+		log.Printf("开始执行文件格式迁移 (v%d -> v%d)...", a.migrationVersion, currentMigrationVersion)
+		migratedCount := 0
+
+		migratedPaths := make([]string, 0, len(vpkPaths))
+		for _, path := range vpkPaths {
+			newPath := a.migrateLegacyTagFilename(path)
+			migratedPaths = append(migratedPaths, newPath)
+			if newPath != path {
+				migratedCount++
+			}
+		}
+		vpkPaths = migratedPaths
+
+		log.Printf("迁移完成，处理了 %d 个文件", migratedCount)
+
+		// 更新迁移版本并保存配置
+		a.mu.Lock()
+		a.migrationVersion = currentMigrationVersion
+		a.mu.Unlock()
+		a.saveConfig()
 	}
 
 	// 创建当前文件路径集合，用于清理不存在的缓存
@@ -2048,7 +2076,8 @@ func (a *App) SetVPKTags(filePath string, primaryTag string, secondaryTags []str
 	if len(allTags) == 0 {
 		newFilename = prefix + baseName
 	} else {
-		tagStr := strings.Join(allTags, ",")
+		// 使用 + 作为分隔符，避免使用逗号导致 Windows Explorer /select, 失效
+		tagStr := strings.Join(allTags, "+")
 		newFilename = fmt.Sprintf("%s[%s]%s", prefix, tagStr, baseName)
 	}
 
@@ -2121,7 +2150,8 @@ func (a *App) RenameVPKFile(filePath string, newFilename string) (string, error)
 		allTags = append(allTags, sTags...)
 
 		if len(allTags) > 0 {
-			tagStr := strings.Join(allTags, ",")
+			// 使用 + 作为分隔符
+			tagStr := strings.Join(allTags, "+")
 			finalFilename = fmt.Sprintf("%s[%s]%s", prefix, tagStr, body)
 		}
 	}

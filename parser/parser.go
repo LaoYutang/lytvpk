@@ -100,7 +100,9 @@ func ParseFilenameTags(filename string) (string, []string, string, bool) {
 	tagsContent := matches[2]
 	// realName := hiddenPrefix + matches[3]
 
-	tagParts := strings.Split(tagsContent, ",")
+	tagParts := strings.FieldsFunc(tagsContent, func(r rune) bool {
+		return r == ',' || r == '+'
+	})
 	var primaryTag string
 	var secondaryTags []string
 
