@@ -106,6 +106,14 @@ export function GetMirrors() {
   return window['go']['main']['App']['GetMirrors']();
 }
 
+export function GetMirrorsInitial() {
+  return window['go']['main']['App']['GetMirrorsInitial']();
+}
+
+export function GetMirrorsWithLatency() {
+  return window['go']['main']['App']['GetMirrorsWithLatency']();
+}
+
 export function GetModRotation() {
   return window['go']['main']['App']['GetModRotation']();
 }
@@ -228,6 +236,10 @@ export function SetWorkshopPreferredIP(arg1) {
 
 export function StartDownloadTask(arg1, arg2) {
   return window['go']['main']['App']['StartDownloadTask'](arg1, arg2);
+}
+
+export function TestMirrorsLatency() {
+  return window['go']['main']['App']['TestMirrorsLatency']();
 }
 
 export function ToggleVPKFile(arg1) {

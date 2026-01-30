@@ -86,6 +86,20 @@ export namespace main {
 	        this.created_at = source["created_at"];
 	    }
 	}
+	export class MirrorWithLatency {
+	    url: string;
+	    latency: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new MirrorWithLatency(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.latency = source["latency"];
+	    }
+	}
 	export class PlayerInfo {
 	    name: string;
 	    score: number;

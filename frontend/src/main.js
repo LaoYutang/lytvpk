@@ -33,7 +33,9 @@ import {
   SelectFiles,
   CheckUpdate,
   DoUpdate,
-  GetMirrors,
+  GetMirrorsWithLatency,
+  GetMirrorsInitial,
+  TestMirrorsLatency,
   AutoDiscoverAddons,
   ExportVPKFilesToZip,
   RenameVPKFile,
@@ -4923,7 +4925,18 @@ async function showUpdateModal(info) {
   const newVer = document.getElementById("new-version-number");
   const curVer = document.getElementById("current-version-number");
   const notes = document.getElementById("release-notes-content");
-  const mirrorSelect = document.getElementById("mirror-select");
+
+  // Custom Dropdown Elements
+  const mirrorSelectContainer = document.getElementById(
+    "mirror-select-container"
+  );
+  const mirrorSelectedDisplay = document.getElementById(
+    "mirror-selected-display"
+  );
+  const mirrorOptionsList = document.getElementById("mirror-options-list");
+  const mirrorSelectValue = document.getElementById("mirror-select-value");
+  const refreshBtn = document.getElementById("refresh-mirrors-btn");
+
   const customInput = document.getElementById("custom-mirror-input");
   const confirmBtn = document.getElementById("confirm-update-btn");
   const cancelBtn = document.getElementById("cancel-update-btn");
@@ -4940,48 +4953,264 @@ async function showUpdateModal(info) {
   curVer.textContent = info.current_ver;
   notes.textContent = info.release_note || "暂无更新日志";
 
+  // Helper to set selected option
+  const setSelected = (value, htmlContent) => {
+    mirrorSelectValue.value = value;
+    // Keep arrow
+    mirrorSelectedDisplay.innerHTML =
+      `<div class="selected-content">${htmlContent}</div>` +
+      '<span class="select-arrow">▼</span>';
+
+    if (value === "custom") {
+      customInput.classList.remove("hidden");
+    } else {
+      customInput.classList.add("hidden");
+    }
+    mirrorOptionsList.classList.add("hidden");
+  };
+
+  // Move dropdown to body to avoid overflow/z-index issues
+  document.body.appendChild(mirrorOptionsList);
+
+  // Toggle dropdown
+  const toggleDropdown = (e) => {
+    e.stopPropagation(); // Prevent document click
+    if (e.target.closest(".selected-option")) {
+      if (mirrorOptionsList.classList.contains("hidden")) {
+        // Opening - Calculate fixed position
+        const rect = mirrorSelectContainer.getBoundingClientRect();
+        mirrorOptionsList.style.top = rect.bottom + 4 + "px";
+        mirrorOptionsList.style.left = rect.left + "px";
+        mirrorOptionsList.style.width = rect.width + "px";
+        mirrorOptionsList.classList.remove("hidden");
+      } else {
+        mirrorOptionsList.classList.add("hidden");
+      }
+    }
+  };
+
+  // Use addEventListener instead of onclick assignment
+  mirrorSelectContainer.addEventListener("click", toggleDropdown);
+
+  // Close when clicking outside
+  const clickOutsideHandler = (e) => {
+    // Check if the click is outside the dropdown list AND the container
+    if (
+      !mirrorSelectContainer.contains(e.target) &&
+      !mirrorOptionsList.contains(e.target)
+    ) {
+      mirrorOptionsList.classList.add("hidden");
+    }
+  };
+
+  // Close on scroll or resize
+  const closeDropdown = () => {
+    mirrorOptionsList.classList.add("hidden");
+  };
+
+  document.addEventListener("click", clickOutsideHandler);
+  window.addEventListener("resize", closeDropdown);
+  // Capture scroll events to handle scrolling in modal or any parent
+  window.addEventListener("scroll", closeDropdown, true);
+
+  let cancelLatencyListener = null;
+  let userInteracted = false;
+  let currentBestLatency = Infinity;
+
   // 加载镜像列表
   try {
-    const mirrors = await GetMirrors();
-    mirrorSelect.innerHTML = '<option value="">GitHub 直连</option>';
+    const mirrors = await GetMirrorsInitial();
+    mirrorOptionsList.innerHTML = "";
+
+    let defaultSelected = false;
+
     if (mirrors && mirrors.length > 0) {
-      mirrors.forEach((mirror) => {
-        const option = document.createElement("option");
-        option.value = mirror;
-        option.textContent = mirror;
-        mirrorSelect.appendChild(option);
+      mirrors.forEach((item) => {
+        const div = document.createElement("div");
+        div.className = "custom-option";
+
+        let latencyClass = "unknown";
+        let latencyText = "检测中...";
+
+        let displayName = item.url;
+        if (item.url === "") {
+          displayName = "GitHub 直连";
+        }
+
+        const innerHTML = `
+            <span class="mirror-url" title="${item.url || "GitHub 直连"}">${displayName}</span>
+            <span class="latency-tag ${latencyClass}">测试中</span>
+        `;
+
+        div.innerHTML = innerHTML;
+
+        div.onclick = () => {
+          userInteracted = true;
+          // Re-fetch current innerHTML to get updated latency tag
+          const currentTag = div.querySelector(".latency-tag").outerHTML;
+          const currentUrlHtml = `<span class="mirror-url" title="${item.url || "GitHub 直连"}">${displayName}</span>`;
+          setSelected(item.url, currentUrlHtml + currentTag);
+        };
+        mirrorOptionsList.appendChild(div);
+
+        // Auto select the first one (will update later)
+        if (!defaultSelected) {
+          setSelected(item.url, innerHTML);
+          defaultSelected = true;
+        }
       });
     }
-    const customOption = document.createElement("option");
-    customOption.value = "custom";
-    customOption.textContent = "自定义镜像源...";
-    mirrorSelect.appendChild(customOption);
+
+    const customOption = document.createElement("div");
+    customOption.className = "custom-option";
+    customOption.innerHTML = `<span class="mirror-url">自定义镜像源...</span>`;
+    customOption.onclick = () => {
+      userInteracted = true;
+      setSelected("custom", `<span class="mirror-url">自定义镜像源...</span>`);
+    };
+    mirrorOptionsList.appendChild(customOption);
+
+    // If no mirrors found or default not set, select custom or fallback
+    if (!defaultSelected) {
+      setSelected(
+        "",
+        `<span class="mirror-url">GitHub 直连</span><span class="latency-tag unknown">未知</span>`
+      );
+    }
+
+    // Start async test
+    TestMirrorsLatency();
+
+    // Listen for updates
+    cancelLatencyListener = EventsOn("mirror_latency_result", (result) => {
+      const options = mirrorOptionsList.querySelectorAll(".custom-option");
+      options.forEach((div) => {
+        const urlSpan = div.querySelector(".mirror-url");
+        if (!urlSpan) return;
+
+        let isMatch = false;
+        // Handle Direct connection (empty URL) case
+        if (result.url === "" && urlSpan.title === "GitHub 直连") {
+          isMatch = true;
+        } else if (result.url === urlSpan.title) {
+          isMatch = true;
+        }
+
+        if (isMatch) {
+          const tag = div.querySelector(".latency-tag");
+          if (tag) {
+            let latencyClass = "unknown";
+            let latencyText = "测试中";
+
+            if (result.latency === -1) {
+              latencyClass = "bad";
+              latencyText = "超时";
+            } else if (result.latency < 200) {
+              latencyClass = "good";
+              latencyText = result.latency + "ms";
+            } else if (result.latency < 500) {
+              latencyClass = "medium";
+              latencyText = result.latency + "ms";
+            } else {
+              latencyClass = "bad";
+              latencyText = result.latency + "ms";
+            }
+
+            tag.className = `latency-tag ${latencyClass}`;
+            tag.textContent = latencyText;
+
+            let justAutoSelected = false;
+            // Auto-select lowest latency (if user hasn't interacted)
+            if (
+              !userInteracted &&
+              result.latency !== -1 &&
+              result.latency < currentBestLatency
+            ) {
+              currentBestLatency = result.latency;
+              mirrorSelectValue.value = result.url;
+
+              mirrorSelectedDisplay.innerHTML =
+                `<div class="selected-content">${urlSpan.outerHTML}${tag.outerHTML}</div>` +
+                '<span class="select-arrow">▼</span>';
+
+              customInput.classList.add("hidden");
+              justAutoSelected = true;
+            }
+
+            // If this option is currently selected (and not just auto-selected), update the display too
+            if (!justAutoSelected && mirrorSelectValue.value === result.url) {
+              const displayTag =
+                mirrorSelectedDisplay.querySelector(".latency-tag");
+              if (displayTag) {
+                displayTag.className = `latency-tag ${latencyClass}`;
+                displayTag.textContent = latencyText;
+              }
+            }
+          }
+        }
+      });
+    });
   } catch (e) {
     console.error("Failed to load mirrors:", e);
+    // Fallback
+    setSelected("", `<span class="mirror-url">GitHub 直连</span>`);
+  }
+
+  // Refresh Handler
+  const refreshHandler = () => {
+    userInteracted = false;
+    currentBestLatency = Infinity;
+
+    const tags = mirrorOptionsList.querySelectorAll(".latency-tag");
+    tags.forEach((tag) => {
+      tag.className = "latency-tag unknown";
+      tag.textContent = "测试中";
+    });
+
+    const displayTag = mirrorSelectedDisplay.querySelector(".latency-tag");
+    if (displayTag) {
+      displayTag.className = "latency-tag unknown";
+      displayTag.textContent = "测试中";
+    }
+
+    TestMirrorsLatency();
+  };
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", refreshHandler);
   }
 
   // 重置状态
-  mirrorSelect.value = "";
-  customInput.classList.add("hidden");
   customInput.value = "";
   progressContainer.classList.add("hidden");
   modalFooter.classList.remove("hidden");
   confirmBtn.disabled = false;
   confirmBtn.textContent = "立即更新";
 
-  // 镜像选择事件
-  mirrorSelect.onchange = () => {
-    if (mirrorSelect.value === "custom") {
-      customInput.classList.remove("hidden");
-    } else {
-      customInput.classList.add("hidden");
-    }
-  };
-
   let cancelProgress = null;
 
   // 清理函数
   const cleanup = () => {
+    document.removeEventListener("click", clickOutsideHandler);
+    mirrorSelectContainer.removeEventListener("click", toggleDropdown);
+    window.removeEventListener("resize", closeDropdown);
+    window.removeEventListener("scroll", closeDropdown, true);
+
+    if (refreshBtn) {
+      refreshBtn.removeEventListener("click", refreshHandler);
+    }
+
+    if (cancelLatencyListener) {
+      cancelLatencyListener();
+      cancelLatencyListener = null;
+    }
+
+    // Put mirrorOptionsList back to container to avoid DOM detaching issues on next open
+    if (document.body.contains(mirrorOptionsList)) {
+      mirrorSelectContainer.appendChild(mirrorOptionsList);
+    }
+    mirrorOptionsList.classList.add("hidden");
+
     if (cancelProgress) {
       cancelProgress();
       cancelProgress = null;
@@ -5000,7 +5229,7 @@ async function showUpdateModal(info) {
 
   // 确认更新
   confirmBtn.onclick = async () => {
-    let mirror = mirrorSelect.value;
+    let mirror = mirrorSelectValue.value;
     if (mirror === "custom") {
       mirror = customInput.value.trim();
       if (!mirror) {

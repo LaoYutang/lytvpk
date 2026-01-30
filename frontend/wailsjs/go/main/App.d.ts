@@ -55,6 +55,10 @@ export function GetMapName(arg1:string):Promise<string>;
 
 export function GetMirrors():Promise<Array<string>>;
 
+export function GetMirrorsInitial():Promise<Array<main.MirrorWithLatency>>;
+
+export function GetMirrorsWithLatency():Promise<Array<main.MirrorWithLatency>>;
+
 export function GetModRotation():Promise<main.RotationConfig>;
 
 export function GetPrimaryTags():Promise<Array<string>>;
@@ -116,6 +120,8 @@ export function SetVPKTags(arg1:string,arg2:string,arg3:Array<string>):Promise<v
 export function SetWorkshopPreferredIP(arg1:boolean):Promise<void>;
 
 export function StartDownloadTask(arg1:main.WorkshopFileDetails,arg2:boolean):Promise<string>;
+
+export function TestMirrorsLatency():Promise<void>;
 
 export function ToggleVPKFile(arg1:string):Promise<void>;
 

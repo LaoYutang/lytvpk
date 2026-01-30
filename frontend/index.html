@@ -503,13 +503,26 @@
               </div>
 
               <div class="update-options">
-                <label for="mirror-select">下载源选择:</label>
-                <div class="select-wrapper">
-                  <select id="mirror-select" class="form-select">
-                    <option value="">GitHub 直连</option>
-                    <option value="custom">自定义镜像源...</option>
-                  </select>
-                  <div class="select-arrow">▼</div>
+                <label for="mirror-select-value">下载源选择:</label>
+                <div class="mirror-selection-group" style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                    <div class="select-wrapper custom-dropdown-wrapper" style="flex: 1;">
+                      <div class="custom-select-container" id="mirror-select-container">
+                        <div class="selected-option" id="mirror-selected-display">
+                          <span class="selected-text">GitHub 直连</span>
+                          <span class="select-arrow">▼</span>
+                        </div>
+                        <div class="options-list hidden" id="mirror-options-list">
+                          <!-- 动态生成选项 -->
+                        </div>
+                      </div>
+                      <input type="hidden" id="mirror-select-value" value="">
+                    </div>
+                    <button id="refresh-mirrors-btn" class="btn btn-icon-only" title="重新检测延迟">
+                        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6"></path>
+                            <path d="M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
+                        </svg>
+                    </button>
                 </div>
                 <input
                   type="text"
