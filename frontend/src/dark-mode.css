@@ -1,0 +1,407 @@
+/* 暗黑模式配色方案 */
+html.dark-mode {
+  /* 主色调 - 保持但微调以适应深色背景 */
+  --primary: #6366f1;
+  --primary-light: #818cf8;
+  --primary-dark: #4f46e5;
+  --primary-50: rgba(99, 102, 241, 0.1);
+  --primary-100: rgba(99, 102, 241, 0.2);
+  --primary-200: rgba(99, 102, 241, 0.3);
+
+  /* 背景层级 - 深空灰蓝 */
+  --bg-app: #0f172a; /* slate-900 */
+  --bg-surface: #1e293b; /* slate-800 */
+  --bg-card: #334155; /* slate-700 */
+  --bg-hover: #475569; /* slate-600 */
+  --bg-active: #64748b; /* slate-500 */
+  --bg-overlay: rgba(15, 23, 42, 0.95);
+
+  /* 文本颜色 */
+  --text-primary: #f1f5f9; /* slate-100 */
+  --text-secondary: #cbd5e1; /* slate-300 */
+  --text-tertiary: #94a3b8; /* slate-400 */
+  --text-muted: #64748b; /* slate-500 */
+  --text-inverse: #0f172a; /* slate-900 */
+
+  /* 边框 */
+  --border-default: rgba(148, 163, 184, 0.2);
+  --border-light: rgba(148, 163, 184, 0.1);
+  --border-strong: rgba(148, 163, 184, 0.3);
+
+  /* 阴影 - 加深以在深色背景可见 */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm:
+    0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.2);
+  --shadow-md:
+    0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg:
+    0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+  --shadow-xl:
+    0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+
+  /* 滚动条适配 */
+  color-scheme: dark;
+}
+
+/* 针对特定组件的暗黑模式覆盖 */
+
+/* 头部渐变调整 */
+html.dark-mode .header {
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom-color: var(--border-default);
+}
+
+html.dark-mode .header::before {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.05) 0%,
+    rgba(6, 182, 212, 0.05) 100%
+  );
+}
+
+/* 主背景渐变 */
+html.dark-mode #app {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+}
+
+/* 按钮样式微调 */
+html.dark-mode .btn-secondary {
+  background: var(--bg-card);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+html.dark-mode .btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+html.dark-mode .btn-ghost {
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+}
+
+html.dark-mode .btn-ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+html.dark-mode .header-right .btn-icon {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+html.dark-mode .header-right .btn-icon:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+  color: var(--primary-light);
+}
+
+/* 输入框 */
+html.dark-mode .search-input,
+html.dark-mode .form-input,
+html.dark-mode input[type="text"],
+html.dark-mode input[type="number"] {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+html.dark-mode .search-input:focus,
+html.dark-mode .form-input:focus {
+  background: var(--bg-card);
+  border-color: var(--primary);
+}
+
+/* 模态框 */
+html.dark-mode .modal-content {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+}
+
+html.dark-mode .modal-header {
+  border-bottom-color: var(--border-default);
+}
+
+html.dark-mode .modal-footer {
+  background-color: var(--bg-app);
+  border-top-color: var(--border-default);
+}
+
+html.dark-mode .close-btn {
+  color: var(--text-tertiary);
+}
+
+html.dark-mode .close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* 表格和列表 */
+html.dark-mode .file-list-header {
+  background: var(--bg-surface);
+  border-bottom-color: var(--border-default);
+}
+
+html.dark-mode .file-item {
+  border-bottom-color: var(--border-light);
+  background-color: transparent;
+}
+
+html.dark-mode .file-item:hover {
+  background-color: var(--bg-card) !important;
+}
+
+html.dark-mode .file-item.selected {
+  background-color: rgba(99, 102, 241, 0.15);
+  border-left-color: var(--primary);
+}
+
+/* 状态栏 - 与头部保持一致 */
+html.dark-mode .status-bar {
+  background: rgba(15, 23, 42, 0.9);
+  border-top-color: var(--border-default);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+html.dark-mode .status-bar::before {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.05) 0%,
+    rgba(6, 182, 212, 0.05) 100%
+  );
+}
+
+/* 强制移除斑马纹 */
+html.dark-mode .file-list .file-item:nth-child(even),
+html.dark-mode .file-item:nth-child(even) {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* 创意工坊骨架屏暗黑模式适配 */
+html.dark-mode .card-preview.skeleton-anim,
+html.dark-mode .main-preview-container.skeleton-anim,
+html.dark-mode .thumbnail-item.skeleton-anim {
+  background-color: var(--bg-card) !important;
+  background-image: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--bg-surface) 50%,
+    var(--bg-card) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+}
+
+/* 筛选标签 */
+html.dark-mode .tag-filter-btn {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+html.dark-mode .tag-filter-btn:hover {
+  background: var(--bg-hover);
+}
+
+html.dark-mode .tag-filter-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* 详情页 */
+html.dark-mode .detail-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+}
+
+html.dark-mode .detail-description-text blockquote {
+  background: var(--bg-card);
+  border-left-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+html.dark-mode .detail-description-text pre {
+  background: #020617; /* 更深的背景 */
+  border: 1px solid var(--border-default);
+}
+
+/* 加载界面 */
+html.dark-mode .loading-screen {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+/* 下拉菜单 */
+html.dark-mode .dropdown-content {
+  background-color: var(--bg-surface);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-lg);
+}
+
+html.dark-mode .dropdown-item {
+  color: var(--text-primary);
+}
+
+html.dark-mode .dropdown-item:hover {
+  background-color: var(--bg-hover);
+}
+
+/* 自定义标题栏 */
+html.dark-mode #custom-title-bar {
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+html.dark-mode .control-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+html.dark-mode .control-btn#w-close-btn:hover {
+  background-color: #c42b1c;
+  color: white;
+}
+
+/* 针对 style.css 中硬编码颜色的修正 */
+
+/* 冲突检测 */
+html.dark-mode .conflict-header {
+  background-color: rgba(231, 76, 60, 0.15); /* 稍微增加不透明度 */
+  border-bottom-color: var(--border-strong);
+}
+
+html.dark-mode .conflict-group {
+  background-color: var(--bg-card);
+  border-color: var(--border-default);
+}
+
+html.dark-mode .conflict-vpk-list {
+  color: var(--text-primary);
+}
+
+html.dark-mode .conflict-file-count {
+  background-color: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+html.dark-mode .conflict-file-item {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border-default);
+}
+
+/* 空状态 */
+html.dark-mode .conflict-empty {
+  color: var(--success); /* 使用变量而不是硬编码的绿色 */
+}
+
+/* 严重程度徽章 - 使用变量 */
+html.dark-mode .severity-badge.critical {
+  background-color: var(--danger);
+  color: white;
+}
+
+html.dark-mode .severity-badge.warning {
+  background-color: var(--warning);
+  color: black;
+}
+
+html.dark-mode .severity-badge.info {
+  background-color: var(--accent);
+  color: white;
+}
+
+/* 标签颜色 */
+html.dark-mode .tag-critical {
+  color: var(--danger-light);
+}
+html.dark-mode .tag-warning {
+  color: var(--warning-light);
+}
+html.dark-mode .tag-info {
+  color: var(--accent-light);
+}
+
+/* 修正详情页边框问题 */
+html.dark-mode .detail-section {
+  border: none;
+  box-shadow: none; /* 或者是微调阴影 */
+  background: var(--bg-surface); /* 确保背景色正确 */
+}
+
+/* 修正 Switch 在暗黑模式下关闭状态的颜色 */
+html.dark-mode .toggle-slider {
+  background-color: var(--gray-600); /* 比默认的 gray-300 更暗 */
+}
+
+html.dark-mode input:checked + .toggle-slider {
+  background-color: var(--primary); /* 选中状态保持主色 */
+}
+
+/* 修正主题切换按钮图标对齐 */
+html.dark-mode #theme-toggle-btn,
+#theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 0; /* 消除可能的空白字符影响 */
+}
+
+#theme-toggle-btn .icon-svg {
+  margin: auto; /* 强制居中 */
+  display: block; /* 避免 inline 元素的基线问题 */
+  flex-shrink: 0;
+}
+
+/* 移除暗黑模式下的列表斑马纹 - 已在上方统一定义 */
+
+/* 修正服务器编辑模态框底部背景色不一致的问题 */
+html.dark-mode .modal-footer {
+  background-color: transparent;
+  border-top-color: var(--border-default);
+}
+
+/* 调整暗黑模式下文件列表的背景色，使其与筛选栏一致，避免过深 */
+html.dark-mode .file-list-container,
+html.dark-mode .file-list {
+  background-color: var(--bg-surface);
+}
+
+/* 详情页背景色统一 - 修复右侧色差 */
+html.dark-mode .detail-container,
+html.dark-mode .detail-header-action {
+  background-color: var(--bg-app);
+}
+
+/* 全局滚动条适配 */
+html.dark-mode ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html.dark-mode ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.dark-mode ::-webkit-scrollbar-thumb {
+  background-color: var(--bg-card);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 10px;
+}
+
+html.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--bg-active);
+}
+
+html.dark-mode ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 强制移除斑马纹 - 已在上方统一定义 */

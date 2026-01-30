@@ -138,6 +138,41 @@
               </svg>
               <span>收藏服务器</span>
             </button>
+            <button id="theme-toggle-btn" class="btn-icon" title="切换主题">
+              <svg
+                class="icon-svg sun-icon"
+                style="display: none; width: 20px; height: 20px"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg
+              ><svg
+                class="icon-svg moon-icon"
+                style="width: 20px; height: 20px"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                ></path>
+              </svg>
+            </button>
             <button id="global-settings-btn" class="btn-icon" title="设置">
               <svg
                 class="icon-svg"
@@ -504,25 +539,51 @@
 
               <div class="update-options">
                 <label for="mirror-select-value">下载源选择:</label>
-                <div class="mirror-selection-group" style="display: flex; gap: 8px; align-items: center; width: 100%;">
-                    <div class="select-wrapper custom-dropdown-wrapper" style="flex: 1;">
-                      <div class="custom-select-container" id="mirror-select-container">
-                        <div class="selected-option" id="mirror-selected-display">
-                          <span class="selected-text">GitHub 直连</span>
-                          <span class="select-arrow">▼</span>
-                        </div>
-                        <div class="options-list hidden" id="mirror-options-list">
-                          <!-- 动态生成选项 -->
-                        </div>
+                <div
+                  class="mirror-selection-group"
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    width: 100%;
+                  "
+                >
+                  <div
+                    class="select-wrapper custom-dropdown-wrapper"
+                    style="flex: 1"
+                  >
+                    <div
+                      class="custom-select-container"
+                      id="mirror-select-container"
+                    >
+                      <div class="selected-option" id="mirror-selected-display">
+                        <span class="selected-text">GitHub 直连</span>
+                        <span class="select-arrow">▼</span>
                       </div>
-                      <input type="hidden" id="mirror-select-value" value="">
+                      <div class="options-list hidden" id="mirror-options-list">
+                        <!-- 动态生成选项 -->
+                      </div>
                     </div>
-                    <button id="refresh-mirrors-btn" class="btn btn-icon-only" title="重新检测延迟">
-                        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21.5 2v6h-6"></path>
-                            <path d="M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
-                        </svg>
-                    </button>
+                    <input type="hidden" id="mirror-select-value" value="" />
+                  </div>
+                  <button
+                    id="refresh-mirrors-btn"
+                    class="btn btn-icon-only"
+                    title="重新检测延迟"
+                  >
+                    <svg
+                      class="icon-svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M21.5 2v6h-6"></path>
+                      <path d="M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
+                    </svg>
+                  </button>
                 </div>
                 <input
                   type="text"
@@ -1038,28 +1099,24 @@
           <div class="load-order-body">
             <div class="load-order-section">
               <label class="load-order-label">当前文件</label>
-              <div
-                id="load-order-filename"
-                class="load-order-filename"
-              ></div>
+              <div id="load-order-filename" class="load-order-filename"></div>
             </div>
-            
+
             <div class="load-order-grid">
               <div class="load-order-input-wrapper">
                 <label class="load-order-label">当前序号</label>
                 <div class="load-order-current-box">
-                  <div
-                    id="load-order-current"
-                    class="load-order-current-value"
-                  >未生成</div>
+                  <div id="load-order-current" class="load-order-current-value">
+                    未生成
+                  </div>
                 </div>
               </div>
-              
+
               <div class="load-order-input-wrapper">
-                 <label for="load-order-input" class="load-order-label"
+                <label for="load-order-input" class="load-order-label"
                   >新序号</label
                 >
-                <div class="input-group" style="flex: 1;">
+                <div class="input-group" style="flex: 1">
                   <input
                     type="number"
                     id="load-order-input"
@@ -1076,7 +1133,12 @@
                 <div class="load-order-tips-text">
                   <p class="load-order-tips-title">加载顺序说明</p>
                   <ul class="load-order-tips-list">
-                    <li>数值 <span class="load-order-tips-highlight">越小</span>，加载优先级 <span class="load-order-tips-highlight">越高</span>。</li>
+                    <li>
+                      数值
+                      <span class="load-order-tips-highlight">越小</span
+                      >，加载优先级
+                      <span class="load-order-tips-highlight">越高</span>。
+                    </li>
                     <li>若文件未在列表中，将按此序号插入。</li>
                     <li>若已存在，将移动到此位置。</li>
                   </ul>
@@ -1085,10 +1147,16 @@
             </div>
           </div>
           <div class="load-order-footer">
-            <button id="cancel-load-order-btn" class="btn btn-secondary load-order-btn-cancel">
+            <button
+              id="cancel-load-order-btn"
+              class="btn btn-secondary load-order-btn-cancel"
+            >
               取消
             </button>
-            <button id="confirm-load-order-btn" class="btn btn-primary load-order-btn-confirm">
+            <button
+              id="confirm-load-order-btn"
+              class="btn btn-primary load-order-btn-confirm"
+            >
               保存更改
             </button>
           </div>

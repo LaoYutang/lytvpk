@@ -1,5 +1,6 @@
 import "./style.css?v=2.7";
 import "./app.css?v=2.7";
+import "./dark-mode.css";
 import "./titlebar.css";
 import "./rotation.css";
 
@@ -88,6 +89,51 @@ function getConfig() {
 function saveConfig(config) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
+
+// --- Theme Management ---
+function initTheme() {
+  const savedTheme = localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
+    document.documentElement.classList.add("dark-mode");
+  } else {
+    document.documentElement.classList.remove("dark-mode");
+  }
+}
+
+function updateThemeIcon() {
+  const isDark = document.documentElement.classList.contains("dark-mode");
+  const sunIcon = document.querySelector("#theme-toggle-btn .sun-icon");
+  const moonIcon = document.querySelector("#theme-toggle-btn .moon-icon");
+
+  if (sunIcon && moonIcon) {
+    if (isDark) {
+      sunIcon.style.display = "block";
+      moonIcon.style.display = "none";
+    } else {
+      sunIcon.style.display = "none";
+      moonIcon.style.display = "block";
+    }
+  }
+}
+
+// Initialize theme immediately
+initTheme();
+
+document.addEventListener("DOMContentLoaded", () => {
+  const themeBtn = document.getElementById("theme-toggle-btn");
+  if (themeBtn) {
+    themeBtn.addEventListener("click", () => {
+      const isDark = document.documentElement.classList.toggle("dark-mode");
+      localStorage.setItem("theme", isDark ? "dark" : "light");
+      updateThemeIcon();
+    });
+    // Initial icon update
+    updateThemeIcon();
+  }
+});
+// --- Theme Management End ---
 
 function getDefaultDirectory() {
   return getConfig().defaultDirectory || "";
@@ -2174,7 +2220,7 @@ function createFileCard(file) {
                 <path d="M4 10h2"></path>
                 <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
               </svg>
-            </span> 编辑加载顺序
+            </span> 加载顺序
           </button>
           <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
             <span class="btn-icon">📂</span> 位置
