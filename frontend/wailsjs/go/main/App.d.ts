@@ -65,6 +65,8 @@ export function GetSecondaryTags(arg1:string):Promise<Array<string>>;
 
 export function GetVPKFiles():Promise<Array<parser.VPKFile>>;
 
+export function GetVPKLoadOrder(arg1:string):Promise<number>;
+
 export function GetVPKPreviewImage(arg1:string):Promise<string>;
 
 export function GetWorkshopDetails(arg1:string):Promise<Array<main.WorkshopFileDetails>>;
@@ -106,6 +108,8 @@ export function SelectFiles():Promise<Array<string>>;
 export function SetModRotation(arg1:main.RotationConfig):Promise<void>;
 
 export function SetRootDirectory(arg1:string):Promise<void>;
+
+export function SetVPKLoadOrder(arg1:string,arg2:number):Promise<void>;
 
 export function SetVPKTags(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 

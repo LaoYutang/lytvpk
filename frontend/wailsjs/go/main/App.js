@@ -126,6 +126,10 @@ export function GetVPKFiles() {
   return window['go']['main']['App']['GetVPKFiles']();
 }
 
+export function GetVPKLoadOrder(arg1) {
+  return window['go']['main']['App']['GetVPKLoadOrder'](arg1);
+}
+
 export function GetVPKPreviewImage(arg1) {
   return window['go']['main']['App']['GetVPKPreviewImage'](arg1);
 }
@@ -208,6 +212,10 @@ export function SetModRotation(arg1) {
 
 export function SetRootDirectory(arg1) {
   return window['go']['main']['App']['SetRootDirectory'](arg1);
+}
+
+export function SetVPKLoadOrder(arg1, arg2) {
+  return window['go']['main']['App']['SetVPKLoadOrder'](arg1, arg2);
 }
 
 export function SetVPKTags(arg1, arg2, arg3) {

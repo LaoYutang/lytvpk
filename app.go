@@ -499,6 +499,185 @@ func (a *App) GetVPKFiles() []VPKFile {
 	return result
 }
 
+// AddonListItem 存储 addonlist.txt 中的条目信息
+type AddonListItem struct {
+	Name  string
+	Value string
+}
+
+// readAddonList 读取并解析 addonlist.txt
+func (a *App) readAddonList() ([]AddonListItem, string, error) {
+	if a.rootDir == "" {
+		return nil, "", fmt.Errorf("未选择L4D2目录")
+	}
+
+	parentDir := filepath.Dir(a.rootDir)
+	addonListPath := filepath.Join(parentDir, "addonlist.txt")
+
+	if _, err := os.Stat(addonListPath); os.IsNotExist(err) {
+		return nil, addonListPath, fmt.Errorf("addonlist.txt 不存在")
+	}
+
+	content, err := os.ReadFile(addonListPath)
+	if err != nil {
+		return nil, addonListPath, fmt.Errorf("无法读取 addonlist.txt: %v", err)
+	}
+
+	// 处理 BOM
+	if len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
+		content = content[3:]
+	}
+
+	// 转码
+	var contentStr string
+	if !utf8.Valid(content) {
+		reader := transform.NewReader(bytes.NewReader(content), simplifiedchinese.GBK.NewDecoder())
+		decoded, err := io.ReadAll(reader)
+		if err == nil {
+			contentStr = string(decoded)
+		} else {
+			contentStr = string(content)
+		}
+	} else {
+		contentStr = string(content)
+	}
+
+	// 解析
+	var list []AddonListItem
+	lines := strings.Split(contentStr, "\n")
+	kvRegex := regexp.MustCompile(`"([^"]+)"\s+"([^"]+)"`)
+	inBlock := false
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "//") {
+			continue
+		}
+		if strings.Contains(line, "\"AddonList\"") {
+			continue
+		}
+		if strings.Contains(line, "{") {
+			inBlock = true
+			continue
+		}
+		if strings.Contains(line, "}") {
+			inBlock = false
+			continue
+		}
+
+		if inBlock {
+			matches := kvRegex.FindStringSubmatch(line)
+			if len(matches) == 3 {
+				list = append(list, AddonListItem{
+					Name:  matches[1],
+					Value: matches[2],
+				})
+			}
+		}
+	}
+
+	return list, addonListPath, nil
+}
+
+// writeAddonList 写入 addonlist.txt
+func (a *App) writeAddonList(path string, list []AddonListItem) error {
+	var buf bytes.Buffer
+	buf.WriteString("\"AddonList\"\n{\n")
+	for _, item := range list {
+		// 确保只写入文件名，不带路径
+		name := filepath.Base(item.Name)
+		buf.WriteString(fmt.Sprintf("\t\"%s\"\t\t\"%s\"\n", name, item.Value))
+	}
+	buf.WriteString("}\n")
+
+	// 写入文件 (使用 UTF-8)
+	return os.WriteFile(path, buf.Bytes(), 0644)
+}
+
+// GetVPKLoadOrder 获取 VPK 文件的加载顺序 (1-based index)
+// 如果文件不在列表中，返回 -1
+func (a *App) GetVPKLoadOrder(filename string) (int, error) {
+	list, _, err := a.readAddonList()
+	if err != nil {
+		// 如果文件不存在，必须返回错误，而不是吞掉错误
+		// 这样前端才能区分是"文件不存在"还是"文件不在列表中"
+		return 0, err
+	}
+
+	targetName := strings.ToLower(filepath.Base(filename))
+	for i, item := range list {
+		if strings.ToLower(item.Name) == targetName {
+			return i + 1, nil // 1-based
+		}
+	}
+
+	return -1, nil
+}
+
+// SetVPKLoadOrder 设置 VPK 文件的加载顺序
+func (a *App) SetVPKLoadOrder(filename string, newOrder int) error {
+	list, path, err := a.readAddonList()
+
+	// 如果文件不存在，初始化为空列表，准备新建
+	if err != nil && strings.Contains(err.Error(), "不存在") {
+		list = []AddonListItem{}
+		// 重新计算路径，因为 readAddonList 出错时可能返回了空路径或正确路径
+		// 既然 readAddonList 返回了 path，我们就用它
+		if path == "" {
+			parentDir := filepath.Dir(a.rootDir)
+			path = filepath.Join(parentDir, "addonlist.txt")
+		}
+	} else if err != nil {
+		return err
+	}
+
+	targetName := filepath.Base(filename)
+	lowerTargetName := strings.ToLower(targetName)
+
+	// 1. 先查找并移除已存在的条目
+	var existingItem AddonListItem
+	found := false
+	cleanList := make([]AddonListItem, 0, len(list))
+
+	for _, item := range list {
+		if strings.ToLower(item.Name) == lowerTargetName {
+			existingItem = item
+			found = true
+		} else {
+			cleanList = append(cleanList, item)
+		}
+	}
+
+	// 如果没找到，创建一个新的，默认为开启状态 "1"
+	if !found {
+		existingItem = AddonListItem{
+			Name:  targetName,
+			Value: "1",
+		}
+	}
+
+	// 2. 确定插入位置
+	// newOrder 是 1-based
+	// 转换到 0-based slice index
+	index := newOrder - 1
+
+	if index < 0 {
+		index = 0
+	}
+	if index > len(cleanList) {
+		index = len(cleanList)
+	}
+
+	// 3. 插入
+	finalList := make([]AddonListItem, 0, len(cleanList)+1)
+	finalList = append(finalList, cleanList[:index]...)
+	finalList = append(finalList, existingItem)
+	finalList = append(finalList, cleanList[index:]...)
+
+	// 4. 写入文件
+	return a.writeAddonList(path, finalList)
+}
+
 // GetAddonListOrder 读取并解析 addonlist.txt 获取加载顺序
 func (a *App) GetAddonListOrder() ([]string, error) {
 	if a.rootDir == "" {

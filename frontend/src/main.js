@@ -47,6 +47,8 @@ import {
   GetWorkshopPreferredIP,
   GetCurrentBestIP,
   GetAddonListOrder,
+  GetVPKLoadOrder,
+  SetVPKLoadOrder,
 } from "../wailsjs/go/main/App";
 
 import {
@@ -633,6 +635,15 @@ function setupBatchActionEvents() {
   document
     .getElementById("close-info-modal-btn")
     .addEventListener("click", closeInfoModal);
+  document
+    .getElementById("close-load-order-modal-btn")
+    .addEventListener("click", closeLoadOrderModal);
+  document
+    .getElementById("cancel-load-order-btn")
+    .addEventListener("click", closeLoadOrderModal);
+  document
+    .getElementById("confirm-load-order-btn")
+    .addEventListener("click", saveLoadOrder);
 
   // 创意工坊按钮
   document
@@ -738,6 +749,14 @@ function setupBatchActionEvents() {
       closeInfoModal();
     }
   });
+
+  document
+    .getElementById("load-order-modal")
+    .addEventListener("click", function (e) {
+      if (e.target === this) {
+        closeLoadOrderModal();
+      }
+    });
 
   // 文件列表按钮事件委托
   console.log("正在设置文件列表按钮事件委托...");
@@ -948,6 +967,27 @@ function setupBatchActionEvents() {
         });
 
         deleteFile(filePath);
+      }
+    }
+
+    // 处理编辑加载顺序按钮点击
+    const loadOrderBtn = e.target.closest(
+      '.load-order-btn[data-action="load-order"]'
+    );
+    if (loadOrderBtn) {
+      const filePath = loadOrderBtn.getAttribute("data-file-path");
+      if (filePath) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 关闭下拉菜单
+        document.querySelectorAll(".dropdown-content").forEach((d) => {
+          d.classList.add("hidden");
+          const fileItem = d.closest(".file-item");
+          if (fileItem) fileItem.classList.remove("active-dropdown");
+        });
+
+        openLoadOrderModal(filePath);
       }
     }
   });
@@ -1948,6 +1988,50 @@ function createFileItem(file) {
   const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
   const hideBtnIcon = isHidden ? "👁️" : "👁️‍🗨️";
 
+  // 更多操作下拉菜单
+  const moreActionsHtml = `
+      <div class="more-actions-dropdown">
+        <button class="btn-small action-btn more-btn" title="更多操作">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+          </svg>
+        </button>
+        <div class="dropdown-content hidden">
+          <button class="dropdown-item detail-btn" data-file-path="${file.path}">
+            <span class="btn-icon">🔍</span> 详情
+          </button>
+          <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
+            <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+          </button>
+          <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
+            <span class="btn-icon">🏷️</span> 设置标签
+          </button>
+          <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
+            <span class="btn-icon">✏️</span> 重命名
+          </button>
+          <button class="dropdown-item load-order-btn" data-file-path="${file.path}" data-action="load-order">
+            <span class="btn-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="10" y1="6" x2="21" y2="6"></line>
+                <line x1="10" y1="12" x2="21" y2="12"></line>
+                <line x1="10" y1="18" x2="21" y2="18"></line>
+                <path d="M4 6h1v4"></path>
+                <path d="M4 10h2"></path>
+                <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+              </svg>
+            </span> 加载顺序
+          </button>
+          <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
+            <span class="btn-icon">📂</span> 位置
+          </button>
+          <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
+            <span class="btn-icon">🗑️</span> 删除
+          </button>
+        </div>
+      </div>
+    `;
+
+  // 组合内容
   item.innerHTML = `
         <div class="file-checkbox-container"></div>
         <div class="file-name" title="${file.path}">
@@ -1955,58 +2039,16 @@ function createFileItem(file) {
             <div class="file-filename">${file.name}</div>
         </div>
         <div class="file-size">${formatFileSize(file.size)}</div>
-        <div class="file-status">${statusIcon} ${
-          file.enabled ? "启用" : "禁用"
-        }</div>
-        <div class="file-location">${locationIcon} ${getLocationDisplayName(
-          file.location
-        )}</div>
-        <div class="file-tags">${formatTags(
-          file.primaryTag,
-          file.secondaryTags
-        )}</div>
+        <div class="file-status">${statusIcon} ${file.enabled ? "启用" : "禁用"}</div>
+        <div class="file-location">${locationIcon} ${getLocationDisplayName(file.location)}</div>
+        <div class="file-tags">${formatTags(file.primaryTag, file.secondaryTags)}</div>
         <div class="file-actions">
-            <button class="btn-small action-btn detail-btn" data-file-path="${
-              file.path
-            }">
+            <button class="btn-small action-btn detail-btn" data-file-path="${file.path}">
                 <span class="btn-icon">🔍</span>
                 <span class="btn-text">详情</span>
             </button>
             ${getActionButton(file)}
-            <div class="more-actions-dropdown">
-                <button class="btn-small action-btn more-btn" title="更多操作">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                    </svg>
-                </button>
-                <div class="dropdown-content hidden">
-                    <button class="dropdown-item hide-btn" data-file-path="${
-                      file.path
-                    }" data-action="hide">
-                        <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
-                    </button>
-                    <button class="dropdown-item set-tags-btn" data-file-path="${
-                      file.path
-                    }" data-action="set-tags">
-                        <span class="btn-icon">🏷️</span> 设置标签
-                    </button>
-                    <button class="dropdown-item rename-btn" data-file-path="${
-                      file.path
-                    }" data-action="rename">
-                        <span class="btn-icon">✏️</span> 重命名
-                    </button>
-                    <button class="dropdown-item open-location-btn" data-file-path="${
-                      file.path
-                    }" data-action="open-location">
-                        <span class="btn-icon">📂</span> 位置
-                    </button>
-                    <button class="dropdown-item delete-btn" data-file-path="${
-                      file.path
-                    }" data-action="delete">
-                        <span class="btn-icon">🗑️</span> 删除
-                    </button>
-                </div>
-            </div>
+            ${moreActionsHtml}
         </div>
     `;
 
@@ -2104,6 +2146,49 @@ function createFileCard(file) {
     `;
   }
 
+  // 更多操作下拉菜单
+  const moreActionsHtml = `
+      <div class="more-actions-dropdown">
+        <button class="btn-small action-btn more-btn" title="更多操作">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+          </svg>
+        </button>
+        <div class="dropdown-content hidden">
+          <button class="dropdown-item detail-btn" data-file-path="${file.path}">
+            <span class="btn-icon">🔍</span> 详情
+          </button>
+          <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
+            <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+          </button>
+          <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
+            <span class="btn-icon">🏷️</span> 设置标签
+          </button>
+          <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
+            <span class="btn-icon">✏️</span> 重命名
+          </button>
+          <button class="dropdown-item load-order-btn" data-file-path="${file.path}" data-action="load-order">
+            <span class="btn-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="10" y1="6" x2="21" y2="6"></line>
+                <line x1="10" y1="12" x2="21" y2="12"></line>
+                <line x1="10" y1="18" x2="21" y2="18"></line>
+                <path d="M4 6h1v4"></path>
+                <path d="M4 10h2"></path>
+                <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+              </svg>
+            </span> 编辑加载顺序
+          </button>
+          <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
+            <span class="btn-icon">📂</span> 位置
+          </button>
+          <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
+            <span class="btn-icon">🗑️</span> 删除
+          </button>
+        </div>
+      </div>
+    `;
+
   card.innerHTML = `
     <div class="card-preview-container">
         <div class="card-preview-placeholder ${showPlaceholder ? "" : "hidden"}">
@@ -2133,45 +2218,7 @@ function createFileCard(file) {
         <div class="card-filename" title="${file.name}">${file.name}</div>
         <div class="card-actions">
             ${actionBtn}
-            <div class="more-actions-dropdown">
-                <button class="btn-small action-btn more-btn" title="更多操作">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                    </svg>
-                </button>
-                <div class="dropdown-content hidden">
-                    <button class="dropdown-item detail-btn" data-file-path="${
-                      file.path
-                    }">
-                        <span class="btn-icon">🔍</span> 详情
-                    </button>
-                    <button class="dropdown-item hide-btn" data-file-path="${
-                      file.path
-                    }" data-action="hide">
-                        <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
-                    </button>
-                    <button class="dropdown-item set-tags-btn" data-file-path="${
-                      file.path
-                    }" data-action="set-tags">
-                        <span class="btn-icon">🏷️</span> 设置标签
-                    </button>
-                    <button class="dropdown-item rename-btn" data-file-path="${
-                      file.path
-                    }" data-action="rename">
-                        <span class="btn-icon">✏️</span> 重命名
-                    </button>
-                    <button class="dropdown-item open-location-btn" data-file-path="${
-                      file.path
-                    }" data-action="open-location">
-                        <span class="btn-icon">📂</span> 位置
-                    </button>
-                    <button class="dropdown-item delete-btn" data-file-path="${
-                      file.path
-                    }" data-action="delete">
-                        <span class="btn-icon">🗑️</span> 删除
-                    </button>
-                </div>
-            </div>
+            ${moreActionsHtml}
         </div>
     </div>
   `;
@@ -2478,6 +2525,93 @@ async function exportZipSelected() {
     if (typeof cleanup === "function") {
       cleanup();
     }
+  }
+}
+
+// 加载顺序编辑相关
+let currentLoadOrderFile = null;
+
+function openLoadOrderModal(filePath) {
+  const file = appState.vpkFiles.find((f) => f.path === filePath);
+  if (!file) return;
+
+  currentLoadOrderFile = filePath;
+  const modal = document.getElementById("load-order-modal");
+  const filenameEl = document.getElementById("load-order-filename");
+  const currentOrderEl = document.getElementById("load-order-current");
+  const input = document.getElementById("load-order-input");
+
+  filenameEl.textContent = file.name;
+  currentOrderEl.textContent = "正在获取...";
+  input.value = "";
+
+  // 获取当前顺序
+  GetVPKLoadOrder(file.name)
+    .then((order) => {
+      // 检查返回值是否是 -1 (不在列表中) 或 0 (可能出错)
+      // 后端返回 -1 表示不在列表，>0 表示在列表中的序号
+
+      modal.classList.remove("hidden");
+      input.focus();
+
+      if (order > 0) {
+        currentOrderEl.textContent = order;
+        input.placeholder = order; // 提示当前序号
+      } else {
+        currentOrderEl.textContent = "未生成";
+        input.placeholder = "输入新的序号";
+      }
+    })
+    .catch((err) => {
+      console.error("获取加载顺序失败:", err);
+      // 如果 addonlist.txt 不存在，不弹框，直接提示错误
+      if (err && err.includes && err.includes("addonlist.txt 不存在")) {
+        showError("未找到 addonlist.txt 文件，无法设置加载顺序");
+        return;
+      }
+
+      // 其他错误也弹提示，不打开弹框
+      showError("获取加载顺序失败: " + err);
+    });
+}
+
+function closeLoadOrderModal() {
+  document.getElementById("load-order-modal").classList.add("hidden");
+  currentLoadOrderFile = null;
+}
+
+async function saveLoadOrder() {
+  if (!currentLoadOrderFile) return;
+
+  const input = document.getElementById("load-order-input");
+  const orderStr = input.value.trim();
+
+  if (!orderStr) {
+    showError("请输入有效的序号");
+    return;
+  }
+
+  const order = parseInt(orderStr, 10);
+  if (isNaN(order)) {
+    showError("序号必须是数字");
+    return;
+  }
+
+  const file = appState.vpkFiles.find((f) => f.path === currentLoadOrderFile);
+  if (!file) return;
+
+  try {
+    await SetVPKLoadOrder(file.name, order);
+    showNotification("加载顺序已保存", "success");
+    closeLoadOrderModal();
+
+    // 刷新排序
+    // 如果当前是加载顺序排序，重新执行排序逻辑
+    // 无论如何，我们都刷新一下顺序数据，如果用户开启了加载顺序排序，界面会自动更新
+    await handleLoadOrderSort();
+  } catch (err) {
+    console.error("保存加载顺序失败:", err);
+    showError("保存失败: " + err);
   }
 }
 

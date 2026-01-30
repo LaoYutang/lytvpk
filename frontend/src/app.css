@@ -524,6 +524,184 @@ body {
   margin: 0;
 }
 
+/* 加载顺序弹框样式 */
+.load-order-modal-content {
+  max-width: 500px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  background-color: var(--bg-app);
+}
+
+.load-order-header {
+  padding: var(--spacing-6);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.load-order-header h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.load-order-body {
+  padding: var(--spacing-6);
+}
+
+.load-order-section {
+  margin-bottom: var(--spacing-6);
+}
+
+.load-order-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: var(--spacing-2);
+  display: block;
+}
+
+.load-order-filename {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+  background-color: var(--bg-surface);
+  padding: var(--spacing-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  word-break: break-all;
+  line-height: var(--leading-normal);
+}
+
+.load-order-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-6);
+  margin-bottom: var(--spacing-6);
+}
+
+.load-order-current-box {
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  border: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.load-order-current-value {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.load-order-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.load-order-input {
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  background-color: var(--bg-app);
+  border: 2px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  transition: all var(--duration-200);
+}
+
+.load-order-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+.load-order-tips {
+  background-color: rgba(6, 182, 212, 0.05); /* accent-50 */
+  padding: var(--spacing-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(6, 182, 212, 0.1);
+}
+
+.load-order-tips-content {
+  display: flex;
+  gap: var(--spacing-3);
+}
+
+.load-order-tips-icon {
+  font-size: var(--text-lg);
+  color: var(--accent);
+}
+
+.load-order-tips-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.load-order-tips-title {
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: var(--spacing-1);
+}
+
+.load-order-tips-list {
+  list-style-type: disc;
+  padding-left: var(--spacing-4);
+  margin: 0;
+}
+
+.load-order-tips-list li {
+  margin-bottom: var(--spacing-1);
+}
+
+.load-order-tips-highlight {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.load-order-footer {
+  padding: var(--spacing-5) var(--spacing-6);
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-3);
+  border-bottom-left-radius: var(--radius-xl);
+  border-bottom-right-radius: var(--radius-xl);
+}
+
+.load-order-btn-cancel {
+  padding: var(--spacing-2) var(--spacing-6);
+}
+
+.load-order-btn-confirm {
+  padding: var(--spacing-2) var(--spacing-6);
+}
+
+/* 隐藏数字输入框箭头 */
+.no-arrow::-webkit-outer-spin-button,
+.no-arrow::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-arrow {
+  -moz-appearance: textfield;
+}
+
 /* 主屏幕布局 */
 .main-screen {
   flex: 1;

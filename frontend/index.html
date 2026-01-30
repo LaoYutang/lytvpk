@@ -1012,6 +1012,75 @@
           </div>
         </div>
       </div>
+
+      <!-- 加载顺序编辑弹窗 -->
+      <div id="load-order-modal" class="modal hidden">
+        <div class="modal-content load-order-modal-content">
+          <div class="load-order-header">
+            <h2>编辑加载顺序</h2>
+            <button id="close-load-order-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="load-order-body">
+            <div class="load-order-section">
+              <label class="load-order-label">当前文件</label>
+              <div
+                id="load-order-filename"
+                class="load-order-filename"
+              ></div>
+            </div>
+            
+            <div class="load-order-grid">
+              <div class="load-order-input-wrapper">
+                <label class="load-order-label">当前序号</label>
+                <div class="load-order-current-box">
+                  <div
+                    id="load-order-current"
+                    class="load-order-current-value"
+                  >未生成</div>
+                </div>
+              </div>
+              
+              <div class="load-order-input-wrapper">
+                 <label for="load-order-input" class="load-order-label"
+                  >新序号</label
+                >
+                <div class="input-group" style="flex: 1;">
+                  <input
+                    type="number"
+                    id="load-order-input"
+                    class="load-order-input no-arrow"
+                    placeholder="输入"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="load-order-tips">
+              <div class="load-order-tips-content">
+                <div class="load-order-tips-icon">💡</div>
+                <div class="load-order-tips-text">
+                  <p class="load-order-tips-title">加载顺序说明</p>
+                  <ul class="load-order-tips-list">
+                    <li>数值 <span class="load-order-tips-highlight">越小</span>，加载优先级 <span class="load-order-tips-highlight">越高</span>。</li>
+                    <li>若文件未在列表中，将按此序号插入。</li>
+                    <li>若已存在，将移动到此位置。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="load-order-footer">
+            <button id="cancel-load-order-btn" class="btn btn-secondary load-order-btn-cancel">
+              取消
+            </button>
+            <button id="confirm-load-order-btn" class="btn btn-primary load-order-btn-confirm">
+              保存更改
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     <!-- 冲突检测弹窗 -->
     <div id="conflict-modal" class="modal hidden">
