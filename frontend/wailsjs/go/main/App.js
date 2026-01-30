@@ -82,6 +82,10 @@ export function ForceExit() {
   return window['go']['main']['App']['ForceExit']();
 }
 
+export function GetAddonListOrder() {
+  return window['go']['main']['App']['GetAddonListOrder']();
+}
+
 export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }

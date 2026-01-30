@@ -43,6 +43,8 @@ export function FetchWorkshopList(arg1:main.WorkshopQueryOptions):Promise<main.W
 
 export function ForceExit():Promise<void>;
 
+export function GetAddonListOrder():Promise<Array<string>>;
+
 export function GetAppVersion():Promise<string>;
 
 export function GetCurrentBestIP():Promise<string>;

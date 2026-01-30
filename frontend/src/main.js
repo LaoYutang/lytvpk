@@ -46,6 +46,7 @@ import {
   SetWorkshopPreferredIP,
   GetWorkshopPreferredIP,
   GetCurrentBestIP,
+  GetAddonListOrder,
 } from "../wailsjs/go/main/App";
 
 import {
@@ -107,8 +108,9 @@ let appState = {
   currentDirectory: "",
   isLoading: false, // 是否正在加载中
   showHidden: false, // 是否显示隐藏文件
-  sortType: "name", // 'name' | 'date'
+  sortType: "name", // 'name' | 'date' | 'loadOrder'
   sortOrder: "asc", // 'asc' | 'desc'
+  loadOrderMap: new Map(), // Map<filename, index>
   displayMode: getConfig().displayMode || "list", // 'list' | 'card'
 };
 
@@ -274,14 +276,56 @@ function setupSortEvents() {
   document
     .getElementById("sort-date-btn")
     ?.addEventListener("click", () => handleSortChange("date"));
+  document
+    .getElementById("sort-load-order-btn")
+    ?.addEventListener("click", () => handleLoadOrderSort());
 
   // 初始化 UI
   updateSortButtonUI();
 }
 
+// 处理加载顺序排序
+async function handleLoadOrderSort() {
+  // 关闭下拉菜单
+  document.getElementById("sort-dropdown-content")?.classList.add("hidden");
+
+  // 如果已经是按加载顺序排序，只刷新数据，不反转顺序
+  // 用户要求"完全按文件里面的顺序"
+
+  // 尝试获取加载顺序
+  try {
+    const orderList = await GetAddonListOrder();
+    console.log("获取到加载顺序:", orderList.length, "个条目");
+
+    // 构建 Map
+    appState.loadOrderMap.clear();
+    orderList.forEach((name, index) => {
+      appState.loadOrderMap.set(name.toLowerCase(), index); // 使用小写key以忽略大小写
+    });
+
+    // 切换到加载顺序模式，并强制正序
+    appState.sortType = "loadOrder";
+    appState.sortOrder = "asc";
+
+    updateSortButtonUI();
+    applySort(appState.vpkFiles);
+    renderFileList();
+
+    showNotification("已按加载顺序排序", "success");
+  } catch (err) {
+    console.error("获取加载顺序失败:", err);
+    showError("addonlist.txt 错误: " + err);
+  }
+}
+
 // 处理排序变更
 function handleSortChange(type) {
-  if (appState.sortType === type) {
+  if (appState.sortType === "loadOrder") {
+    // 强制保持正序，因为用户要求"完全按文件里面的顺序"
+    appState.sortOrder = "asc";
+    // 如果已经获取过且没有重新点击（这里实际上重新点击也会重新获取，保证最新）
+    // 为了简单，每次点击都刷新逻辑
+  } else if (appState.sortType === type) {
     // 同类型切换顺序
     appState.sortOrder = appState.sortOrder === "asc" ? "desc" : "asc";
   } else {
@@ -306,6 +350,7 @@ function updateSortButtonUI() {
   const btnText = document.getElementById("sort-btn-text");
   const nameBtn = document.getElementById("sort-name-btn");
   const dateBtn = document.getElementById("sort-date-btn");
+  const loadOrderBtn = document.getElementById("sort-load-order-btn");
 
   // 更新按钮文本
   let text = "文件名排序";
@@ -317,6 +362,9 @@ function updateSortButtonUI() {
   } else if (appState.sortType === "date") {
     text = "更新时间排序";
     arrow = appState.sortOrder === "desc" ? "(最新)" : "(最旧)";
+  } else if (appState.sortType === "loadOrder") {
+    text = "加载顺序排序";
+    arrow = appState.sortOrder === "asc" ? "(顺序)" : "(倒序)";
   }
 
   if (btnText) btnText.textContent = `${text} ${arrow}`;
@@ -329,6 +377,10 @@ function updateSortButtonUI() {
   if (dateBtn) {
     dateBtn.classList.toggle("active", appState.sortType === "date");
   }
+
+  if (loadOrderBtn) {
+    loadOrderBtn.classList.toggle("active", appState.sortType === "loadOrder");
+  }
 }
 
 // 应用排序
@@ -340,6 +392,44 @@ function applySort(files) {
       const dateA = a.lastModified ? new Date(a.lastModified).getTime() : 0;
       const dateB = b.lastModified ? new Date(b.lastModified).getTime() : 0;
       result = dateA - dateB;
+    } else if (appState.sortType === "loadOrder") {
+      // 加载顺序排序
+      // 规则：
+      // 1. 如果都在列表中，按列表顺序
+      // 2. 如果都不在列表中，按文件名顺序
+      // 3. 如果一个在列表中一个不在，在列表中的排前面（不在列表中的放最后）
+
+      const nameA = a.name.toLowerCase();
+      const nameB = b.name.toLowerCase();
+
+      const inListA = appState.loadOrderMap.has(nameA);
+      const inListB = appState.loadOrderMap.has(nameB);
+
+      if (inListA && inListB) {
+        // 都在列表中，比较索引
+        result =
+          appState.loadOrderMap.get(nameA) - appState.loadOrderMap.get(nameB);
+      } else if (!inListA && !inListB) {
+        // 都不在列表中，比较文件名
+        result = nameA.localeCompare(nameB, "zh-CN", {
+          numeric: true,
+          sensitivity: "accent",
+        });
+      } else {
+        // 一个在，一个不在
+        // 在列表中的排前面 (-1)，不在的排后面 (1)
+        if (inListA) {
+          result = -1;
+        } else {
+          result = 1;
+        }
+      }
+
+      // 注意：这里不应用 sortOrder 反转，因为"未找到文件放最后"是一个固定规则
+      // 且用户要求"完全按文件里面的顺序"，所以我们忽略 sortOrder 对整体结构的影响
+      // 或者我们只在 sortOrder 为 desc 时反转"都在列表中"和"都不在列表中"的内部顺序？
+      // 但鉴于我们强制了 asc，这里直接返回 result 即可。
+      return result;
     } else {
       // 默认文件名排序
       const nameA = a.name.toLowerCase();
