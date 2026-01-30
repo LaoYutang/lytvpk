@@ -322,12 +322,7 @@ async function handleLoadOrderSort() {
 
 // 处理排序变更
 function handleSortChange(type) {
-  if (appState.sortType === "loadOrder") {
-    // 强制保持正序，因为用户要求"完全按文件里面的顺序"
-    appState.sortOrder = "asc";
-    // 如果已经获取过且没有重新点击（这里实际上重新点击也会重新获取，保证最新）
-    // 为了简单，每次点击都刷新逻辑
-  } else if (appState.sortType === type) {
+  if (appState.sortType === type) {
     // 同类型切换顺序
     appState.sortOrder = appState.sortOrder === "asc" ? "desc" : "asc";
   } else {
