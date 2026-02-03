@@ -292,11 +292,10 @@ func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool
 	// Clean filename
 	filename := cleanFilename(details.Filename)
 
-	// If it's a workshop download (not direct), append the ID to the filename
+	// If it's a workshop download (not direct), use the ID as filename
 	if !strings.HasPrefix(details.PublishedFileId, "direct-") {
 		ext := filepath.Ext(filename)
-		nameWithoutExt := strings.TrimSuffix(filename, ext)
-		filename = fmt.Sprintf("%s_%s%s", nameWithoutExt, details.PublishedFileId, ext)
+		filename = fmt.Sprintf("%s%s", details.PublishedFileId, ext)
 	}
 
 	// If it's a direct download, use the cleaned filename as title
@@ -513,11 +512,10 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 				// Clean filename
 				filename = cleanFilename(filename)
 
-				// If it's a workshop download (not direct), append the ID to the filename
+				// If it's a workshop download (not direct), use the ID as filename
 				if !strings.HasPrefix(task.WorkshopID, "direct-") {
 					ext := filepath.Ext(filename)
-					nameWithoutExt := strings.TrimSuffix(filename, ext)
-					filename = fmt.Sprintf("%s_%s%s", nameWithoutExt, task.WorkshopID, ext)
+					filename = fmt.Sprintf("%s%s", task.WorkshopID, ext)
 				}
 
 				// Update task filename if it was unknown or we want to prefer server filename
@@ -591,17 +589,16 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 
 	out.Close() // Close before rename
 
-	// For direct downloads, ALWAYS append timestamp to ensure uniqueness
+	// For direct downloads, ALWAYS use timestamp to ensure uniqueness
 	if strings.HasPrefix(task.WorkshopID, "direct-") {
-		// Append timestamp with ms
+		// Use timestamp with ms
 		ext := filepath.Ext(task.Filename)
-		nameWithoutExt := strings.TrimSuffix(task.Filename, ext)
 		ms := time.Now().UnixNano() / int64(time.Millisecond)
-		newFilename := fmt.Sprintf("%s_%d%s", nameWithoutExt, ms, ext)
+		newFilename := fmt.Sprintf("%d%s", ms, ext)
 
 		taskManager.mu.Lock()
 		task.Filename = newFilename
-		task.Title = newFilename // Also update title for direct
+		// task.Title = newFilename // Keep original title for readability
 		taskManager.mu.Unlock()
 
 		targetPath = filepath.Join(a.rootDir, newFilename)
