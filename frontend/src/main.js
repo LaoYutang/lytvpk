@@ -1753,6 +1753,12 @@ async function renderSecondaryTags(primaryTag) {
     existingContainer.remove();
   }
 
+  // 清除现有的展开按钮
+  const existingExpandBtn = secondaryGroup.querySelector(".expand-tags-btn");
+  if (existingExpandBtn) {
+    existingExpandBtn.remove();
+  }
+
   if (!primaryTag) {
     // 没有选择标签时隐藏整个子标签组
     secondaryGroup.style.display = "none";
@@ -1778,6 +1784,22 @@ async function renderSecondaryTags(primaryTag) {
       });
 
       secondaryGroup.appendChild(container);
+
+      // 检查是否超过一行（高度超过30px）
+      if (container.scrollHeight > 30) {
+        container.classList.add("collapsed");
+        const expandBtn = document.createElement("button");
+        expandBtn.className = "expand-tags-btn";
+        expandBtn.innerHTML = '<span class="icon">▼</span> 展开';
+        expandBtn.onclick = () => {
+          container.classList.toggle("collapsed");
+          const isCollapsed = container.classList.contains("collapsed");
+          expandBtn.innerHTML = isCollapsed
+            ? '<span class="icon">▼</span> 展开'
+            : '<span class="icon">▲</span> 收起';
+        };
+        secondaryGroup.appendChild(expandBtn);
+      }
     } else {
       // 没有子标签时隐藏
       secondaryGroup.style.display = "none";

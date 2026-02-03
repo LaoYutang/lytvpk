@@ -2558,7 +2558,7 @@ body {
 /* 两级标签系统样式 */
 .tag-group {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
 }
 
@@ -2572,6 +2572,8 @@ body {
   font-weight: 500;
   color: var(--text-secondary);
   font-size: 0.875rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* 二级标签容器 */
@@ -2580,6 +2582,33 @@ body {
   flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.secondary-tags-container.collapsed {
+  max-height: 28px;
+}
+
+.expand-tags-btn {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+  margin-left: 4px;
+}
+
+.expand-tags-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
 }
 
 .secondary-tag-btn {
