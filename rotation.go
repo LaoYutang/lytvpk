@@ -55,15 +55,25 @@ func (a *App) GetModRotation() RotationConfig {
 	return a.modRotationConfig
 }
 
-// RotateMods 执行Mod随机轮换逻辑
+// RotateMods 执行Mod随机轮换逻辑 (对外接口，使用当前配置)
 func (a *App) RotateMods() error {
-	a.mu.Lock()
+	a.mu.RLock()
 	config := a.modRotationConfig
+	a.mu.RUnlock()
+
+	return a.rotateModsInternal(config)
+}
+
+// ManualRotateMods 手动执行一次Mod随机轮换 (使用指定配置)
+func (a *App) ManualRotateMods(config RotationConfig) error {
+	return a.rotateModsInternal(config)
+}
+
+// rotateModsInternal 内部轮换逻辑
+func (a *App) rotateModsInternal(config RotationConfig) error {
 	if !config.EnableCharacters && !config.EnableWeapons {
-		a.mu.Unlock()
 		return nil
 	}
-	a.mu.Unlock() // 解锁以允许后续操作获取锁
 
 	logMsg := func(msg string) {
 		runtime.EventsEmit(a.ctx, "rotation_log", msg)
@@ -116,6 +126,8 @@ func (a *App) RotateMods() error {
 	for tag := range targetTags {
 		// 构建池：包含该标签的所有Mod（启用和禁用）
 		var pool []VPKFile
+		var currentEnabled *VPKFile // 当前在该标签下启用的Mod
+
 		for _, file := range files {
 			// 检查是否包含该标签
 			hasTag := false
@@ -127,6 +139,9 @@ func (a *App) RotateMods() error {
 			}
 			if hasTag {
 				pool = append(pool, file)
+				if file.Enabled {
+					currentEnabled = &file
+				}
 			}
 		}
 
@@ -135,9 +150,26 @@ func (a *App) RotateMods() error {
 			continue
 		}
 
-		// 随机选择一个
-		selected := pool[rand.Intn(len(pool))]
-		logMsg(fmt.Sprintf("标签 [%s] 选中 Mod: %s", tag, selected.Name))
+		// 筛选出非当前的Mod作为候选池
+		var candidates []VPKFile
+		if currentEnabled != nil && len(pool) > 1 {
+			for _, file := range pool {
+				if file.Path != currentEnabled.Path {
+					candidates = append(candidates, file)
+				}
+			}
+		}
+
+		// 如果有候选池（即存在至少一个不同的Mod），则从候选池中选择
+		// 否则（只有一个Mod或没有当前启用的），从整个池中选择（实际上就是保持原样）
+		var selected VPKFile
+		if len(candidates) > 0 {
+			selected = candidates[rand.Intn(len(candidates))]
+			logMsg(fmt.Sprintf("标签 [%s] 候选数: %d, 选中新 Mod: %s (原: %s)", tag, len(candidates), selected.Name, currentEnabled.Name))
+		} else {
+			selected = pool[rand.Intn(len(pool))]
+			logMsg(fmt.Sprintf("标签 [%s] 无可替换 Mod (总数: %d), 保持: %s", tag, len(pool), selected.Name))
+		}
 
 		// 标记需要启用的
 		toEnable[selected.Path] = selected

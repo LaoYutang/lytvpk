@@ -52,6 +52,7 @@ import {
   GetAddonListOrder,
   GetVPKLoadOrder,
   SetVPKLoadOrder,
+  ManualRotateMods,
 } from "../wailsjs/go/main/App";
 
 import {
@@ -3152,6 +3153,49 @@ window.openFileLocation = async function (filePath) {
   }
 };
 
+// 手动执行轮换
+window.manualRotate = async function (type) {
+  try {
+    // 关闭当前的确认框
+    document.getElementById("confirm-modal").classList.add("hidden");
+
+    showLoadingScreen();
+
+    let config = {
+      enableCharacters: false,
+      enableWeapons: false,
+    };
+
+    let typeName = "";
+    if (type === "weapon") {
+      config.enableWeapons = true;
+      typeName = "武器";
+    } else if (type === "character") {
+      config.enableCharacters = true;
+      typeName = "人物";
+    } else {
+      // both
+      config.enableCharacters = true;
+      config.enableWeapons = true;
+      typeName = "所有";
+    }
+
+    updateLoadingMessage(`正在执行${typeName}轮换...`);
+
+    await ManualRotateMods(config);
+
+    // 刷新列表
+    await refreshFilesKeepFilter();
+
+    showMainScreen();
+    showNotification(`${typeName}轮换已完成`, "success");
+  } catch (e) {
+    showMainScreen();
+    // 错误已由后端事件处理，此处不再重复弹窗
+    console.error("手动轮换失败:", e);
+  }
+};
+
 // Mod随机轮换逻辑
 async function initModRotationState() {
   // 检查后端方法是否存在（兼容性检查）
@@ -3254,6 +3298,19 @@ async function toggleModRotation() {
             <span class="rotation-slider round"></span>
           </div>
         </label>
+        <div style="margin-top: 8px; border-top: 1px solid var(--border-light); padding-top: 12px; display: flex; gap: 10px;">
+           <button onclick="window.manualRotate('character')" class="btn btn-outline btn-small" style="flex: 1; justify-content: center;">
+             <span class="icon">
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+             </span> 手动轮换人物
+           </button>
+           <button onclick="window.manualRotate('weapon')" class="btn btn-outline btn-small" style="flex: 1; justify-content: center;">
+             <span class="icon">
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+             </span> 手动轮换武器
+           </button>
+        </div>
+        <div style="font-size: 0.85em; color: var(--text-tertiary); margin-top: 6px; text-align: center;">即便未开启自动轮换，也可以手动执行</div>
       </div>
       <div class="rotation-desc-container">
         <p>开启后，每次启动游戏将自动从已安装的Mod中随机选择并替换。</p>

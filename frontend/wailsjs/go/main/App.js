@@ -170,6 +170,10 @@ export function LogError(arg1, arg2, arg3) {
   return window['go']['main']['App']['LogError'](arg1, arg2, arg3);
 }
 
+export function ManualRotateMods(arg1) {
+  return window['go']['main']['App']['ManualRotateMods'](arg1);
+}
+
 export function MoveWorkshopToAddons(arg1) {
   return window['go']['main']['App']['MoveWorkshopToAddons'](arg1);
 }

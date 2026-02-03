@@ -87,6 +87,8 @@ export function LaunchL4D2():Promise<void>;
 
 export function LogError(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function ManualRotateMods(arg1:main.RotationConfig):Promise<void>;
+
 export function MoveWorkshopToAddons(arg1:string):Promise<void>;
 
 export function OpenFileLocation(arg1:string):Promise<void>;
