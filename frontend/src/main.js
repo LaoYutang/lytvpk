@@ -3991,6 +3991,14 @@ function createTaskElement(task) {
     cancelled: "已取消",
   };
 
+  const copyBtn = `
+    <button class="task-action-btn copy-link-btn" data-url="${task.file_url}" title="复制下载链接">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>`;
+
   let actionButtons = "";
   if (
     task.status === "downloading" ||
@@ -3998,6 +4006,7 @@ function createTaskElement(task) {
     task.status === "selecting_ip"
   ) {
     actionButtons = `
+      ${copyBtn}
       <button class="task-action-btn cancel-btn cancel-task-btn" data-id="${task.id}" title="取消下载">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -4006,6 +4015,7 @@ function createTaskElement(task) {
       </button>`;
   } else if (task.status === "failed" || task.status === "cancelled") {
     actionButtons = `
+      ${copyBtn}
       <button class="task-action-btn retry-btn retry-task-btn" data-id="${task.id}" title="重试下载">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M23 4v6h-6"></path>
@@ -4013,6 +4023,8 @@ function createTaskElement(task) {
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
         </svg>
       </button>`;
+  } else if (task.status === "completed") {
+    actionButtons = copyBtn;
   }
 
   let previewHtml = "";
@@ -4070,6 +4082,32 @@ function createTaskElement(task) {
   `;
 
   // Add event listeners for buttons
+  const copyLinkBtn = div.querySelector(".copy-link-btn");
+  if (copyLinkBtn) {
+    copyLinkBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const url = copyLinkBtn.dataset.url;
+      if (url) {
+        navigator.clipboard
+          .writeText(url)
+          .then(() => showNotification("下载链接已复制", "success"))
+          .catch((err) => {
+            console.error("复制失败:", err);
+            // Fallback for older browsers
+            const el = document.createElement("textarea");
+            el.value = url;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand("copy");
+            document.body.removeChild(el);
+            showNotification("下载链接已复制", "success");
+          });
+      } else {
+        showError("无效的下载链接");
+      }
+    });
+  }
+
   const cancelBtn = div.querySelector(".cancel-task-btn");
   if (cancelBtn) {
     cancelBtn.addEventListener("click", (e) => {
@@ -6174,7 +6212,7 @@ async function loadWorkshopList() {
   if (isSelecting) {
     // 释放锁以便后续重试
     browserState.loading = false;
-    
+
     const grid = document.getElementById("browser-grid");
     const loadingEl = document.getElementById("browser-loading");
     const loadMoreBtn = document.getElementById("browser-load-more");
@@ -6237,8 +6275,10 @@ async function loadWorkshopList() {
   }
 
   try {
-    console.log(`[Frontend] Fetching Workshop List: Page=${browserState.page}, Query=${browserState.query}, Sort=${browserState.sort}`);
-    
+    console.log(
+      `[Frontend] Fetching Workshop List: Page=${browserState.page}, Query=${browserState.query}, Sort=${browserState.sort}`
+    );
+
     // 调用 Go 后端
     const opts = {
       page: browserState.page,
