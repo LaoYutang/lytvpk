@@ -156,6 +156,9 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 		req.SetQueryParam("tags", strings.Join(opts.Tags, ","))
 	}
 
+	// Log request for debugging
+	fmt.Printf("[Workshop] Fetching List: Page=%d, Q=%s, Sort=%s\n", opts.Page, opts.SearchText, opts.Sort)
+
 	// 发起请求到 Cloudflare Worker (Path: /list)
 	resp, err := req.Get(WorkshopWorkerURL + "/list")
 
@@ -169,6 +172,13 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 	}
 
 	result := resp.Result().(*SteamMsgResponse)
+
+	// Log first item ID for debugging duplication issues
+	if len(result.Response.PublishedFileDetails) > 0 {
+		fmt.Printf("[Workshop] Got %d items. First ID: %s\n", len(result.Response.PublishedFileDetails), result.Response.PublishedFileDetails[0].PublishedFileId)
+	} else {
+		fmt.Println("[Workshop] Got 0 items")
+	}
 
 	finalResult := WorkshopListResult{
 		Items: result.Response.PublishedFileDetails,

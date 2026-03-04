@@ -6158,15 +6158,23 @@ function openBrowser() {
   modal.classList.remove("hidden");
 
   // 如果是第一次打开且没数据，加载
-  if (browserState.data.length === 0) {
+  if (browserState.data.length === 0 && !browserState.loading) {
+    browserState.page = 1; // 确保从第一页开始
     loadWorkshopList();
   }
 }
 
 async function loadWorkshopList() {
+  // 防止重复请求锁
+  if (browserState.loading) return;
+  browserState.loading = true;
+
   // 检查是否正在优选IP
   const isSelecting = await IsSelectingIP();
   if (isSelecting) {
+    // 释放锁以便后续重试
+    browserState.loading = false;
+    
     const grid = document.getElementById("browser-grid");
     const loadingEl = document.getElementById("browser-loading");
     const loadMoreBtn = document.getElementById("browser-load-more");
@@ -6204,8 +6212,6 @@ async function loadWorkshopList() {
     return;
   }
 
-  if (browserState.loading && browserState.page > 1) return; // 第一页允许重刷
-
   // 隐藏详情页
   const detailView = document.getElementById("browser-detail-view");
   if (detailView) detailView.classList.add("hidden");
@@ -6214,7 +6220,6 @@ async function loadWorkshopList() {
   const loadingEl = document.getElementById("browser-loading");
   const loadMoreBtn = document.getElementById("browser-load-more");
 
-  browserState.loading = true;
   loadingEl.classList.remove("hidden");
   loadMoreBtn.classList.add("hidden");
 
@@ -6232,6 +6237,8 @@ async function loadWorkshopList() {
   }
 
   try {
+    console.log(`[Frontend] Fetching Workshop List: Page=${browserState.page}, Query=${browserState.query}, Sort=${browserState.sort}`);
+    
     // 调用 Go 后端
     const opts = {
       page: browserState.page,
