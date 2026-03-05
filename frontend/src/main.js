@@ -2042,6 +2042,8 @@ function createFileItem(file) {
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.className = "file-checkbox";
+  // 初始化选中状态
+  checkbox.checked = appState.selectedFiles.has(file.path);
   checkbox.addEventListener("change", function () {
     toggleFileSelection(file.path, checkbox.checked);
   });
