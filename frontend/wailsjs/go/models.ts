@@ -100,6 +100,22 @@ export namespace main {
 	        this.latency = source["latency"];
 	    }
 	}
+	export class MoveResult {
+	    successCount: number;
+	    failCount: number;
+	    errors: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MoveResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.successCount = source["successCount"];
+	        this.failCount = source["failCount"];
+	        this.errors = source["errors"];
+	    }
+	}
 	export class PlayerInfo {
 	    name: string;
 	    score: number;

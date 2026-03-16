@@ -986,17 +986,13 @@ func (a *App) GetSecondaryTags(primaryTag string) []string {
 // SelectDirectory 选择文件夹对话框
 func (a *App) SelectDirectory() (string, error) {
 	directory, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:                "选择 L4D2 addons 目录",
+		Title:                "选择文件夹",
 		ShowHiddenFiles:      false,
-		CanCreateDirectories: false,
+		CanCreateDirectories: true,
 	})
 
 	if err != nil {
 		return "", err
-	}
-
-	if directory == "" {
-		return "", fmt.Errorf("未选择目录")
 	}
 
 	return directory, nil
@@ -1036,6 +1032,104 @@ func (a *App) AutoDiscoverAddons() (string, error) {
 	}
 
 	return "", nil
+}
+
+// MoveResult 移动结果
+type MoveResult struct {
+	SuccessCount int      `json:"successCount"`
+	FailCount    int      `json:"failCount"`
+	Errors       []string `json:"errors"`
+}
+
+// MoveVpkFiles 移动多个VPK文件及其关联的sidecar文件到指定目录
+func (a *App) MoveVpkFiles(filePaths []string, destDir string) (MoveResult, error) {
+	result := MoveResult{}
+
+	// 确保目标目录存在
+	if _, err := os.Stat(destDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			return result, fmt.Errorf("无法创建目标目录: %v", err)
+		}
+	}
+
+	for _, srcPath := range filePaths {
+		fileName := filepath.Base(srcPath)
+		destPath := filepath.Join(destDir, fileName)
+
+		// 移动 VPK 文件
+		if err := moveFile(srcPath, destPath); err != nil {
+			result.FailCount++
+			result.Errors = append(result.Errors, fmt.Sprintf("移动 %s 失败: %v", fileName, err))
+			continue
+		}
+
+		// 处理 Sidecar 文件 (图片)
+		ext := filepath.Ext(srcPath)
+		baseName := strings.TrimSuffix(srcPath, ext)
+
+		// 常见的图片扩展名
+		imageExts := []string{".jpg", ".png", ".jpeg", ".bmp"}
+		for _, imgExt := range imageExts {
+			imgSrc := baseName + imgExt
+			if _, err := os.Stat(imgSrc); err == nil {
+				imgName := filepath.Base(imgSrc)
+				imgDest := filepath.Join(destDir, imgName)
+				// 尝试移动图片，如果失败仅记录日志，不视为整体失败
+				if err := moveFile(imgSrc, imgDest); err != nil {
+					log.Printf("移动关联图片 %s 失败: %v", imgName, err)
+				}
+			}
+		}
+
+		result.SuccessCount++
+	}
+
+	return result, nil
+}
+
+// moveFile 移动文件，如果跨设备移动失败则尝试复制并删除
+func moveFile(src, dst string) error {
+	// 检查目标文件是否存在，避免覆盖
+	if _, err := os.Stat(dst); err == nil {
+		return fmt.Errorf("目标文件已存在")
+	}
+
+	if err := os.Rename(src, dst); err != nil {
+		// 如果是跨设备移动错误，尝试复制并删除
+		// Windows: "The system cannot move the file to a different disk drive"
+		// Linux/Unix: "cross-device link"
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "cross-device link") || strings.Contains(errMsg, "different disk drive") {
+			return copyAndDelete(src, dst)
+		}
+		return err
+	}
+	return nil
+}
+
+// copyAndDelete 复制并删除源文件
+func copyAndDelete(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	if _, err := io.Copy(destFile, sourceFile); err != nil {
+		return err
+	}
+
+	// 确保写入完成
+	sourceFile.Close()
+	destFile.Close()
+
+	return os.Remove(src)
 }
 
 // SelectFiles 选择文件对话框 (支持多选)

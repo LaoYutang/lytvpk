@@ -174,6 +174,10 @@ export function ManualRotateMods(arg1) {
   return window['go']['main']['App']['ManualRotateMods'](arg1);
 }
 
+export function MoveVpkFiles(arg1, arg2) {
+  return window['go']['main']['App']['MoveVpkFiles'](arg1, arg2);
+}
+
 export function MoveWorkshopToAddons(arg1) {
   return window['go']['main']['App']['MoveWorkshopToAddons'](arg1);
 }

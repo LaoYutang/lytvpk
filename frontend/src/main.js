@@ -17,6 +17,7 @@ import {
   SelectDirectory,
   ValidateDirectory,
   LaunchL4D2,
+  MoveVpkFiles,
   OpenFileLocation,
   GetWorkshopDetails,
   StartDownloadTask,
@@ -559,6 +560,15 @@ function setupBatchActionEvents() {
     exportZipSelectedBtn.addEventListener("click", () => {
       closeBatchDropdown();
       exportZipSelected();
+    });
+  }
+
+  // 批量移动
+  const moveSelectedBtn = document.getElementById("move-selected-btn");
+  if (moveSelectedBtn) {
+    moveSelectedBtn.addEventListener("click", () => {
+      closeBatchDropdown();
+      moveSelected();
     });
   }
 
@@ -2810,6 +2820,42 @@ async function deleteSelected() {
       }
     }
   );
+}
+
+// 批量移动选中的文件
+async function moveSelected() {
+  if (appState.selectedFiles.size === 0) {
+    alert("请先选择文件");
+    return;
+  }
+
+  const filesToMove = Array.from(appState.selectedFiles);
+
+  try {
+    const destDir = await SelectDirectory();
+    if (!destDir) return; // 用户取消
+
+    showNotification("正在移动文件...", "info");
+
+    const result = await MoveVpkFiles(filesToMove, destDir);
+
+    if (result.successCount > 0) {
+      showSuccess(`成功移动 ${result.successCount} 个文件`);
+      appState.selectedFiles.clear();
+    }
+
+    if (result.failCount > 0) {
+      showError(`${result.failCount} 个文件移动失败: ${result.errors[0]}`);
+      console.error("移动失败详情:", result.errors);
+    }
+
+    // 刷新列表
+    await refreshFilesKeepFilter();
+    updateStatusBar();
+  } catch (error) {
+    console.error("移动文件出错:", error);
+    showError(`移动文件出错: ${error}`);
+  }
 }
 
 // 更新状态栏
