@@ -1434,7 +1434,7 @@ async function loadFiles() {
     console.log("扫描完成，找到", files.length, "个文件");
   } catch (error) {
     console.error("扫描文件失败:", error);
-    alert("扫描文件失败: " + error);
+    showError("扫描文件失败: " + error);
   } finally {
     appState.isLoading = false;
     showMainScreen();
@@ -1444,7 +1444,7 @@ async function loadFiles() {
 // 刷新文件列表
 async function refreshFiles() {
   if (!appState.currentDirectory) {
-    alert("请先选择目录");
+    showNotification("请先选择目录", "info");
     return;
   }
   await loadFiles();
@@ -1453,7 +1453,7 @@ async function refreshFiles() {
 // 保持筛选状态的刷新文件列表
 async function refreshFilesKeepFilter() {
   if (!appState.currentDirectory) {
-    alert("请先选择目录");
+    showNotification("请先选择目录", "info");
     return;
   }
 
@@ -2457,7 +2457,7 @@ function deselectAll() {
 // 启用选中的文件
 async function enableSelected() {
   if (appState.selectedFiles.size === 0) {
-    alert("请先选择文件");
+    showNotification("请先选择文件", "info");
     return;
   }
 
@@ -2515,7 +2515,7 @@ async function enableSelected() {
 // 禁用选中的文件
 async function disableSelected() {
   if (appState.selectedFiles.size === 0) {
-    alert("请先选择文件");
+    showNotification("请先选择文件", "info");
     return;
   }
 
@@ -2790,7 +2790,7 @@ async function renameFile(filePath) {
 // 批量删除选中的文件
 async function deleteSelected() {
   if (appState.selectedFiles.size === 0) {
-    alert("请先选择文件");
+    showNotification("请先选择文件", "info");
     return;
   }
 
@@ -2825,7 +2825,7 @@ async function deleteSelected() {
 // 批量移动选中的文件
 async function moveSelected() {
   if (appState.selectedFiles.size === 0) {
-    alert("请先选择文件");
+    showNotification("请先选择文件", "info");
     return;
   }
 
@@ -4881,7 +4881,7 @@ function connectServer(address) {
     })
     .catch((err) => {
       console.error("连接服务器失败:", err);
-      alert("连接服务器失败: " + err);
+      showError("连接服务器失败: " + err);
     });
 }
 
@@ -5969,7 +5969,7 @@ if (appSaveTagsBtn) {
         showError("更新标签失败: " + err);
       } else {
         console.error(err);
-        alert("更新标签失败: " + err);
+        showError("更新标签失败: " + err);
       }
     }
   });
