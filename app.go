@@ -23,6 +23,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"net"
+	"net/http"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -116,9 +117,19 @@ func NewApp() *App {
 
 	pool, _ := ants.NewPool(cores) // 创建协程池
 
-	// 初始化 Resty 客户端
+	// 初始化 Resty 客户端（强制 IPv4，避免伪 IPv6 导致连接失败）
+	ipv4Dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	ipv4Transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return ipv4Dialer.DialContext(ctx, "tcp4", addr)
+		},
+	}
 	client := resty.New()
 	client.SetTimeout(2 * time.Second)
+	client.SetTransport(ipv4Transport)
 
 	// 启动本地图片代理
 	proxy := NewImageProxyServer(globalIPSelector)

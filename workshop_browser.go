@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -103,9 +105,19 @@ var (
 
 func getWorkshopClient() *resty.Client {
 	workshopClientOnce.Do(func() {
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		transport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialer.DialContext(ctx, "tcp4", addr)
+			},
+		}
 		workshopClient = resty.New()
 		workshopClient.SetTimeout(15 * time.Second)
 		workshopClient.SetRetryCount(2)
+		workshopClient.SetTransport(transport)
 	})
 	return workshopClient
 }

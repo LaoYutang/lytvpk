@@ -28,7 +28,15 @@ var defaultSteamCDNIPs = []string{
 
 func fetchRemoteIPs(domain string) ([]string, error) {
 	apiURL := fmt.Sprintf("https://lytvpk-get-ips.laoyutang.cn/?domain=%s", domain)
-	client := &http.Client{Timeout: 5 * time.Second}
+	dialer := &net.Dialer{Timeout: 5 * time.Second}
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialer.DialContext(ctx, "tcp4", addr)
+			},
+		},
+	}
 
 	resp, err := client.Get(apiURL)
 	if err != nil {
