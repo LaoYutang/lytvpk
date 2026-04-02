@@ -56,19 +56,21 @@ foreach ($ip in $IpList) {
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
             $socket = New-Object System.Net.Sockets.TcpClient
             $connectTask = $socket.ConnectAsync($ip, $port)
-            if ($connectTask.Wait(2000)) { # 2s timeout
+            if ($connectTask.Wait(2000)) {
+                # 2s timeout
                 $stopwatch.Stop()
                 $lat = $stopwatch.Elapsed.TotalMilliseconds
                 $latencies += $lat
                 $socket.Close()
                 Write-Host ("{0:N0}ms " -f $lat) -ForegroundColor Green -NoNewline
-            } else {
-                 Write-Host "X " -ForegroundColor Red -NoNewline
+            }
+            else {
+                Write-Host "X " -ForegroundColor Red -NoNewline
             }
             $socket.Dispose()
         }
         catch {
-             Write-Host "Err " -ForegroundColor Red -NoNewline
+            Write-Host "Err " -ForegroundColor Red -NoNewline
         }
         Start-Sleep -Milliseconds 100
     }
@@ -130,7 +132,8 @@ foreach ($ip in $IpList) {
                 $speedMBps = $speedBps / 1024 / 1024
                 $speeds += $speedMBps
                 Write-Host ("{0:N2} " -f $speedMBps) -ForegroundColor Yellow -NoNewline
-            } else {
+            }
+            else {
                 Write-Host "X " -ForegroundColor Red -NoNewline
             }
             
@@ -143,11 +146,12 @@ foreach ($ip in $IpList) {
             Write-Host ("MB/s (Avg: {0:N2} MB/s)" -f $avgSpeed) -ForegroundColor Yellow
             
             $results += [PSCustomObject]@{
-                IP = $ip
+                IP           = $ip
                 AvgLatencyMs = [math]::Round($avgLatency, 2)
                 AvgSpeedMBps = [math]::Round($avgSpeed, 2)
             }
-        } else {
+        }
+        else {
             Write-Host "Failed all speed tests" -ForegroundColor Red
         }
     }
@@ -159,3 +163,6 @@ foreach ($ip in $IpList) {
 Write-Host ""
 Write-Host "--- Results (Sorted by Speed) ---" -ForegroundColor Cyan
 $results | Sort-Object AvgSpeedMBps -Descending | Format-Table -AutoSize
+
+Write-Host "Press any key to exit..." -ForegroundColor Gray
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
