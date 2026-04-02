@@ -95,7 +95,7 @@ type App struct {
 // ConfigFile 定义配置文件结构
 type ConfigFile struct {
 	ModRotationConfig   RotationConfig `json:"modRotationConfig"`
-	WorkshopPreferredIP bool           `json:"workshopPreferredIP"`
+	WorkshopPreferredIP *bool          `json:"workshopPreferredIP,omitempty"`
 	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
 	MigrationVersion int `json:"migrationVersion"`
 }
@@ -142,10 +142,11 @@ func NewApp() *App {
 	configPath := filepath.Join(appConfigDir, "config.json")
 
 	app := &App{
-		goroutinePool: pool,
-		restyClient:   client,
-		proxyServer:   proxy,
-		configPath:    configPath,
+		goroutinePool:       pool,
+		restyClient:         client,
+		proxyServer:         proxy,
+		configPath:          configPath,
+		workshopPreferredIP: true, // 默认开启优选IP
 	}
 
 	// 加载配置
@@ -173,7 +174,9 @@ func (a *App) loadConfig() {
 
 	a.mu.Lock()
 	a.modRotationConfig = config.ModRotationConfig
-	a.workshopPreferredIP = config.WorkshopPreferredIP
+	if config.WorkshopPreferredIP != nil {
+		a.workshopPreferredIP = *config.WorkshopPreferredIP
+	}
 	a.migrationVersion = config.MigrationVersion
 	a.mu.Unlock()
 
@@ -182,9 +185,10 @@ func (a *App) loadConfig() {
 
 func (a *App) saveConfig() {
 	a.mu.RLock()
+	v := a.workshopPreferredIP
 	config := ConfigFile{
 		ModRotationConfig:   a.modRotationConfig,
-		WorkshopPreferredIP: a.workshopPreferredIP,
+		WorkshopPreferredIP: &v,
 		MigrationVersion:    a.migrationVersion,
 	}
 	a.mu.RUnlock()
