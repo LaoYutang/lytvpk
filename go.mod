@@ -11,6 +11,7 @@ require (
 	github.com/nwaples/rardecode v1.1.3
 	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/wailsapp/wails/v2 v2.10.2
+	golang.org/x/sys v0.35.0
 	golang.org/x/text v0.32.0
 )
 
@@ -51,7 +52,6 @@ require (
 	golang.org/x/crypto v0.41.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
 )
 
 // replace github.com/wailsapp/wails/v2 v2.6.0 => C:\Users\PC\go\pkg\mod

@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -20,6 +21,10 @@ const (
 )
 
 func main() {
+	// 确保单例运行
+	// 如果已有实例运行，会将参数传递给已有实例并退出
+	EnsureSingleton(os.Args)
+
 	// Create an instance of the app structure
 	app := NewApp()
 

@@ -79,6 +79,8 @@ export function GetWorkshopPreferredIP():Promise<boolean>;
 
 export function HandleFileDrop(arg1:Array<string>):Promise<void>;
 
+export function HandleProtocolURL(arg1:string):Promise<void>;
+
 export function HasActiveDownloads():Promise<boolean>;
 
 export function IsSelectingIP():Promise<boolean>;

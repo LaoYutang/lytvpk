@@ -1242,6 +1242,33 @@ function setupWailsEvents() {
   EventsOn("rotation_log", (msg) => {
     console.log(`[ModRotation] ${msg}`);
   });
+
+  // --- URL协议事件监听 ---
+  // 监听解析工坊ID事件 (lytvpk://parse/{id})
+  EventsOn("protocol:parse", (data) => {
+    console.log("收到协议解析请求:", data);
+    if (data && data.workshopId) {
+      // 调用现有的工坊解析功能
+      handleProtocolParse(data.workshopId);
+    }
+  });
+
+  // 监听打开工坊页面事件 (lytvpk://workshop/{id})
+  EventsOn("protocol:workshop", (data) => {
+    console.log("收到协议打开工坊请求:", data);
+    if (data && data.workshopId) {
+      // 导航到工坊页面并显示详情
+      handleProtocolWorkshop(data.workshopId);
+    }
+  });
+
+  // 监听协议错误事件
+  EventsOn("protocol:error", (data) => {
+    console.error("协议处理错误:", data);
+    if (data && data.message) {
+      showError(`协议处理失败: ${data.message}`);
+    }
+  });
 }
 
 // 退出确认相关函数
@@ -7002,3 +7029,78 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+/* -------------------------------------------------------------------------- */
+/* URL协议处理函数 (lytvpk://parse/{id} 和 lytvpk://workshop/{id})            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 处理 lytvpk://parse/{id} 协议
+ * 解析工坊ID并显示下载界面
+ */
+async function handleProtocolParse(workshopId) {
+  console.log("处理协议解析:", workshopId);
+
+  // 显示通知
+  showNotification(`正在解析工坊ID: ${workshopId}`, "info");
+
+  // 打开工坊下载模态框
+  openWorkshopModal();
+
+  // 填充工坊URL（使用ID构造URL）
+  const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`;
+  document.getElementById("workshop-url").value = workshopUrl;
+
+  // 自动触发解析
+  setTimeout(() => {
+    const checkBtn = document.getElementById("check-workshop-btn");
+    if (checkBtn) {
+      checkBtn.click();
+    }
+  }, 300);
+}
+
+/**
+ * 处理 lytvpk://workshop/{id} 协议
+ * 在工坊浏览器中打开指定工坊详情
+ */
+async function handleProtocolWorkshop(workshopId) {
+  console.log("处理协议打开工坊:", workshopId);
+
+  // 显示通知
+  showNotification(`正在打开工坊: ${workshopId}`, "info");
+
+  // 打开工坊浏览器模态框
+  openBrowser();
+
+  // 等待模态框打开后，直接打开详情
+  setTimeout(async () => {
+    try {
+      // 尝试获取详情
+      const detail = await FetchWorkshopDetail(workshopId);
+      if (detail && detail.publishedfileid) {
+        // API成功，使用完整详情
+        openWorkshopDetail(detail);
+      } else {
+        // API返回空，使用基本信息
+        openWorkshopDetail({
+          publishedfileid: workshopId,
+          title: `工坊 #${workshopId}`,
+          preview_url: "",
+          description: "无法获取详细信息，请检查网络连接",
+        });
+      }
+    } catch (err) {
+      console.error("获取工坊详情失败:", err);
+      // API失败时，使用基本信息打开（而不是显示错误）
+      openWorkshopDetail({
+        publishedfileid: workshopId,
+        title: `工坊 #${workshopId}`,
+        preview_url: "",
+        description: `获取详情失败: ${err}\n\n请检查网络连接或稍后重试`,
+      });
+      // 显示错误提示（但不阻止用户操作）
+      showError(`获取工坊详情失败: ${err}`);
+    }
+  }, 500);
+}

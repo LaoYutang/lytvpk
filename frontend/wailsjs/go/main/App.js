@@ -154,6 +154,10 @@ export function HandleFileDrop(arg1) {
   return window['go']['main']['App']['HandleFileDrop'](arg1);
 }
 
+export function HandleProtocolURL(arg1) {
+  return window['go']['main']['App']['HandleProtocolURL'](arg1);
+}
+
 export function HasActiveDownloads() {
   return window['go']['main']['App']['HasActiveDownloads']();
 }
