@@ -7073,6 +7073,17 @@ async function handleProtocolWorkshop(workshopId) {
   // 打开工坊浏览器模态框
   openBrowser();
 
+  // 检查是否正在优选IP，如果是则等待完成
+  const isSelecting = await IsSelectingIP();
+  if (isSelecting) {
+    console.log("正在优选IP，等待完成...");
+    showNotification("正在等待IP优选完成...", "info");
+
+    // 等待优选IP完成
+    await waitForIPSelection();
+    console.log("IP优选已完成，继续获取详情");
+  }
+
   // 等待模态框打开后，直接打开详情
   setTimeout(async () => {
     try {
@@ -7103,4 +7114,25 @@ async function handleProtocolWorkshop(workshopId) {
       showError(`获取工坊详情失败: ${err}`);
     }
   }, 500);
+}
+
+/**
+ * 等待IP优选完成
+ * 返回Promise，在ip_selection_end事件触发后resolve
+ */
+function waitForIPSelection() {
+  return new Promise((resolve) => {
+    // 设置超时，最多等待30秒
+    const timeout = setTimeout(() => {
+      console.log("等待IP优选超时，继续执行");
+      resolve();
+    }, 30000);
+
+    // 监听优选完成事件
+    const cleanup = EventsOn("ip_selection_end", () => {
+      clearTimeout(timeout);
+      cleanup(); // 清理事件监听
+      resolve();
+    });
+  });
 }
