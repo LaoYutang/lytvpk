@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -57,6 +58,7 @@ func fetchRemoteIPs(domain string) ([]string, error) {
 
 type IPSelector struct {
 	cachedBestIP string
+	cachedSpeed  float64 // Cached download speed in MB/s
 	lastCheck    time.Time
 	isSelecting  bool
 	mu           sync.RWMutex
@@ -68,6 +70,12 @@ func (s *IPSelector) IsSelecting() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.isSelecting
+}
+
+func (s *IPSelector) GetCachedSpeed() float64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cachedSpeed
 }
 
 func (s *IPSelector) GetBestIP(testUrl string) string {
@@ -164,11 +172,12 @@ func (s *IPSelector) refreshBestIP(testUrl string) string {
 		fmt.Printf("[IPSelector] DNS lookup failed: %v\n", err)
 	}
 
-	bestIP := selectBestIP(candidateIPs, testUrl)
+	bestIP, speed := selectBestIP(candidateIPs, testUrl)
 
 	s.mu.Lock()
 	if bestIP != "" {
 		s.cachedBestIP = bestIP
+		s.cachedSpeed = speed
 		s.lastCheck = time.Now()
 	}
 	result := s.cachedBestIP
@@ -190,7 +199,7 @@ func lookupIPWithDNS(dnsServer string, host string) ([]string, error) {
 	return r.LookupHost(context.Background(), host)
 }
 
-func selectBestIP(ips []string, testUrl string) string {
+func selectBestIP(ips []string, testUrl string) (string, float64) {
 	type result struct {
 		ip      string
 		latency time.Duration
@@ -233,7 +242,7 @@ PING_DONE:
 
 	if len(pingResults) == 0 {
 		fmt.Println("[IPSelector] No reachable IP found via Ping")
-		return ""
+		return "", 0.0
 	}
 
 	// Sort by latency
@@ -331,12 +340,12 @@ SPEED_DONE:
 
 	if bestIP != "" {
 		fmt.Printf("[IPSelector] Best IP selected: %s (Speed: %.2f MB/s)\n", bestIP, maxSpeed)
-		return bestIP
+		return bestIP, maxSpeed
 	}
 
 	// Fallback to lowest latency if speed test failed for all
 	fmt.Printf("[IPSelector] Speed test failed for all, falling back to lowest latency: %s\n", topCandidates[0].ip)
-	return topCandidates[0].ip
+	return topCandidates[0].ip, 0.0
 }
 
 func testDownloadSpeed(ctx context.Context, ip string, downloadUrl string) (float64, error) {
@@ -398,4 +407,70 @@ func testDownloadSpeed(ctx context.Context, ip string, downloadUrl string) (floa
 
 	speedMBps := float64(written) / 1024 / 1024 / duration.Seconds()
 	return speedMBps, nil
+}
+
+// CalculateThreadCount determines optimal thread count based on file size
+// Returns the number of parallel download threads to use
+func CalculateThreadCount(fileSize int64, maxThreads int) int {
+	if maxThreads <= 0 {
+		maxThreads = 8 // Default max
+	}
+
+	// Minimum file size threshold for multi-threading (5MB)
+	minSizeForMultiThread := int64(5 * 1024 * 1024)
+	if fileSize < minSizeForMultiThread {
+		return 1
+	}
+
+	// Thread count based on file size only
+	var threads int
+	switch {
+	case fileSize < 50*1024*1024: // 5-50MB
+		threads = 2
+	case fileSize < 200*1024*1024: // 50-200MB
+		threads = 4
+	default: // > 200MB
+		threads = 8
+	}
+
+	// Ensure minimum chunk size of 1MB to avoid too many small chunks
+	minChunkSize := int64(1 * 1024 * 1024)
+	maxPossibleThreads := int(fileSize / minChunkSize)
+	if maxPossibleThreads < threads {
+		threads = max(1, maxPossibleThreads)
+	}
+
+	return min(threads, maxThreads)
+}
+
+// CreateChunks creates chunk download tasks based on file size and thread count
+func CreateChunks(totalSize int64, threadCount int, tempDir string, taskID string) []*ChunkDownload {
+	if threadCount <= 0 || totalSize <= 0 {
+		return nil
+	}
+
+	chunks := make([]*ChunkDownload, threadCount)
+	chunkSize := totalSize / int64(threadCount)
+
+	for i := 0; i < threadCount; i++ {
+		start := int64(i) * chunkSize
+		end := start + chunkSize - 1
+
+		// Last chunk gets remaining bytes
+		if i == threadCount-1 {
+			end = totalSize - 1
+		}
+
+		chunks[i] = &ChunkDownload{
+			Index:      i,
+			StartByte:  start,
+			EndByte:    end,
+			Status:     "pending",
+			Retries:    0,
+			Downloaded: 0,
+			TempFile:   filepath.Join(tempDir, fmt.Sprintf("%s_chunk_%d.part", taskID, i)),
+		}
+	}
+
+	return chunks
 }

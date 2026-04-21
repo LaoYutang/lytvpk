@@ -65,6 +65,29 @@ type DownloadTask struct {
 	cancelFunc     context.CancelFunc `json:"-"`
 }
 
+// ChunkDownload represents a single chunk for parallel download
+type ChunkDownload struct {
+	Index      int    `json:"index"`      // Chunk index (0-based)
+	StartByte  int64  `json:"start_byte"` // Start byte position
+	EndByte    int64  `json:"end_byte"`   // End byte position (inclusive)
+	Status     string `json:"status"`     // "pending", "downloading", "completed", "failed"
+	Retries    int    `json:"retries"`    // Number of retries attempted
+	Downloaded int64  `json:"downloaded"` // Bytes downloaded for this chunk
+	TempFile   string `json:"temp_file"`  // Temporary file path for this chunk
+	Error      string `json:"error"`      // Error message if failed
+}
+
+// ChunkManager manages all chunks for a parallel download
+type ChunkManager struct {
+	Chunks      []*ChunkDownload
+	TotalSize   int64
+	ChunkCount  int
+	Completed   int64 // Total bytes completed (atomic)
+	ActiveCount int32 // Number of active chunks (atomic)
+	FailedCount int32 // Number of failed chunks (atomic)
+	mu          sync.Mutex
+}
+
 // TaskManager manages download tasks
 type TaskManager struct {
 	tasks map[string]*DownloadTask
@@ -377,6 +400,76 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		return
 	}
 
+	// First, try to get file size via HEAD request for chunked download decision
+	totalSize := task.TotalSize
+	if totalSize == 0 {
+		totalSize = a.getFileSize(ctx, downloadUrl, bestIP)
+		if totalSize > 0 {
+			taskManager.mu.Lock()
+			task.TotalSize = totalSize
+			taskManager.mu.Unlock()
+			runtime.EventsEmit(a.ctx, "task_updated", task)
+		}
+	}
+
+	// Calculate optimal thread count based on file size (max 8 threads)
+	threadCount := CalculateThreadCount(totalSize, 8)
+
+	// Use chunked download if multiple threads are needed
+	if threadCount > 1 && totalSize > 0 {
+		fmt.Printf("[Download] Using %d-thread download for %s (Size: %.2f MB)\n",
+			threadCount, task.Filename, float64(totalSize)/1024/1024)
+
+		err := a.processChunkedDownload(ctx, task, downloadUrl, bestIP, totalSize, threadCount, tempDir)
+		if err != nil {
+			// Check if server does not support Range, fallback to single-thread
+			if err.Error() == "range_not_supported" {
+				fmt.Printf("[Download] Server does not support Range, falling back to single-thread download\n")
+				// Continue to single-thread download below
+			} else if ctx.Err() != nil {
+				updateStatus("cancelled", "Cancelled by user")
+				return
+			} else {
+				updateStatus("failed", err.Error())
+				return
+			}
+		} else {
+			// Chunked download succeeded
+			// Move final file to target location
+			finalPath := filepath.Join(tempDir, task.ID+"_final")
+			targetPath := filepath.Join(a.rootDir, filepath.Base(task.Filename))
+
+			// For direct downloads, use timestamp for uniqueness
+			if strings.HasPrefix(task.WorkshopID, "direct-") {
+				ext := filepath.Ext(task.Filename)
+				ms := time.Now().UnixNano() / int64(time.Millisecond)
+				newFilename := fmt.Sprintf("%d%s", ms, ext)
+				taskManager.mu.Lock()
+				task.Filename = newFilename
+				taskManager.mu.Unlock()
+				targetPath = filepath.Join(a.rootDir, newFilename)
+				runtime.EventsEmit(a.ctx, "task_updated", task)
+			}
+
+			if err := os.Rename(finalPath, targetPath); err != nil {
+				updateStatus("failed", "Rename failed: "+err.Error())
+				return
+			}
+
+			// Download preview image
+			a.downloadPreviewImage(task, targetPath)
+
+			// Auto extract for archives
+			a.handleArchiveExtraction(task, targetPath, updateStatus)
+
+			updateStatus("completed", "")
+			return
+		}
+	}
+
+	// Single-thread download (fallback or small files)
+	fmt.Printf("[Download] Using single-thread download for %s\n", task.Filename)
+
 	// Generate hash for temp filename
 	hashInput := fmt.Sprintf("%s-%d", task.Filename, time.Now().UnixNano())
 	hash := md5.Sum([]byte(hashInput))
@@ -555,7 +648,6 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 
 	// Determine total size
-	totalSize := task.TotalSize
 	if totalSize == 0 && resp.ContentLength > 0 {
 		totalSize = resp.ContentLength
 		// Update task info
@@ -762,5 +854,453 @@ func formatSpeed(bytesPerSec float64) string {
 		return fmt.Sprintf("%.1f KB/s", bytesPerSec/1024)
 	} else {
 		return fmt.Sprintf("%.1f MB/s", bytesPerSec/(1024*1024))
+	}
+}
+
+// ==================== Chunked Download Functions ====================
+
+// downloadChunk downloads a single chunk with Range request
+func (a *App) downloadChunk(ctx context.Context, chunk *ChunkDownload, downloadUrl string, bestIP string, chunkManager *ChunkManager, task *DownloadTask) error {
+	// Create HTTP client with optimized IP if available
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   15 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: 60 * time.Second,
+	}
+
+	if bestIP != "" {
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, _ := net.SplitHostPort(addr)
+			u, parseErr := url.Parse(downloadUrl)
+			if parseErr == nil && u.Hostname() == host {
+				return dialer.DialContext(ctx, network, net.JoinHostPort(bestIP, port))
+			}
+			return dialer.DialContext(ctx, network, addr)
+		}
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   0, // No global timeout for large chunks
+	}
+
+	// Create request with Range header
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
+	if err != nil {
+		return err
+	}
+
+	// Set Range header for this chunk
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", chunk.StartByte, chunk.EndByte))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Referer", "https://steamcommunity.com/")
+	req.Header.Set("Accept", "*/*")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode == http.StatusOK {
+		// Server does not support Range requests, return special error
+		return fmt.Errorf("server does not support range requests")
+	}
+	if resp.StatusCode != http.StatusPartialContent {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	// Create temp file for this chunk
+	out, err := os.Create(chunk.TempFile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Create progress writer for this chunk
+	chunkWriter := &ChunkProgressWriter{
+		Chunk:        chunk,
+		ChunkManager: chunkManager,
+		Task:         task,
+		Ctx:          a.ctx,
+	}
+
+	// Download chunk content
+	_, err = io.Copy(out, io.TeeReader(resp.Body, chunkWriter))
+	if err != nil {
+		return err
+	}
+
+	// Mark chunk as completed
+	chunkManager.mu.Lock()
+	chunk.Status = "completed"
+	chunkManager.mu.Unlock()
+
+	return nil
+}
+
+// ChunkProgressWriter tracks progress for a single chunk
+type ChunkProgressWriter struct {
+	Chunk        *ChunkDownload
+	ChunkManager *ChunkManager
+	Task         *DownloadTask
+	Ctx          context.Context
+	LastUpdate   time.Time
+	LastBytes    int64 // For speed calculation
+}
+
+func (cw *ChunkProgressWriter) Write(p []byte) (int, error) {
+	n := len(p)
+
+	// Update chunk downloaded count
+	cw.ChunkManager.mu.Lock()
+	cw.Chunk.Downloaded += int64(n)
+	cw.ChunkManager.mu.Unlock()
+
+	// Update total completed
+	completed := cw.ChunkManager.Completed + int64(n)
+	cw.ChunkManager.Completed = completed
+
+	// Update task progress and speed periodically
+	now := time.Now()
+	duration := now.Sub(cw.LastUpdate)
+
+	if duration > 500*time.Millisecond {
+		taskManager.mu.Lock()
+		cw.Task.DownloadedSize = completed
+		if cw.ChunkManager.TotalSize > 0 {
+			cw.Task.Progress = int(float64(completed) / float64(cw.ChunkManager.TotalSize) * 100)
+		}
+
+		// Calculate speed
+		if duration > 0 && cw.LastBytes > 0 {
+			bytesDelta := completed - cw.LastBytes
+			speedBps := float64(bytesDelta) / duration.Seconds()
+			cw.Task.Speed = formatSpeed(speedBps)
+		}
+
+		taskManager.mu.Unlock()
+		runtime.EventsEmit(cw.Ctx, "task_progress", cw.Task)
+		cw.LastUpdate = now
+		cw.LastBytes = completed
+	}
+
+	return n, nil
+}
+
+// processChunkedDownload manages parallel chunk downloads
+func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, downloadUrl string, bestIP string, totalSize int64, threadCount int, tempDir string) error {
+	// Create chunk manager
+	chunkManager := &ChunkManager{
+		TotalSize:  totalSize,
+		ChunkCount: threadCount,
+		Completed:  0,
+	}
+
+	// Create chunks
+	chunks := CreateChunks(totalSize, threadCount, tempDir, task.ID)
+	if chunks == nil {
+		return fmt.Errorf("failed to create chunks")
+	}
+	chunkManager.Chunks = chunks
+
+	fmt.Printf("[ChunkedDownload] Starting %d-thread download for %s (Size: %.2f MB)\n",
+		threadCount, task.Filename, float64(totalSize)/1024/1024)
+
+	// Create semaphore to limit concurrent downloads
+	sem := make(chan struct{}, threadCount)
+
+	// Channel to collect errors
+	errChan := make(chan error, threadCount)
+
+	// Wait group for all chunks
+	var wg sync.WaitGroup
+
+	// Start chunk downloads
+	for _, chunk := range chunks {
+		wg.Add(1)
+
+		go func(c *ChunkDownload) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Check for cancellation
+			select {
+			case <-ctx.Done():
+				chunkManager.mu.Lock()
+				c.Status = "cancelled"
+				chunkManager.mu.Unlock()
+				errChan <- ctx.Err()
+				return
+			default:
+			}
+
+			// Mark as downloading
+			chunkManager.mu.Lock()
+			c.Status = "downloading"
+			chunkManager.mu.Unlock()
+
+			// Retry loop for this chunk
+			maxChunkRetries := 3
+			var lastErr error
+
+			for i := 0; i < maxChunkRetries; i++ {
+				if i > 0 {
+					fmt.Printf("[ChunkedDownload] Retrying chunk %d (%d/%d)...\n", c.Index, i+1, maxChunkRetries)
+					time.Sleep(1 * time.Second)
+
+					// Reset chunk state
+					chunkManager.mu.Lock()
+					c.Downloaded = 0
+					c.Retries = i
+					chunkManager.mu.Unlock()
+				}
+
+				err := a.downloadChunk(ctx, c, downloadUrl, bestIP, chunkManager, task)
+				if err == nil {
+					// Success
+					return
+				}
+
+				lastErr = err
+
+				// Check if cancelled
+				if ctx.Err() != nil {
+					chunkManager.mu.Lock()
+					c.Status = "cancelled"
+					chunkManager.mu.Unlock()
+					errChan <- ctx.Err()
+					return
+				}
+			}
+
+			// All retries failed
+			chunkManager.mu.Lock()
+			c.Status = "failed"
+			c.Error = lastErr.Error()
+			chunkManager.mu.Unlock()
+			errChan <- fmt.Errorf("chunk %d failed after %d retries: %v", c.Index, maxChunkRetries, lastErr)
+		}(chunk)
+	}
+
+	// Wait for all chunks to complete
+	wg.Wait()
+	close(errChan)
+
+	// Check for errors
+	var errors []error
+	var rangeNotSupported bool
+	for err := range errChan {
+		if err != nil && err != context.Canceled {
+			// Check if server does not support Range
+			if strings.Contains(err.Error(), "server does not support range requests") {
+				rangeNotSupported = true
+			}
+			errors = append(errors, err)
+		}
+	}
+
+	// If cancelled, clean up and return
+	if ctx.Err() != nil {
+		a.cleanupChunks(chunks)
+		return ctx.Err()
+	}
+
+	// If server does not support Range, return special error for fallback
+	if rangeNotSupported {
+		a.cleanupChunks(chunks)
+		return fmt.Errorf("range_not_supported")
+	}
+
+	// If any chunk failed, clean up and return error
+	if len(errors) > 0 {
+		a.cleanupChunks(chunks)
+		return fmt.Errorf("download failed: %v", errors[0])
+	}
+
+	// All chunks completed, merge them
+	finalPath := filepath.Join(tempDir, task.ID+"_final")
+	err := a.mergeChunks(chunks, finalPath, totalSize)
+	if err != nil {
+		a.cleanupChunks(chunks)
+		return fmt.Errorf("merge failed: %v", err)
+	}
+
+	// Clean up chunk files
+	a.cleanupChunks(chunks)
+
+	// Update task with final file path
+	taskManager.mu.Lock()
+	task.DownloadedSize = totalSize
+	task.Progress = 100
+	taskManager.mu.Unlock()
+
+	fmt.Printf("[ChunkedDownload] Successfully downloaded %s with %d threads\n", task.Filename, threadCount)
+
+	return nil
+}
+
+// mergeChunks combines all chunk files into final file
+func (a *App) mergeChunks(chunks []*ChunkDownload, finalPath string, expectedSize int64) error {
+	// Create final file
+	out, err := os.Create(finalPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Merge chunks in order
+	for _, chunk := range chunks {
+		// Open chunk file
+		in, err := os.Open(chunk.TempFile)
+		if err != nil {
+			return fmt.Errorf("failed to open chunk %d: %v", chunk.Index, err)
+		}
+
+		// Copy chunk content to final file
+		_, err = io.Copy(out, in)
+		in.Close()
+		if err != nil {
+			return fmt.Errorf("failed to merge chunk %d: %v", chunk.Index, err)
+		}
+	}
+
+	// Verify final file size
+	stat, err := out.Stat()
+	if err != nil {
+		return err
+	}
+
+	if stat.Size() != expectedSize {
+		return fmt.Errorf("size mismatch: expected %d, got %d", expectedSize, stat.Size())
+	}
+
+	return nil
+}
+
+// cleanupChunks removes all temporary chunk files
+func (a *App) cleanupChunks(chunks []*ChunkDownload) {
+	for _, chunk := range chunks {
+		if chunk.TempFile != "" {
+			os.Remove(chunk.TempFile)
+		}
+	}
+}
+
+// getFileSize gets file size via HEAD request
+func (a *App) getFileSize(ctx context.Context, downloadUrl string, bestIP string) int64 {
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
+
+	if bestIP != "" {
+		dialer := &net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, _ := net.SplitHostPort(addr)
+			u, parseErr := url.Parse(downloadUrl)
+			if parseErr == nil && u.Hostname() == host {
+				return dialer.DialContext(ctx, network, net.JoinHostPort(bestIP, port))
+			}
+			return dialer.DialContext(ctx, network, addr)
+		}
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   15 * time.Second,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "HEAD", downloadUrl, nil)
+	if err != nil {
+		return 0
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Referer", "https://steamcommunity.com/")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
+		return resp.ContentLength
+	}
+
+	return 0
+}
+
+// downloadPreviewImage downloads preview image for the task
+func (a *App) downloadPreviewImage(task *DownloadTask, targetPath string) {
+	if task.PreviewUrl == "" {
+		return
+	}
+
+	imgExt := ".jpg"
+	if strings.HasSuffix(strings.ToLower(task.PreviewUrl), ".png") {
+		imgExt = ".png"
+	} else if strings.HasSuffix(strings.ToLower(task.PreviewUrl), ".jpeg") {
+		imgExt = ".jpeg"
+	}
+
+	vpkExt := filepath.Ext(targetPath)
+	imgPath := strings.TrimSuffix(targetPath, vpkExt) + imgExt
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(task.PreviewUrl)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	out, err := os.Create(imgPath)
+	if err != nil {
+		return
+	}
+	defer out.Close()
+
+	io.Copy(out, resp.Body)
+}
+
+// handleArchiveExtraction handles auto extraction for archive files
+func (a *App) handleArchiveExtraction(task *DownloadTask, targetPath string, updateStatus func(string, string)) {
+	ext := strings.ToLower(filepath.Ext(targetPath))
+	if strings.HasPrefix(task.WorkshopID, "direct-") && (ext == ".zip" || ext == ".rar" || ext == ".7z") {
+		updateStatus("downloading", "正在解压...")
+		err := a.ExtractVPKFromArchive(targetPath, a.rootDir)
+		if err != nil {
+			fmt.Printf("解压压缩包失败: %v\n", err)
+		} else {
+			if err := os.Remove(targetPath); err != nil {
+				fmt.Printf("删除压缩文件失败: %v\n", err)
+			} else {
+				fmt.Printf("已删除压缩文件: %s\n", targetPath)
+			}
+		}
 	}
 }
