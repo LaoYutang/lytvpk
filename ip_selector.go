@@ -16,15 +16,12 @@ import (
 
 // Embedded Steam CDN IP list (Fallback)
 var defaultSteamCDNIPs = []string{
-	"104.116.243.163",
-	"104.116.243.72",
-	"2.17.107.170",
-	"2.17.107.243",
-	"23.192.228.147",
-	"23.192.228.139",
-	"23.52.74.14",
-	"23.212.62.72",
-	"23.212.62.73",
+	"23.59.72.59",
+	"23.59.72.42",
+	"23.206.175.162",
+	"23.206.175.170",
+	"23.55.51.221",
+	"23.67.75.74",
 }
 
 func fetchRemoteIPs(domain string) ([]string, error) {
@@ -153,25 +150,6 @@ func (s *IPSelector) refreshBestIP(testUrl string) string {
 		copy(candidateIPs, defaultSteamCDNIPs)
 	}
 
-	// Resolve via 8.8.8.8
-	fmt.Println("[IPSelector] Resolving cdn.steamusercontent.com via 8.8.8.8...")
-	dnsIPs, err := lookupIPWithDNS("8.8.8.8", "cdn.steamusercontent.com")
-	if err == nil {
-		v4 := 0
-		v6 := 0
-		for _, ip := range dnsIPs {
-			if net.ParseIP(ip).To4() != nil {
-				v4++
-			} else {
-				v6++
-			}
-		}
-		fmt.Printf("[IPSelector] DNS returned %d IPs (IPv4: %d, IPv6: %d): %v\n", len(dnsIPs), v4, v6, dnsIPs)
-		candidateIPs = append(candidateIPs, dnsIPs...)
-	} else {
-		fmt.Printf("[IPSelector] DNS lookup failed: %v\n", err)
-	}
-
 	bestIP, speed := selectBestIP(candidateIPs, testUrl)
 
 	s.mu.Lock()
@@ -186,20 +164,8 @@ func (s *IPSelector) refreshBestIP(testUrl string) string {
 	return result
 }
 
-func lookupIPWithDNS(dnsServer string, host string) ([]string, error) {
-	r := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: time.Second * 5,
-			}
-			return d.DialContext(ctx, "udp", dnsServer+":53")
-		},
-	}
-	return r.LookupHost(context.Background(), host)
-}
-
 func selectBestIP(ips []string, testUrl string) (string, float64) {
+	totalStart := time.Now() // 记录总开始时间
 	type result struct {
 		ip      string
 		latency time.Duration
@@ -256,8 +222,8 @@ PING_DONE:
 	}
 	fmt.Println("[IPSelector] --------------------------------")
 
-	// Take top 3 for speed test
-	topCount := 3
+	// Take top 5 for speed test
+	topCount := 5
 	if len(pingResults) < topCount {
 		topCount = len(pingResults)
 	}
@@ -338,13 +304,16 @@ PING_DONE:
 	}
 SPEED_DONE:
 
+	totalDuration := time.Since(totalStart)
 	if bestIP != "" {
 		fmt.Printf("[IPSelector] Best IP selected: %s (Speed: %.2f MB/s)\n", bestIP, maxSpeed)
+		fmt.Printf("[IPSelector] Total selection time: %v\n", totalDuration)
 		return bestIP, maxSpeed
 	}
 
 	// Fallback to lowest latency if speed test failed for all
 	fmt.Printf("[IPSelector] Speed test failed for all, falling back to lowest latency: %s\n", topCandidates[0].ip)
+	fmt.Printf("[IPSelector] Total selection time: %v\n", totalDuration)
 	return topCandidates[0].ip, 0.0
 }
 
@@ -365,7 +334,9 @@ func testDownloadSpeed(ctx context.Context, ip string, downloadUrl string) (floa
 			_, port, _ := net.SplitHostPort(addr)
 			return dialer.DialContext(ctx, network, net.JoinHostPort(ip, port))
 		},
-		TLSHandshakeTimeout: 5 * time.Second,
+		TLSHandshakeTimeout:   5 * time.Second,
+		ResponseHeaderTimeout: 5 * time.Second,
+		DisableKeepAlives:     true, // 禁用连接复用，确保每次都是新连接
 	}
 
 	client := &http.Client{
@@ -373,39 +344,61 @@ func testDownloadSpeed(ctx context.Context, ip string, downloadUrl string) (floa
 		Timeout:   20 * time.Second,
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
+	// === 预热阶段：下载64KB建立连接（不计入测速） ===
+	warmupReq, err := http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
 	if err != nil {
 		return 0, err
 	}
+	warmupReq.Header.Set("Range", "bytes=0-65535") // 64KB warmup
+	warmupReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	warmupReq.Header.Set("Host", u.Host)
 
-	// Request first 5MB for better speed measurement
-	req.Header.Set("Range", "bytes=0-5242880")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Host", u.Host)
+	warmupStart := time.Now()
+	warmupResp, err := client.Do(warmupReq)
+	if err != nil {
+		fmt.Printf("[IPSelector] Warmup failed for %s: %v\n", ip, err)
+		return 0, err
+	}
+	io.Copy(io.Discard, warmupResp.Body)
+	warmupResp.Body.Close()
+	warmupDuration := time.Since(warmupStart)
+	fmt.Printf("[IPSelector] Warmup for %s: 64KB in %v (connect+transfer)\n", ip, warmupDuration)
 
-	start := time.Now()
-	resp, err := client.Do(req)
+	// === 正式测速：下载512KB（只计算传输时间） ===
+	testStart := time.Now()
+	testReq, err := http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	testReq.Header.Set("Range", "bytes=65536-589823") // 512KB after warmup (65536 + 524288 - 1)
+	testReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	testReq.Header.Set("Host", u.Host)
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return 0, fmt.Errorf("bad status: %d", resp.StatusCode)
+	testResp, err := client.Do(testReq)
+	if err != nil {
+		fmt.Printf("[IPSelector] Test request failed for %s: %v\n", ip, err)
+		return 0, err
+	}
+	defer testResp.Body.Close()
+
+	if testResp.StatusCode != http.StatusOK && testResp.StatusCode != http.StatusPartialContent {
+		return 0, fmt.Errorf("bad status: %d", testResp.StatusCode)
 	}
 
 	// Read body to measure throughput
-	written, err := io.Copy(io.Discard, resp.Body)
+	written, err := io.Copy(io.Discard, testResp.Body)
 	if err != nil {
 		return 0, err
 	}
 
-	duration := time.Since(start)
-	if duration == 0 {
-		duration = 1 * time.Millisecond
+	testDuration := time.Since(testStart)
+	if testDuration == 0 {
+		testDuration = 1 * time.Millisecond
 	}
 
-	speedMBps := float64(written) / 1024 / 1024 / duration.Seconds()
+	speedMBps := float64(written) / 1024 / 1024 / testDuration.Seconds()
+	fmt.Printf("[IPSelector] Test result for %s: %d bytes in %v = %.2f MB/s (pure transfer speed)\n", ip, written, testDuration, speedMBps)
+
 	return speedMBps, nil
 }
 
