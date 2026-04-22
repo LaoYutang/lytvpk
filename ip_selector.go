@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -430,68 +429,19 @@ func testDownloadSpeed(ctx context.Context, ip string, downloadUrl string) (floa
 	return speedMBps, nil
 }
 
-// CalculateThreadCount determines optimal thread count based on file size
-// Returns the number of parallel download threads to use
+// CalculateThreadCount determines the number of parallel download workers.
+// With dynamic 5MB blocks, worker count is capped by the number of blocks
+// (no point spawning more workers than there are tasks).
 func CalculateThreadCount(fileSize int64, maxThreads int) int {
 	if maxThreads <= 0 {
-		maxThreads = 8 // Default max
+		maxThreads = 8
 	}
 
-	// Minimum file size threshold for multi-threading (5MB)
-	minSizeForMultiThread := int64(5 * 1024 * 1024)
-	if fileSize < minSizeForMultiThread {
+	const blockSize = 5 * 1024 * 1024
+	if fileSize < blockSize {
 		return 1
 	}
 
-	// Thread count based on file size only
-	var threads int
-	switch {
-	case fileSize < 50*1024*1024: // 5-50MB
-		threads = 2
-	case fileSize < 200*1024*1024: // 50-200MB
-		threads = 4
-	default: // > 200MB
-		threads = 8
-	}
-
-	// Ensure minimum chunk size of 1MB to avoid too many small chunks
-	minChunkSize := int64(1 * 1024 * 1024)
-	maxPossibleThreads := int(fileSize / minChunkSize)
-	if maxPossibleThreads < threads {
-		threads = max(1, maxPossibleThreads)
-	}
-
-	return min(threads, maxThreads)
-}
-
-// CreateChunks creates chunk download tasks based on file size and thread count
-func CreateChunks(totalSize int64, threadCount int, tempDir string, taskID string) []*ChunkDownload {
-	if threadCount <= 0 || totalSize <= 0 {
-		return nil
-	}
-
-	chunks := make([]*ChunkDownload, threadCount)
-	chunkSize := totalSize / int64(threadCount)
-
-	for i := 0; i < threadCount; i++ {
-		start := int64(i) * chunkSize
-		end := start + chunkSize - 1
-
-		// Last chunk gets remaining bytes
-		if i == threadCount-1 {
-			end = totalSize - 1
-		}
-
-		chunks[i] = &ChunkDownload{
-			Index:      i,
-			StartByte:  start,
-			EndByte:    end,
-			Status:     "pending",
-			Retries:    0,
-			Downloaded: 0,
-			TempFile:   filepath.Join(tempDir, fmt.Sprintf("%s_chunk_%d.part", taskID, i)),
-		}
-	}
-
-	return chunks
+	numBlocks := int((fileSize + blockSize - 1) / blockSize)
+	return min(maxThreads, numBlocks)
 }
