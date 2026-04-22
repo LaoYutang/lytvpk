@@ -75,6 +75,8 @@ export function GetVPKPreviewImage(arg1:string):Promise<string>;
 
 export function GetWorkshopDetails(arg1:string):Promise<Array<main.WorkshopFileDetails>>;
 
+export function GetWorkshopFixedIP():Promise<string>;
+
 export function GetWorkshopPreferredIP():Promise<boolean>;
 
 export function HandleFileDrop(arg1:Array<string>):Promise<void>;
@@ -122,6 +124,8 @@ export function SetRootDirectory(arg1:string):Promise<void>;
 export function SetVPKLoadOrder(arg1:string,arg2:number):Promise<void>;
 
 export function SetVPKTags(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
+
+export function SetWorkshopFixedIP(arg1:string):Promise<void>;
 
 export function SetWorkshopPreferredIP(arg1:boolean):Promise<void>;
 

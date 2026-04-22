@@ -49,6 +49,8 @@ import {
   IsSelectingIP,
   SetWorkshopPreferredIP,
   GetWorkshopPreferredIP,
+  SetWorkshopFixedIP,
+  GetWorkshopFixedIP,
   GetCurrentBestIP,
   GetAddonListOrder,
   GetVPKLoadOrder,
@@ -6100,6 +6102,8 @@ document.addEventListener("DOMContentLoaded", () => {
 async function showGlobalSettings() {
   try {
     const enabled = await GetWorkshopPreferredIP();
+    const fixedIP = await GetWorkshopFixedIP();
+    const useFixedIP = enabled && fixedIP !== "";
 
     // 获取优选状态
     let ipStatusText = "";
@@ -6110,7 +6114,11 @@ async function showGlobalSettings() {
       } else {
         const bestIP = await GetCurrentBestIP();
         if (bestIP) {
-          ipStatusText = `<span style="color: var(--success); font-size: 0.85em; display: block; margin-top: 4px;">当前优选IP: ${bestIP}</span>`;
+          if (useFixedIP) {
+            ipStatusText = `<span style="color: var(--success); font-size: 0.85em; display: block; margin-top: 4px;">当前固定IP: ${bestIP}</span>`;
+          } else {
+            ipStatusText = `<span style="color: var(--success); font-size: 0.85em; display: block; margin-top: 4px;">当前优选IP: ${bestIP}</span>`;
+          }
         } else {
           ipStatusText = `<span style="color: var(--text-tertiary); font-size: 0.85em; display: block; margin-top: 4px;">尚未获取到优选IP</span>`;
         }
@@ -6121,7 +6129,7 @@ async function showGlobalSettings() {
       <div class="settings-modal-body">
         <div class="settings-section">
             <h3 class="settings-section-title" style="margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">网络设置</h3>
-            
+
             <div class="setting-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div class="setting-info" style="flex: 1; padding-right: 20px;">
                     <div class="setting-label" style="font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">开启优选IP加速</div>
@@ -6136,6 +6144,31 @@ async function showGlobalSettings() {
                     }>
                     <span class="toggle-slider"></span>
                 </label>
+            </div>
+
+            <div id="ip-mode-section" style="margin-top: 12px; padding-left: 8px; ${
+              enabled ? "" : "display: none;"
+            }">
+                <div style="font-size: 0.9em; color: var(--text-primary); margin-bottom: 6px; font-weight: 500;">加速模式</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: center; cursor: pointer; gap: 6px;">
+                        <input type="radio" name="ip-mode" value="auto" style="accent-color: var(--primary);" ${
+                          useFixedIP ? "" : "checked"
+                        }>
+                        <span style="font-size: 0.85em; color: var(--text-secondary);">自动优选最佳IP（推荐）</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer; gap: 6px;">
+                        <input type="radio" name="ip-mode" value="fixed" style="accent-color: var(--primary);" ${
+                          useFixedIP ? "checked" : ""
+                        }>
+                        <span style="font-size: 0.85em; color: var(--text-secondary);">手动指定IP</span>
+                    </label>
+                    <input type="text" id="fixed-ip-input" class="form-input" placeholder="例如: 23.59.72.59" value="${
+                      fixedIP
+                    }" style="margin-top: 2px; width: 100%; box-sizing: border-box; ${
+                      useFixedIP ? "" : "display: none;"
+                    }">
+                </div>
             </div>
         </div>
 
@@ -6213,17 +6246,27 @@ async function showGlobalSettings() {
         if (!checkbox) return;
 
         const newEnabled = checkbox.checked;
+        const ipModeRadios = document.getElementsByName("ip-mode");
+        let selectedMode = "auto";
+        for (const radio of ipModeRadios) {
+          if (radio.checked) {
+            selectedMode = radio.value;
+            break;
+          }
+        }
+        const fixedIPInput = document.getElementById("fixed-ip-input");
+        const newFixedIP = selectedMode === "fixed" && fixedIPInput ? fixedIPInput.value.trim() : "";
+
+        const config = getConfig();
+        let configChanged = false;
 
         if (newEnabled !== enabled) {
-          // 保存配置到本地
-          const config = getConfig();
           config.workshopPreferredIP = newEnabled;
-          saveConfig(config);
+          configChanged = true;
 
           // 保存设置到后端
           await SetWorkshopPreferredIP(newEnabled);
 
-          // 前端只负责通知，具体状态由事件监听处理
           if (!newEnabled) {
             showNotification("已关闭优选IP加速", "info");
           } else {
@@ -6240,6 +6283,30 @@ async function showGlobalSettings() {
             browserState.data = [];
             loadWorkshopList();
           }
+        }
+
+        // 处理固定IP设置（仅在开启优选时生效）
+        if (newEnabled) {
+          const currentFixedIP = fixedIP || "";
+          if (newFixedIP !== currentFixedIP) {
+            await SetWorkshopFixedIP(newFixedIP);
+            config.workshopFixedIP = newFixedIP;
+            config.workshopUseFixedIP = selectedMode === "fixed";
+            configChanged = true;
+
+            if (newFixedIP) {
+              showNotification(`已设置固定IP: ${newFixedIP}`, "success");
+            } else {
+              showNotification("已恢复自动优选IP", "info");
+            }
+          } else if (config.workshopUseFixedIP !== (selectedMode === "fixed")) {
+            config.workshopUseFixedIP = selectedMode === "fixed";
+            configChanged = true;
+          }
+        }
+
+        if (configChanged) {
+          saveConfig(config);
         }
       },
       true // useHtml
@@ -6259,6 +6326,26 @@ async function showGlobalSettings() {
           if (radio) radio.checked = true;
         });
       });
+
+      // 绑定优选IP开关切换，控制加速模式区域显示/隐藏
+      const ipToggle = document.getElementById("workshop-preferred-ip-check");
+      const ipModeSection = document.getElementById("ip-mode-section");
+      if (ipToggle && ipModeSection) {
+        ipToggle.addEventListener("change", function () {
+          ipModeSection.style.display = this.checked ? "block" : "none";
+        });
+      }
+
+      // 绑定IP模式radio切换，控制固定IP输入框显示/隐藏
+      const ipModeRadios = document.getElementsByName("ip-mode");
+      const fixedIPInput = document.getElementById("fixed-ip-input");
+      for (const radio of ipModeRadios) {
+        radio.addEventListener("change", function () {
+          if (fixedIPInput) {
+            fixedIPInput.style.display = this.value === "fixed" ? "block" : "none";
+          }
+        });
+      }
     }, 50);
   } catch (err) {
     console.error("获取设置失败:", err);

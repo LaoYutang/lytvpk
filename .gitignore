@@ -5,3 +5,4 @@ frontend/dist
 workshop
 disabled
 *.exe
+.claude

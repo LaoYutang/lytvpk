@@ -89,6 +89,7 @@ type App struct {
 	// 配置项
 	modRotationConfig   RotationConfig
 	workshopPreferredIP bool
+	workshopFixedIP     string
 	migrationVersion    int
 	configPath          string
 }
@@ -97,6 +98,7 @@ type App struct {
 type ConfigFile struct {
 	ModRotationConfig   RotationConfig `json:"modRotationConfig"`
 	WorkshopPreferredIP *bool          `json:"workshopPreferredIP,omitempty"`
+	WorkshopFixedIP     *string        `json:"workshopFixedIP,omitempty"`
 	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
 	MigrationVersion int `json:"migrationVersion"`
 }
@@ -178,18 +180,24 @@ func (a *App) loadConfig() {
 	if config.WorkshopPreferredIP != nil {
 		a.workshopPreferredIP = *config.WorkshopPreferredIP
 	}
+	if config.WorkshopFixedIP != nil {
+		a.workshopFixedIP = *config.WorkshopFixedIP
+		globalIPSelector.SetFixedIP(a.workshopFixedIP)
+	}
 	a.migrationVersion = config.MigrationVersion
 	a.mu.Unlock()
 
-	log.Printf("已加载配置: 优选IP=%v, 轮换=%v, 迁移版本=%d", a.workshopPreferredIP, a.modRotationConfig, a.migrationVersion)
+	log.Printf("已加载配置: 优选IP=%v, 固定IP=%s, 轮换=%v, 迁移版本=%d", a.workshopPreferredIP, a.workshopFixedIP, a.modRotationConfig, a.migrationVersion)
 }
 
 func (a *App) saveConfig() {
 	a.mu.RLock()
 	v := a.workshopPreferredIP
+	fixedIP := a.workshopFixedIP
 	config := ConfigFile{
 		ModRotationConfig:   a.modRotationConfig,
 		WorkshopPreferredIP: &v,
+		WorkshopFixedIP:     &fixedIP,
 		MigrationVersion:    a.migrationVersion,
 	}
 	a.mu.RUnlock()
@@ -235,16 +243,25 @@ func (a *App) startup(ctx context.Context) {
 
 		// 如果开启了优选IP，启动时自动触发
 		if a.GetWorkshopPreferredIP() {
-			log.Println("检测到优选IP已开启，后台启动IP优选...")
-			// 设置状态为正在选择
-			runtime.EventsEmit(a.ctx, "ip_selection_start", nil)
-
-			go func() {
-				// 使用一个典型的工坊图片域名来测试
-				globalIPSelector.GetBestIP("https://steamuserimages-a.akamaihd.net/ugc/test")
-				// 完成后通知前端
+			a.mu.RLock()
+			fixedIP := a.workshopFixedIP
+			a.mu.RUnlock()
+			if fixedIP != "" {
+				log.Printf("检测到优选IP已开启且设置了固定IP: %s，跳过自动优选", fixedIP)
+				globalIPSelector.SetFixedIP(fixedIP)
 				runtime.EventsEmit(a.ctx, "ip_selection_end", nil)
-			}()
+			} else {
+				log.Println("检测到优选IP已开启，后台启动IP优选...")
+				// 设置状态为正在选择
+				runtime.EventsEmit(a.ctx, "ip_selection_start", nil)
+
+				go func() {
+					// 使用一个典型的工坊图片域名来测试
+					globalIPSelector.GetBestIP("https://steamuserimages-a.akamaihd.net/ugc/test")
+					// 完成后通知前端
+					runtime.EventsEmit(a.ctx, "ip_selection_end", nil)
+				}()
+			}
 		}
 
 		exe, err := os.Executable()
@@ -2355,6 +2372,7 @@ func (a *App) ToggleVPKVisibility(filePath string) (string, error) {
 func (a *App) SetWorkshopPreferredIP(enabled bool) {
 	a.mu.Lock()
 	a.workshopPreferredIP = enabled
+	fixedIP := a.workshopFixedIP
 	a.mu.Unlock()
 
 	// 保存配置
@@ -2364,9 +2382,13 @@ func (a *App) SetWorkshopPreferredIP(enabled bool) {
 	if enabled {
 		runtime.EventsEmit(a.ctx, "ip_selection_start", nil)
 		go func() {
-			// 使用一个典型的工坊图片域名来测试
-			// 实际上 IPSelector 目前是硬编码了获取 IP 的逻辑，这里只需要触发一下
-			globalIPSelector.GetBestIP("https://steamuserimages-a.akamaihd.net/ugc/test")
+			if fixedIP != "" {
+				globalIPSelector.SetFixedIP(fixedIP)
+			} else {
+				// 使用一个典型的工坊图片域名来测试
+				// 实际上 IPSelector 目前是硬编码了获取 IP 的逻辑，这里只需要触发一下
+				globalIPSelector.GetBestIP("https://steamuserimages-a.akamaihd.net/ugc/test")
+			}
 			runtime.EventsEmit(a.ctx, "ip_selection_end", nil)
 		}()
 	}
@@ -2387,6 +2409,23 @@ func (a *App) IsSelectingIP() bool {
 // GetCurrentBestIP 获取当前优选IP
 func (a *App) GetCurrentBestIP() string {
 	return globalIPSelector.GetCachedBestIP()
+}
+
+// SetWorkshopFixedIP 设置工坊固定IP（留空则使用自动优选）
+func (a *App) SetWorkshopFixedIP(ip string) {
+	a.mu.Lock()
+	a.workshopFixedIP = ip
+	a.mu.Unlock()
+
+	globalIPSelector.SetFixedIP(ip)
+	a.saveConfig()
+}
+
+// GetWorkshopFixedIP 获取当前设置的固定IP
+func (a *App) GetWorkshopFixedIP() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopFixedIP
 }
 
 // fuzzyMatch 判断 source 是否是 target 的模糊匹配（子序列匹配）

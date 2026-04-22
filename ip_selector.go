@@ -58,14 +58,34 @@ type IPSelector struct {
 	cachedSpeed  float64 // Cached download speed in MB/s
 	lastCheck    time.Time
 	isSelecting  bool
+	fixedIP      string
 	mu           sync.RWMutex
 }
 
 var globalIPSelector = &IPSelector{}
 
+func (s *IPSelector) SetFixedIP(ip string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.fixedIP = ip
+	if ip == "" {
+		s.cachedBestIP = ""
+		s.cachedSpeed = 0
+	}
+}
+
+func (s *IPSelector) GetFixedIP() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.fixedIP
+}
+
 func (s *IPSelector) IsSelecting() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.fixedIP != "" {
+		return false
+	}
 	return s.isSelecting
 }
 
@@ -77,6 +97,11 @@ func (s *IPSelector) GetCachedSpeed() float64 {
 
 func (s *IPSelector) GetBestIP(testUrl string) string {
 	s.mu.RLock()
+	// 如果有固定IP，直接使用
+	if s.fixedIP != "" {
+		defer s.mu.RUnlock()
+		return s.fixedIP
+	}
 	// 如果有缓存，直接使用（生命周期为整个程序运行期间）
 	if s.cachedBestIP != "" {
 		defer s.mu.RUnlock()
@@ -91,6 +116,9 @@ func (s *IPSelector) GetBestIP(testUrl string) string {
 func (s *IPSelector) GetCachedBestIP() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	if s.fixedIP != "" {
+		return s.fixedIP
+	}
 	return s.cachedBestIP
 }
 
