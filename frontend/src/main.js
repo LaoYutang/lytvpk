@@ -53,6 +53,8 @@ import {
   GetWorkshopFixedIP,
   SetWorkshopMetaEnabled,
   GetWorkshopMetaEnabled,
+  SetWorkshopBrowserTarget,
+  GetWorkshopBrowserTarget,
   GetCurrentBestIP,
   GetAddonListOrder,
   GetVPKLoadOrder,
@@ -6146,6 +6148,7 @@ async function showGlobalSettings() {
     const fixedIP = await GetWorkshopFixedIP();
     const useFixedIP = enabled && fixedIP !== "";
     const metaEnabled = await GetWorkshopMetaEnabled();
+    const browserTarget = await GetWorkshopBrowserTarget();
 
     // 获取优选状态
     let ipStatusText = "";
@@ -6283,6 +6286,27 @@ async function showGlobalSettings() {
                     <input type="checkbox" id="workshop-meta-check" ${metaEnabled ? "checked" : ""}>
                     <span class="toggle-slider"></span>
                   </label>
+                </div>
+              </div>
+            </div>
+            <div class="setting-card">
+              <div class="setting-card-title">浏览器跳转</div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="setting-row-label">浏览器跳转目标</div>
+                  <div class="setting-row-desc">选择"使用浏览器打开"时跳转的网站</div>
+                </div>
+                <div class="setting-row-control">
+                  <div class="setting-radio-group">
+                    <label class="setting-radio-label">
+                      <input type="radio" name="browser-target" value="mirror" ${browserTarget === "mirror" ? "checked" : ""}>
+                      <span>镜像站（l4d2ws.com，推荐）</span>
+                    </label>
+                    <label class="setting-radio-label">
+                      <input type="radio" name="browser-target" value="steam" ${browserTarget === "steam" ? "checked" : ""}>
+                      <span>Steam 官方工坊</span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -6439,6 +6463,20 @@ async function showGlobalSettings() {
             showNotification("已关闭工坊信息存储", "info");
           }
           await refreshFilesKeepFilter();
+        }
+
+        // 处理浏览器跳转目标设置
+        const browserTargetRadios = document.getElementsByName("browser-target");
+        let newBrowserTarget = browserTarget;
+        for (const radio of browserTargetRadios) {
+          if (radio.checked) {
+            newBrowserTarget = radio.value;
+            break;
+          }
+        }
+        if (newBrowserTarget !== browserTarget) {
+          await SetWorkshopBrowserTarget(newBrowserTarget);
+          showNotification(newBrowserTarget === "mirror" ? "已切换到镜像站" : "已切换到 Steam 官方", "success");
         }
 
         if (configChanged) {
@@ -6864,10 +6902,15 @@ async function openWorkshopDetail(item) {
 
     document
       .getElementById("open-in-steam-browser")
-      .addEventListener("click", () => {
-        BrowserOpenURL(
-          `https://steamcommunity.com/sharedfiles/filedetails/?id=${detail.publishedfileid}`
-        );
+      .addEventListener("click", async () => {
+        const target = await GetWorkshopBrowserTarget();
+        let url;
+        if (target === "mirror") {
+          url = `https://l4d2ws.com?workshop-id=${detail.publishedfileid}`;
+        } else {
+          url = `https://steamcommunity.com/sharedfiles/filedetails/?id=${detail.publishedfileid}`;
+        }
+        BrowserOpenURL(url);
       });
 
     // 绑定缩略图滚轮事件

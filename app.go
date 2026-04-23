@@ -88,12 +88,13 @@ type App struct {
 	singletonMgr  *SingletonManager // 单例管理器
 
 	// 配置项
-	modRotationConfig   RotationConfig
-	workshopPreferredIP bool
-	workshopFixedIP     string
-	workshopMetaEnabled bool
-	migrationVersion    int
-	configPath          string
+	modRotationConfig     RotationConfig
+	workshopPreferredIP   bool
+	workshopFixedIP       string
+	workshopMetaEnabled   bool
+	workshopBrowserTarget string
+	migrationVersion      int
+	configPath            string
 }
 
 // ConfigFile 定义配置文件结构
@@ -101,7 +102,8 @@ type ConfigFile struct {
 	ModRotationConfig   RotationConfig `json:"modRotationConfig"`
 	WorkshopPreferredIP *bool          `json:"workshopPreferredIP,omitempty"`
 	WorkshopFixedIP     *string        `json:"workshopFixedIP,omitempty"`
-	WorkshopMetaEnabled *bool          `json:"workshopMetaEnabled,omitempty"`
+	WorkshopMetaEnabled   *bool   `json:"workshopMetaEnabled,omitempty"`
+	WorkshopBrowserTarget *string `json:"workshopBrowserTarget,omitempty"`
 	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
 	MigrationVersion int `json:"migrationVersion"`
 }
@@ -148,11 +150,12 @@ func NewApp() *App {
 	configPath := filepath.Join(appConfigDir, "config.json")
 
 	app := &App{
-		goroutinePool:       pool,
-		restyClient:         client,
-		proxyServer:         proxy,
-		configPath:          configPath,
-		workshopPreferredIP: true, // 默认开启优选IP
+		goroutinePool:         pool,
+		restyClient:           client,
+		proxyServer:           proxy,
+		configPath:            configPath,
+		workshopPreferredIP:   true,    // 默认开启优选IP
+		workshopBrowserTarget: "mirror", // 默认使用镜像站
 	}
 
 	// 加载配置
@@ -190,10 +193,13 @@ func (a *App) loadConfig() {
 	if config.WorkshopMetaEnabled != nil {
 		a.workshopMetaEnabled = *config.WorkshopMetaEnabled
 	}
+	if config.WorkshopBrowserTarget != nil {
+		a.workshopBrowserTarget = *config.WorkshopBrowserTarget
+	}
 	a.migrationVersion = config.MigrationVersion
 	a.mu.Unlock()
 
-	log.Printf("已加载配置: 优选IP=%v, 固定IP=%s, 轮换=%v, 迁移版本=%d, meta存储=%v", a.workshopPreferredIP, a.workshopFixedIP, a.modRotationConfig, a.migrationVersion, a.workshopMetaEnabled)
+	log.Printf("已加载配置: 优选IP=%v, 固定IP=%s, 轮换=%v, 迁移版本=%d, meta存储=%v, 浏览器目标=%s", a.workshopPreferredIP, a.workshopFixedIP, a.modRotationConfig, a.migrationVersion, a.workshopMetaEnabled, a.workshopBrowserTarget)
 }
 
 func (a *App) saveConfig() {
@@ -201,12 +207,14 @@ func (a *App) saveConfig() {
 	v := a.workshopPreferredIP
 	fixedIP := a.workshopFixedIP
 	metaEnabled := a.workshopMetaEnabled
+	browserTarget := a.workshopBrowserTarget
 	config := ConfigFile{
-		ModRotationConfig:   a.modRotationConfig,
-		WorkshopPreferredIP: &v,
-		WorkshopFixedIP:     &fixedIP,
-		WorkshopMetaEnabled: &metaEnabled,
-		MigrationVersion:    a.migrationVersion,
+		ModRotationConfig:     a.modRotationConfig,
+		WorkshopPreferredIP:   &v,
+		WorkshopFixedIP:       &fixedIP,
+		WorkshopMetaEnabled:   &metaEnabled,
+		WorkshopBrowserTarget: &browserTarget,
+		MigrationVersion:      a.migrationVersion,
 	}
 	a.mu.RUnlock()
 
@@ -2492,6 +2500,21 @@ func (a *App) GetWorkshopFixedIP() string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.workshopFixedIP
+}
+
+// SetWorkshopBrowserTarget 设置浏览器跳转目标
+func (a *App) SetWorkshopBrowserTarget(target string) {
+	a.mu.Lock()
+	a.workshopBrowserTarget = target
+	a.mu.Unlock()
+	a.saveConfig()
+}
+
+// GetWorkshopBrowserTarget 获取浏览器跳转目标
+func (a *App) GetWorkshopBrowserTarget() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopBrowserTarget
 }
 
 // fuzzyMatch 判断 source 是否是 target 的模糊匹配（子序列匹配）

@@ -142,6 +142,10 @@ export function GetVPKPreviewImage(arg1) {
   return window['go']['main']['App']['GetVPKPreviewImage'](arg1);
 }
 
+export function GetWorkshopBrowserTarget() {
+  return window['go']['main']['App']['GetWorkshopBrowserTarget']();
+}
+
 export function GetWorkshopDetails(arg1) {
   return window['go']['main']['App']['GetWorkshopDetails'](arg1);
 }
@@ -248,6 +252,10 @@ export function SetVPKLoadOrder(arg1, arg2) {
 
 export function SetVPKTags(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetVPKTags'](arg1, arg2, arg3);
+}
+
+export function SetWorkshopBrowserTarget(arg1) {
+  return window['go']['main']['App']['SetWorkshopBrowserTarget'](arg1);
 }
 
 export function SetWorkshopFixedIP(arg1) {
