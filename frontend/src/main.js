@@ -60,6 +60,7 @@ import {
   GetVPKLoadOrder,
   SetVPKLoadOrder,
   ManualRotateMods,
+  ParseWorkshopID,
 } from "../wailsjs/go/main/App";
 
 import {
@@ -3061,16 +3062,34 @@ window.showFileDetail = function (filePath) {
     descItem.style.display = "none";
   }
 
-  // 链接信息（若有才显示）
+  // 链接信息（工坊ID）
   const urlItem = document.getElementById("detail-vpk-url-item");
   const urlLink = document.getElementById("detail-vpk-url");
-  if (file.addonURL0 && file.addonURL0 !== "") {
-    urlItem.style.display = "grid";
-    urlLink.textContent = file.addonURL0;
-    urlLink.href = file.addonURL0;
-  } else {
-    urlItem.style.display = "none";
-  }
+  urlItem.style.display = "none";
+  urlLink.onclick = null;
+
+  (async () => {
+    let workshopId = file.workshopId;
+
+    if (!workshopId && file.addonURL0) {
+      try {
+        workshopId = await ParseWorkshopID(file.addonURL0);
+      } catch (e) {
+        console.log("从addonURL0解析工坊ID失败:", e);
+      }
+    }
+
+    if (workshopId) {
+      urlItem.style.display = "grid";
+      urlLink.textContent = `工坊 #${workshopId}`;
+      urlLink.href = "javascript:void(0)";
+      urlLink.removeAttribute("target");
+      urlLink.onclick = (e) => {
+        e.preventDefault();
+        handleProtocolWorkshop(workshopId);
+      };
+    }
+  })();
 
   // 填充地图信息
   const mapInfoSection = document.getElementById("map-info-section");
