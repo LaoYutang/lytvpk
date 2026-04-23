@@ -26,6 +26,7 @@ type VPKFile struct {
 	Version   string `json:"version"`   // addonversion (若有)
 	Desc      string `json:"desc"`      // addonDescription (若有)
 	AddonURL0 string `json:"addonURL0"` // addonURL0 (若有)
+	WorkshopID string `json:"workshopId"` // 工坊ID (从meta文件读取)
 }
 
 // Campaign 战役信息

@@ -150,6 +150,10 @@ export function GetWorkshopFixedIP() {
   return window['go']['main']['App']['GetWorkshopFixedIP']();
 }
 
+export function GetWorkshopMetaEnabled() {
+  return window['go']['main']['App']['GetWorkshopMetaEnabled']();
+}
+
 export function GetWorkshopPreferredIP() {
   return window['go']['main']['App']['GetWorkshopPreferredIP']();
 }
@@ -248,6 +252,10 @@ export function SetVPKTags(arg1, arg2, arg3) {
 
 export function SetWorkshopFixedIP(arg1) {
   return window['go']['main']['App']['SetWorkshopFixedIP'](arg1);
+}
+
+export function SetWorkshopMetaEnabled(arg1) {
+  return window['go']['main']['App']['SetWorkshopMetaEnabled'](arg1);
 }
 
 export function SetWorkshopPreferredIP(arg1) {

@@ -62,6 +62,7 @@ export namespace main {
 	    downloaded_size: number;
 	    speed: string;
 	    error: string;
+	    description: string;
 	    created_at: string;
 	
 	    static createFrom(source: any = {}) {
@@ -83,6 +84,7 @@ export namespace main {
 	        this.downloaded_size = source["downloaded_size"];
 	        this.speed = source["speed"];
 	        this.error = source["error"];
+	        this.description = source["description"];
 	        this.created_at = source["created_at"];
 	    }
 	}
@@ -483,6 +485,7 @@ export namespace parser {
 	    version: string;
 	    desc: string;
 	    addonURL0: string;
+	    workshopId: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new VPKFile(source);
@@ -507,6 +510,7 @@ export namespace parser {
 	        this.version = source["version"];
 	        this.desc = source["desc"];
 	        this.addonURL0 = source["addonURL0"];
+	        this.workshopId = source["workshopId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

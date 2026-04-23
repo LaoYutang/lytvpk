@@ -1786,6 +1786,8 @@ body {
   border: 1px solid var(--border-light);
   transform: scale(0.95) translateY(1rem);
   transition: transform var(--duration-300) var(--ease-out);
+  display: flex;
+  flex-direction: column;
 }
 
 .modal:not(.hidden) .modal-content {
@@ -1839,7 +1841,8 @@ body {
 .modal-body {
   padding: var(--spacing-6);
   overflow-y: auto;
-  max-height: calc(80vh - 10rem);
+  flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {

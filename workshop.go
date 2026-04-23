@@ -61,6 +61,7 @@ type DownloadTask struct {
 	DownloadedSize int64              `json:"downloaded_size"`
 	Speed          string             `json:"speed"`
 	Error          string             `json:"error"`
+	Description    string             `json:"description"`
 	CreatedAt      string             `json:"created_at"`
 	cancelFunc     context.CancelFunc `json:"-"`
 }
@@ -315,6 +316,7 @@ func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool
 		Filename:       filename,
 		PreviewUrl:     details.PreviewUrl,
 		FileUrl:        details.FileUrl,
+		Description:    details.Description,
 		UseOptimizedIP: useOptimizedIP,
 		Status:         "pending",
 		Progress:       0,
@@ -437,6 +439,16 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 
 			// Auto extract for archives
 			a.handleArchiveExtraction(task, targetPath, updateStatus)
+
+			// Save meta file
+			metaDetails := WorkshopFileDetails{
+				PublishedFileId: task.WorkshopID,
+				Title:           task.Title,
+				PreviewUrl:      task.PreviewUrl,
+				FileUrl:         task.FileUrl,
+				Description:     task.Description,
+			}
+			SaveWorkshopMeta(targetPath, metaDetails)
 
 			updateStatus("completed", "")
 			return
@@ -714,6 +726,16 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			io.Copy(out, resp.Body)
 		}(task.PreviewUrl, imgPath)
 	}
+
+	// Save meta file
+	metaDetails := WorkshopFileDetails{
+		PublishedFileId: task.WorkshopID,
+		Title:           task.Title,
+		PreviewUrl:      task.PreviewUrl,
+		FileUrl:         task.FileUrl,
+		Description:     task.Description,
+	}
+	SaveWorkshopMeta(targetPath, metaDetails)
 
 	// 如果是直连下载且是压缩文件，自动解压
 	ext := strings.ToLower(filepath.Ext(targetPath))

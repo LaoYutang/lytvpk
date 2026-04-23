@@ -71,6 +71,7 @@ type VPKFileCache struct {
 	ModTime      time.Time
 	Size         int64
 	ImageModTime time.Time // 外部图片修改时间
+	MetaModTime  time.Time // meta文件修改时间
 	CachedAt     time.Time
 }
 
@@ -90,6 +91,7 @@ type App struct {
 	modRotationConfig   RotationConfig
 	workshopPreferredIP bool
 	workshopFixedIP     string
+	workshopMetaEnabled bool
 	migrationVersion    int
 	configPath          string
 }
@@ -99,6 +101,7 @@ type ConfigFile struct {
 	ModRotationConfig   RotationConfig `json:"modRotationConfig"`
 	WorkshopPreferredIP *bool          `json:"workshopPreferredIP,omitempty"`
 	WorkshopFixedIP     *string        `json:"workshopFixedIP,omitempty"`
+	WorkshopMetaEnabled *bool          `json:"workshopMetaEnabled,omitempty"`
 	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
 	MigrationVersion int `json:"migrationVersion"`
 }
@@ -184,20 +187,25 @@ func (a *App) loadConfig() {
 		a.workshopFixedIP = *config.WorkshopFixedIP
 		globalIPSelector.SetFixedIP(a.workshopFixedIP)
 	}
+	if config.WorkshopMetaEnabled != nil {
+		a.workshopMetaEnabled = *config.WorkshopMetaEnabled
+	}
 	a.migrationVersion = config.MigrationVersion
 	a.mu.Unlock()
 
-	log.Printf("已加载配置: 优选IP=%v, 固定IP=%s, 轮换=%v, 迁移版本=%d", a.workshopPreferredIP, a.workshopFixedIP, a.modRotationConfig, a.migrationVersion)
+	log.Printf("已加载配置: 优选IP=%v, 固定IP=%s, 轮换=%v, 迁移版本=%d, meta存储=%v", a.workshopPreferredIP, a.workshopFixedIP, a.modRotationConfig, a.migrationVersion, a.workshopMetaEnabled)
 }
 
 func (a *App) saveConfig() {
 	a.mu.RLock()
 	v := a.workshopPreferredIP
 	fixedIP := a.workshopFixedIP
+	metaEnabled := a.workshopMetaEnabled
 	config := ConfigFile{
 		ModRotationConfig:   a.modRotationConfig,
 		WorkshopPreferredIP: &v,
 		WorkshopFixedIP:     &fixedIP,
+		WorkshopMetaEnabled: &metaEnabled,
 		MigrationVersion:    a.migrationVersion,
 	}
 	a.mu.RUnlock()
@@ -517,13 +525,19 @@ func (a *App) processVPKFileWithCache(filePath string) {
 		}
 	}
 
+	// 检查meta文件状态
+	var metaModTime time.Time
+	if metaInfo, statErr := os.Stat(basePath + ".meta"); statErr == nil {
+		metaModTime = metaInfo.ModTime()
+	}
+
 	// 检查缓存
 	if cached, ok := a.vpkCache.Load(filePath); ok {
 		cache := cached.(*VPKFileCache)
 
-		// 判断文件是否变化（通过修改时间和大小）以及图片是否变化
-		if cache.ModTime.Equal(modTime) && cache.Size == size && cache.ImageModTime.Equal(imgModTime) {
-			// 文件和图片都未变化，使用缓存
+		// 判断文件是否变化（通过修改时间和大小）以及图片/meta是否变化
+		if cache.ModTime.Equal(modTime) && cache.Size == size && cache.ImageModTime.Equal(imgModTime) && cache.MetaModTime.Equal(metaModTime) {
+			// 文件、图片和meta都未变化，使用缓存
 			// 但需要更新位置信息（因为文件可能被移动）
 			location := a.getLocationFromPath(filePath)
 			cache.File.Location = location
@@ -554,12 +568,31 @@ func (a *App) processVPKFileWithCache(filePath string) {
 	vpkFile.LastModified = modTime.Format(time.RFC3339)
 	vpkFile.Path = filePath
 
+	// 应用meta数据（如果开启且存在）
+	if a.workshopMetaEnabled {
+		if meta, err := LoadWorkshopMeta(filePath); meta != nil && err == nil {
+			if meta.Title != "" {
+				vpkFile.Title = meta.Title
+			}
+			if meta.Author != "" {
+				vpkFile.Author = meta.Author
+			}
+			if meta.Description != "" {
+				vpkFile.Desc = meta.Description
+			}
+			if meta.WorkshopID != "" && !strings.HasPrefix(meta.WorkshopID, "direct-") {
+				vpkFile.WorkshopID = meta.WorkshopID
+			}
+		}
+	}
+
 	// 存入缓存
 	cache := &VPKFileCache{
 		File:         *vpkFile,
 		ModTime:      modTime,
 		Size:         size,
 		ImageModTime: imgModTime,
+		MetaModTime:  metaModTime,
 		CachedAt:     time.Now(),
 	}
 	a.vpkCache.Store(filePath, cache)
@@ -1180,6 +1213,16 @@ func (a *App) MoveVpkFiles(filePaths []string, destDir string) (MoveResult, erro
 				if err := moveFile(imgSrc, imgDest); err != nil {
 					log.Printf("移动关联图片 %s 失败: %v", imgName, err)
 				}
+			}
+		}
+
+		// 处理meta文件
+		metaSrc := baseName + ".meta"
+		if _, err := os.Stat(metaSrc); err == nil {
+			metaName := filepath.Base(metaSrc)
+			metaDest := filepath.Join(destDir, metaName)
+			if err := moveFile(metaSrc, metaDest); err != nil {
+				log.Printf("移动关联meta %s 失败: %v", metaName, err)
 			}
 		}
 
@@ -2399,6 +2442,29 @@ func (a *App) GetWorkshopPreferredIP() bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.workshopPreferredIP
+}
+
+// SetWorkshopMetaEnabled 开启/关闭工坊meta信息存储
+func (a *App) SetWorkshopMetaEnabled(enabled bool) {
+	a.mu.Lock()
+	a.workshopMetaEnabled = enabled
+	a.mu.Unlock()
+
+	// 保存配置
+	a.saveConfig()
+
+	// 清空缓存，确保下次扫描应用新规则
+	a.vpkCache.Range(func(key, value interface{}) bool {
+		a.vpkCache.Delete(key)
+		return true
+	})
+}
+
+// GetWorkshopMetaEnabled 获取当前是否开启工坊meta信息存储
+func (a *App) GetWorkshopMetaEnabled() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopMetaEnabled
 }
 
 // IsSelectingIP 检查是否正在优选IP

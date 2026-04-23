@@ -51,6 +51,8 @@ import {
   GetWorkshopPreferredIP,
   SetWorkshopFixedIP,
   GetWorkshopFixedIP,
+  SetWorkshopMetaEnabled,
+  GetWorkshopMetaEnabled,
   GetCurrentBestIP,
   GetAddonListOrder,
   GetVPKLoadOrder,
@@ -894,6 +896,25 @@ function setupBatchActionEvents() {
         showFileDetail(filePath);
       } else {
         console.error("详情按钮缺少 data-file-path 属性");
+      }
+    }
+
+    // 处理跳转工坊按钮点击
+    const workshopBtn = e.target.closest(".workshop-btn");
+    if (workshopBtn) {
+      const workshopId = workshopBtn.getAttribute("data-workshop-id");
+      if (workshopId) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 关闭下拉菜单
+        document.querySelectorAll(".dropdown-content").forEach((d) => {
+          d.classList.add("hidden");
+          const container = d.closest(".file-item") || d.closest(".file-card");
+          if (container) container.classList.remove("active-dropdown");
+        });
+
+        handleProtocolWorkshop(workshopId);
       }
     }
 
@@ -2107,6 +2128,11 @@ function createFileItem(file) {
           <button class="dropdown-item detail-btn" data-file-path="${file.path}">
             <span class="btn-icon">🔍</span> 详情
           </button>
+          ${file.workshopId ? `
+          <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
+            <span class="btn-icon">🌐</span> 跳转工坊
+          </button>
+          ` : ""}
           <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
             <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
           </button>
@@ -2265,6 +2291,11 @@ function createFileCard(file) {
           <button class="dropdown-item detail-btn" data-file-path="${file.path}">
             <span class="btn-icon">🔍</span> 详情
           </button>
+          ${file.workshopId ? `
+          <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
+            <span class="btn-icon">🌐</span> 跳转工坊
+          </button>
+          ` : ""}
           <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
             <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
           </button>
@@ -4242,9 +4273,11 @@ function showConfirmModal(title, message, onConfirm, useHtml = false) {
     closeBtn.onclick = null;
   };
 
-  okBtn.onclick = () => {
-    cleanup();
-    onConfirm();
+  okBtn.onclick = async () => {
+    const result = await onConfirm();
+    if (result !== false) {
+      cleanup();
+    }
   };
 
   cancelBtn.onclick = cleanup;
@@ -6104,6 +6137,7 @@ async function showGlobalSettings() {
     const enabled = await GetWorkshopPreferredIP();
     const fixedIP = await GetWorkshopFixedIP();
     const useFixedIP = enabled && fixedIP !== "";
+    const metaEnabled = await GetWorkshopMetaEnabled();
 
     // 获取优选状态
     let ipStatusText = "";
@@ -6215,6 +6249,28 @@ async function showGlobalSettings() {
                 </div>
             </div>
         </div>
+
+        <div class="settings-section" style="margin-top: 20px;">
+            <h3 class="settings-section-title" style="margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">工坊设置</h3>
+
+            <div class="setting-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div class="setting-info" style="flex: 1; padding-right: 20px;">
+                    <div class="setting-label" style="font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">开启工坊信息存储</div>
+                    <div class="setting-desc" style="font-size: 0.85em; color: var(--text-secondary);">
+                        为每个工坊文件创建 .meta 文件，存储名称、作者等信息
+                    </div>
+                    <div style="font-size: 0.8em; color: var(--text-tertiary); margin-top: 4px;">
+                        <span style="color: var(--warning);">⚠</span> 关闭后不会删除已创建的 .meta 文件
+                    </div>
+                </div>
+                <label class="toggle-switch" style="flex-shrink: 0;">
+                    <input type="checkbox" id="workshop-meta-check" ${
+                      metaEnabled ? "checked" : ""
+                    }>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
       </div>
     `;
 
@@ -6303,6 +6359,80 @@ async function showGlobalSettings() {
             config.workshopUseFixedIP = selectedMode === "fixed";
             configChanged = true;
           }
+        }
+
+        // 处理工坊meta设置
+        const metaCheckbox = document.getElementById("workshop-meta-check");
+        const newMetaEnabled = metaCheckbox ? metaCheckbox.checked : false;
+
+        if (newMetaEnabled !== metaEnabled) {
+          if (newMetaEnabled) {
+            // 从关闭到开启，需要二次确认（设置弹框保持打开，临时替换内容）
+            const modal = document.getElementById("confirm-modal");
+            const titleEl = document.getElementById("confirm-title");
+            const messageEl = document.getElementById("confirm-message");
+            const okBtn = document.getElementById("confirm-ok-btn");
+            const cancelBtn = document.getElementById("confirm-cancel-btn");
+            const closeBtn = document.getElementById("close-confirm-modal-btn");
+
+            // 保存原状态
+            const savedTitle = titleEl.textContent;
+            const savedChildren = Array.from(messageEl.children);
+            const savedOkHandler = okBtn.onclick;
+            const savedCancelHandler = cancelBtn.onclick;
+            const savedCloseHandler = closeBtn.onclick;
+
+            // 隐藏原内容
+            savedChildren.forEach((child) => (child.style.display = "none"));
+
+            // 插入二次确认内容
+            const confirmContent = document.createElement("div");
+            confirmContent.id = "meta-confirm-overlay";
+            confirmContent.innerHTML = `
+              <p style="font-size: 1rem; color: var(--text-primary); margin: 20px 0; line-height: 1.5;">
+                开启后将为工坊文件创建 <code>.meta</code> 文件存储mod信息（名称、作者等），确定开启吗？
+              </p>
+              <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 8px;">
+                ⚠ 关闭后不会删除已创建的 .meta 文件
+              </div>
+            `;
+            messageEl.appendChild(confirmContent);
+
+            // 修改标题
+            titleEl.textContent = "确认开启";
+
+            const restore = () => {
+              confirmContent.remove();
+              savedChildren.forEach((child) => (child.style.display = ""));
+              titleEl.textContent = savedTitle;
+              okBtn.onclick = savedOkHandler;
+              cancelBtn.onclick = savedCancelHandler;
+              closeBtn.onclick = savedCloseHandler;
+              metaCheckbox.checked = false;
+            };
+
+            okBtn.onclick = async () => {
+              await SetWorkshopMetaEnabled(true);
+              showNotification("已开启工坊信息存储", "success");
+              modal.classList.add("hidden");
+              okBtn.onclick = null;
+              cancelBtn.onclick = null;
+              closeBtn.onclick = null;
+              // 主动刷新列表，加载meta数据
+              await refreshFilesKeepFilter();
+            };
+
+            cancelBtn.onclick = restore;
+            closeBtn.onclick = restore;
+
+            return false;
+          } else {
+            // 从开启到关闭，直接关闭
+            await SetWorkshopMetaEnabled(false);
+            showNotification("已关闭工坊信息存储", "info");
+          }
+          // 主动刷新列表，加载/卸载meta数据
+          await refreshFilesKeepFilter();
         }
 
         if (configChanged) {
