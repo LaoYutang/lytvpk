@@ -840,6 +840,11 @@ body {
   height: 1.125rem;
 }
 
+#browser-btn .icon-svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 #upload-btn .icon-svg {
   width: 1.125rem;
   height: 1.125rem;

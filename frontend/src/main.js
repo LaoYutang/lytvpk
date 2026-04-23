@@ -711,6 +711,11 @@ function setupBatchActionEvents() {
     .getElementById("workshop-btn")
     .addEventListener("click", openWorkshopModal);
 
+  // 工坊浏览器按钮
+  document
+    .getElementById("browser-btn")
+    .addEventListener("click", openBrowser);
+
   // 上传按钮
   document.getElementById("upload-btn").addEventListener("click", handleUpload);
 
@@ -6097,7 +6102,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (openBrowserBtn) {
     openBrowserBtn.addEventListener("click", () => {
       document.getElementById("workshop-modal").classList.add("hidden"); // 暂时隐藏现有弹窗
-      openBrowser();
+      openBrowser({ fromWorkshopModal: true });
     });
   }
 
@@ -6106,9 +6111,11 @@ document.addEventListener("DOMContentLoaded", () => {
   if (closeBrowserBtn) {
     closeBrowserBtn.addEventListener("click", () => {
       document.getElementById("browser-modal").classList.add("hidden");
-      // 如果是从下载弹窗来的，恢复下载弹窗？
-      // 或者就不恢复，反正用户关掉了。
-      document.getElementById("workshop-modal").classList.remove("hidden");
+      // 如果是从下载弹窗来的，恢复下载弹窗
+      if (browserOpenedFromWorkshopModal) {
+        document.getElementById("workshop-modal").classList.remove("hidden");
+        browserOpenedFromWorkshopModal = false;
+      }
     });
   }
 
@@ -6559,7 +6566,12 @@ async function showGlobalSettings() {
   }
 }
 
-function openBrowser() {
+let browserOpenedFromWorkshopModal = false;
+
+function openBrowser(options = {}) {
+  const { fromWorkshopModal = false } = options;
+  browserOpenedFromWorkshopModal = fromWorkshopModal;
+
   const modal = document.getElementById("browser-modal");
   modal.classList.remove("hidden");
 
