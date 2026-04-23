@@ -444,3 +444,40 @@
   font-family: monospace;
   margin: 10px 0;
 }
+
+/* BBCode Table */
+.bbcode-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.bbcode-table td,
+.bbcode-table th {
+  border: 1px solid var(--border-default);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.bbcode-table th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+/* BBCode Ordered List */
+ol.bbcode-list {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+
+/* Alignment blocks */
+.detail-description-text div {
+  margin: 4px 0;
+}
+
+.detail-description-text h3,
+.detail-description-text h4,
+.detail-description-text h5 {
+  margin: 12px 0 8px;
+}

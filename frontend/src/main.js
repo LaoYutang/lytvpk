@@ -6967,6 +6967,44 @@ function formatDescription(text) {
       replace: "<blockquote>$1</blockquote>",
     },
     { regex: /\[noparse\](.*?)\[\/noparse\]/gis, replace: "$1" },
+    // 新增：表格
+    {
+      regex: /\[table\](.*?)\[\/table\]/gis,
+      replace: '<table class="bbcode-table">$1</table>',
+    },
+    { regex: /\[tr\](.*?)\[\/tr\]/gis, replace: "<tr>$1</tr>" },
+    { regex: /\[td\](.*?)\[\/td\]/gis, replace: "<td>$1</td>" },
+    { regex: /\[th\](.*?)\[\/th\]/gis, replace: "<th>$1</th>" },
+    // 新增：样式
+    {
+      regex: /\[size=(\d+)\](.*?)\[\/size\]/gi,
+      replace: '<span style="font-size:$1pt">$2</span>',
+    },
+    {
+      regex: /\[color=([^\]]+)\](.*?)\[\/color\]/gi,
+      replace: '<span style="color:$1">$2</span>',
+    },
+    {
+      regex: /\[font=([^\]]+)\](.*?)\[\/font\]/gi,
+      replace: '<span style="font-family:$1">$2</span>',
+    },
+    // 新增：对齐
+    {
+      regex: /\[center\](.*?)\[\/center\]/gis,
+      replace: '<div style="text-align:center">$1</div>',
+    },
+    {
+      regex: /\[left\](.*?)\[\/left\]/gis,
+      replace: '<div style="text-align:left">$1</div>',
+    },
+    {
+      regex: /\[right\](.*?)\[\/right\]/gis,
+      replace: '<div style="text-align:right">$1</div>',
+    },
+    {
+      regex: /\[indent\](.*?)\[\/indent\]/gis,
+      replace: '<div style="margin-left:2em">$1</div>',
+    },
   ];
 
   tags.forEach((tag) => {
@@ -7005,9 +7043,28 @@ function formatDescription(text) {
     const listItems = items.map((item) => `<li>${item.trim()}</li>`).join("");
     return `<ol class="bbcode-list">${listItems}</ol>`;
   });
+  // 新增：[list=1]...[/list]
+  html = html.replace(/\[list=1\](.*?)\[\/list\]/gis, (match, content) => {
+    const items = content.split("[*]").filter((s) => s.trim().length > 0);
+    const listItems = items.map((item) => `<li>${item.trim()}</li>`).join("");
+    return `<ol class="bbcode-list">${listItems}</ol>`;
+  });
+  // 新增：[list=a]...[/list]
+  html = html.replace(/\[list=a\](.*?)\[\/list\]/gis, (match, content) => {
+    const items = content.split("[*]").filter((s) => s.trim().length > 0);
+    const listItems = items.map((item) => `<li>${item.trim()}</li>`).join("");
+    return `<ol type="a" class="bbcode-list">${listItems}</ol>`;
+  });
 
-  // 6. 处理换行
+  // 6. 兜底清理：移除未匹配的 BBCode 标签（保留内容）
+  html = html.replace(/\[\/?[a-zA-Z]+(?:=[^\]]*)?\]/g, "");
+
+  // 7. 处理换行并压缩多余空行
   html = html.replace(/\n/g, "<br>");
+  // 压缩 3 个及以上连续 <br> 为 2 个
+  html = html.replace(/(<br>){3,}/g, "<br><br>");
+  // 去掉首尾多余的 <br>
+  html = html.replace(/^(<br>)+|(<br>)+$/g, "");
 
   return html;
 }

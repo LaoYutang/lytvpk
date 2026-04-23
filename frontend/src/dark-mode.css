@@ -231,6 +231,15 @@ html.dark-mode .detail-description-text pre {
   border: 1px solid var(--border-default);
 }
 
+html.dark-mode .bbcode-table td,
+html.dark-mode .bbcode-table th {
+  border-color: var(--border-default);
+}
+
+html.dark-mode .bbcode-table th {
+  background: var(--bg-card);
+}
+
 /* 加载界面 */
 html.dark-mode .loading-screen {
   background: rgba(15, 23, 42, 0.8);
