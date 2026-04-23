@@ -405,3 +405,38 @@ html.dark-mode ::-webkit-scrollbar-corner {
 }
 
 /* 强制移除斑马纹 - 已在上方统一定义 */
+
+/* ===== 设置界面暗黑模式适配 ===== */
+
+html.dark-mode .settings-sidebar {
+  border-right-color: var(--border-default);
+}
+
+html.dark-mode .settings-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+html.dark-mode .settings-nav-item.active {
+  background: var(--primary-100);
+  color: var(--primary-light);
+}
+
+html.dark-mode .setting-card {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+
+html.dark-mode .setting-card-title {
+  border-bottom-color: var(--border-default);
+}
+
+html.dark-mode .setting-row + .setting-row {
+  border-top-color: var(--border-default);
+}
+
+@media (max-width: 640px) {
+  html.dark-mode .settings-sidebar {
+    border-bottom-color: var(--border-default);
+  }
+}

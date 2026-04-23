@@ -4250,13 +4250,18 @@ function createTaskElement(task) {
 }
 
 // 确认对话框逻辑
-function showConfirmModal(title, message, onConfirm, useHtml = false) {
+function showConfirmModal(title, message, onConfirm, useHtml = false, extraClass = "") {
   const modal = document.getElementById("confirm-modal");
+  const modalContent = modal.querySelector(".modal-content");
   const titleEl = document.getElementById("confirm-title");
   const messageEl = document.getElementById("confirm-message");
   const okBtn = document.getElementById("confirm-ok-btn");
   const cancelBtn = document.getElementById("confirm-cancel-btn");
   const closeBtn = document.getElementById("close-confirm-modal-btn");
+
+  if (extraClass) {
+    extraClass.split(" ").filter(Boolean).forEach((c) => modalContent.classList.add(c));
+  }
 
   titleEl.textContent = title;
   if (useHtml) {
@@ -4271,6 +4276,9 @@ function showConfirmModal(title, message, onConfirm, useHtml = false) {
     okBtn.onclick = null;
     cancelBtn.onclick = null;
     closeBtn.onclick = null;
+    if (extraClass) {
+      extraClass.split(" ").filter(Boolean).forEach((c) => modalContent.classList.remove(c));
+    }
   };
 
   okBtn.onclick = async () => {
@@ -6144,132 +6152,141 @@ async function showGlobalSettings() {
     if (enabled) {
       const isSelecting = await IsSelectingIP();
       if (isSelecting) {
-        ipStatusText = `<span style="color: var(--primary); font-size: 0.85em; display: block; margin-top: 4px;">正在优选最佳线路...</span>`;
+        ipStatusText = `<span class="setting-row-status" style="color: var(--primary);">正在优选最佳线路...</span>`;
       } else {
         const bestIP = await GetCurrentBestIP();
         if (bestIP) {
           if (useFixedIP) {
-            ipStatusText = `<span style="color: var(--success); font-size: 0.85em; display: block; margin-top: 4px;">当前固定IP: ${bestIP}</span>`;
+            ipStatusText = `<span class="setting-row-status" style="color: var(--success);">当前固定IP: ${bestIP}</span>`;
           } else {
-            ipStatusText = `<span style="color: var(--success); font-size: 0.85em; display: block; margin-top: 4px;">当前优选IP: ${bestIP}</span>`;
+            ipStatusText = `<span class="setting-row-status" style="color: var(--success);">当前优选IP: ${bestIP}</span>`;
           }
         } else {
-          ipStatusText = `<span style="color: var(--text-tertiary); font-size: 0.85em; display: block; margin-top: 4px;">尚未获取到优选IP</span>`;
+          ipStatusText = `<span class="setting-row-status" style="color: var(--text-tertiary);">尚未获取到优选IP</span>`;
         }
       }
     }
 
     const htmlContent = `
-      <div class="settings-modal-body">
-        <div class="settings-section">
-            <h3 class="settings-section-title" style="margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">网络设置</h3>
-
-            <div class="setting-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div class="setting-info" style="flex: 1; padding-right: 20px;">
-                    <div class="setting-label" style="font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">开启优选IP加速</div>
-                    <div class="setting-desc" style="font-size: 0.85em; color: var(--text-secondary);">
-                        加速创意工坊图片与文件下载
-                    </div>
-                    ${ipStatusText}
-                </div>
-                <label class="toggle-switch" style="flex-shrink: 0;">
-                    <input type="checkbox" id="workshop-preferred-ip-check" ${
-                      enabled ? "checked" : ""
-                    }>
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-
-            <div id="ip-mode-section" style="margin-top: 12px; padding-left: 8px; ${
-              enabled ? "" : "display: none;"
-            }">
-                <div style="font-size: 0.9em; color: var(--text-primary); margin-bottom: 6px; font-weight: 500;">加速模式</div>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <label style="display: flex; align-items: center; cursor: pointer; gap: 6px;">
-                        <input type="radio" name="ip-mode" value="auto" style="accent-color: var(--primary);" ${
-                          useFixedIP ? "" : "checked"
-                        }>
-                        <span style="font-size: 0.85em; color: var(--text-secondary);">自动优选最佳IP（推荐）</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer; gap: 6px;">
-                        <input type="radio" name="ip-mode" value="fixed" style="accent-color: var(--primary);" ${
-                          useFixedIP ? "checked" : ""
-                        }>
-                        <span style="font-size: 0.85em; color: var(--text-secondary);">手动指定IP</span>
-                    </label>
-                    <input type="text" id="fixed-ip-input" class="form-input" placeholder="例如: 23.59.72.59" value="${
-                      fixedIP
-                    }" style="margin-top: 2px; width: 100%; box-sizing: border-box; ${
-                      useFixedIP ? "" : "display: none;"
-                    }">
-                </div>
-            </div>
+      <div class="settings-layout">
+        <div class="settings-sidebar">
+          <div class="settings-nav-item active" data-panel="network">
+            <span class="settings-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </span>
+            网络设置
+          </div>
+          <div class="settings-nav-item" data-panel="interface">
+            <span class="settings-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </span>
+            界面设置
+          </div>
+          <div class="settings-nav-item" data-panel="workshop">
+            <span class="settings-nav-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+              </svg>
+            </span>
+            工坊设置
+          </div>
         </div>
 
-        <div class="settings-section" style="margin-top: 20px;">
-            <h3 class="settings-section-title" style="margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">界面设置</h3>
-            
-            <div class="setting-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div class="setting-info" style="flex: 1; padding-right: 20px;">
-                    <div class="setting-label" style="font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">显示模式</div>
-                    <div class="setting-desc" style="font-size: 0.85em; color: var(--text-secondary);">
-                        切换文件列表的显示布局
-                    </div>
-                    <div style="font-size: 0.8em; color: var(--text-tertiary); margin-top: 4px;">
-                        <span style="color: var(--warning);">⚠</span> 仅列表模式支持批量操作
-                    </div>
+        <div class="settings-content">
+          <!-- 网络设置面板 -->
+          <div class="settings-panel active" id="settings-panel-network">
+            <div class="setting-card">
+              <div class="setting-card-title">网络加速</div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="setting-row-label">开启优选IP加速</div>
+                  <div class="setting-row-desc">加速创意工坊图片与文件下载</div>
+                  ${ipStatusText}
                 </div>
-                <div class="mode-toggle-group">
-                    <label class="mode-option ${
-                      appState.displayMode === "list" ? "active" : ""
-                    }">
-                        <input type="radio" name="display-mode" value="list" ${
-                          appState.displayMode === "list" ? "checked" : ""
-                        } style="display: none;">
-                        <span class="mode-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
-                            </svg>
-                        </span>
-                        <span class="mode-text">列表</span>
-                    </label>
-                    <label class="mode-option ${
-                      appState.displayMode === "card" ? "active" : ""
-                    }">
-                        <input type="radio" name="display-mode" value="card" ${
-                          appState.displayMode === "card" ? "checked" : ""
-                        } style="display: none;">
-                        <span class="mode-icon">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/>
-                            </svg>
-                        </span>
-                        <span class="mode-text">卡片</span>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <div class="settings-section" style="margin-top: 20px;">
-            <h3 class="settings-section-title" style="margin: 0 0 15px 0; font-size: 1.1em; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">工坊设置</h3>
-
-            <div class="setting-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div class="setting-info" style="flex: 1; padding-right: 20px;">
-                    <div class="setting-label" style="font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">开启工坊信息存储</div>
-                    <div class="setting-desc" style="font-size: 0.85em; color: var(--text-secondary);">
-                        为每个工坊文件创建 .meta 文件，存储名称、作者等信息
-                    </div>
-                    <div style="font-size: 0.8em; color: var(--text-tertiary); margin-top: 4px;">
-                        <span style="color: var(--warning);">⚠</span> 关闭后不会删除已创建的 .meta 文件
-                    </div>
-                </div>
-                <label class="toggle-switch" style="flex-shrink: 0;">
-                    <input type="checkbox" id="workshop-meta-check" ${
-                      metaEnabled ? "checked" : ""
-                    }>
+                <div class="setting-row-control">
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="workshop-preferred-ip-check" ${enabled ? "checked" : ""}>
                     <span class="toggle-slider"></span>
-                </label>
+                  </label>
+                </div>
+              </div>
+
+              <div id="ip-mode-section" class="setting-indent" style="${enabled ? "" : "display: none;"}">
+                <div class="setting-row-label" style="margin-bottom: 8px;">加速模式</div>
+                <div class="setting-radio-group">
+                  <label class="setting-radio-label">
+                    <input type="radio" name="ip-mode" value="auto" ${useFixedIP ? "" : "checked"}>
+                    <span>自动优选最佳IP（推荐）</span>
+                  </label>
+                  <label class="setting-radio-label">
+                    <input type="radio" name="ip-mode" value="fixed" ${useFixedIP ? "checked" : ""}>
+                    <span>手动指定IP</span>
+                  </label>
+                  <input type="text" id="fixed-ip-input" class="form-input" placeholder="例如: 23.59.72.59" value="${fixedIP}" style="margin-top: 4px; ${useFixedIP ? "" : "display: none;"}">
+                </div>
+              </div>
             </div>
+          </div>
+
+          <!-- 界面设置面板 -->
+          <div class="settings-panel" id="settings-panel-interface">
+            <div class="setting-card">
+              <div class="setting-card-title">显示偏好</div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="setting-row-label">显示模式</div>
+                  <div class="setting-row-desc">切换文件列表的显示布局</div>
+                  <div class="setting-row-status" style="color: var(--warning);">⚠ 仅列表模式支持批量操作</div>
+                </div>
+                <div class="setting-row-control">
+                  <div class="mode-toggle-group">
+                    <label class="mode-option ${appState.displayMode === "list" ? "active" : ""}">
+                      <input type="radio" name="display-mode" value="list" ${appState.displayMode === "list" ? "checked" : ""} style="display: none;">
+                      <span class="mode-icon">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                          <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
+                        </svg>
+                      </span>
+                      <span class="mode-text">列表</span>
+                    </label>
+                    <label class="mode-option ${appState.displayMode === "card" ? "active" : ""}">
+                      <input type="radio" name="display-mode" value="card" ${appState.displayMode === "card" ? "checked" : ""} style="display: none;">
+                      <span class="mode-icon">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                          <path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/>
+                        </svg>
+                      </span>
+                      <span class="mode-text">卡片</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 工坊设置面板 -->
+          <div class="settings-panel" id="settings-panel-workshop">
+            <div class="setting-card">
+              <div class="setting-card-title">工坊数据</div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="setting-row-label">开启工坊信息存储</div>
+                  <div class="setting-row-desc">为每个工坊文件创建 .meta 文件，存储名称、作者等信息</div>
+                  <div class="setting-row-status" style="color: var(--warning);">⚠ 关闭后不会删除已创建的 .meta 文件</div>
+                </div>
+                <div class="setting-row-control">
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="workshop-meta-check" ${metaEnabled ? "checked" : ""}>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -6294,7 +6311,6 @@ async function showGlobalSettings() {
           config.displayMode = newMode;
           saveConfig(config);
           renderFileList();
-          // showNotification("显示模式已更新", "success");
         }
 
         // 处理网络设置
@@ -6320,7 +6336,6 @@ async function showGlobalSettings() {
           config.workshopPreferredIP = newEnabled;
           configChanged = true;
 
-          // 保存设置到后端
           await SetWorkshopPreferredIP(newEnabled);
 
           if (!newEnabled) {
@@ -6329,7 +6344,6 @@ async function showGlobalSettings() {
             showNotification("已开启优选IP加速", "success");
           }
 
-          // 刷新当前页面 (如果在工坊中)
           if (
             !document
               .getElementById("browser-modal")
@@ -6367,7 +6381,6 @@ async function showGlobalSettings() {
 
         if (newMetaEnabled !== metaEnabled) {
           if (newMetaEnabled) {
-            // 从关闭到开启，需要二次确认（设置弹框保持打开，临时替换内容）
             const modal = document.getElementById("confirm-modal");
             const titleEl = document.getElementById("confirm-title");
             const messageEl = document.getElementById("confirm-message");
@@ -6375,17 +6388,14 @@ async function showGlobalSettings() {
             const cancelBtn = document.getElementById("confirm-cancel-btn");
             const closeBtn = document.getElementById("close-confirm-modal-btn");
 
-            // 保存原状态
             const savedTitle = titleEl.textContent;
             const savedChildren = Array.from(messageEl.children);
             const savedOkHandler = okBtn.onclick;
             const savedCancelHandler = cancelBtn.onclick;
             const savedCloseHandler = closeBtn.onclick;
 
-            // 隐藏原内容
             savedChildren.forEach((child) => (child.style.display = "none"));
 
-            // 插入二次确认内容
             const confirmContent = document.createElement("div");
             confirmContent.id = "meta-confirm-overlay";
             confirmContent.innerHTML = `
@@ -6398,7 +6408,6 @@ async function showGlobalSettings() {
             `;
             messageEl.appendChild(confirmContent);
 
-            // 修改标题
             titleEl.textContent = "确认开启";
 
             const restore = () => {
@@ -6418,7 +6427,6 @@ async function showGlobalSettings() {
               okBtn.onclick = null;
               cancelBtn.onclick = null;
               closeBtn.onclick = null;
-              // 主动刷新列表，加载meta数据
               await refreshFilesKeepFilter();
             };
 
@@ -6427,11 +6435,9 @@ async function showGlobalSettings() {
 
             return false;
           } else {
-            // 从开启到关闭，直接关闭
             await SetWorkshopMetaEnabled(false);
             showNotification("已关闭工坊信息存储", "info");
           }
-          // 主动刷新列表，加载/卸载meta数据
           await refreshFilesKeepFilter();
         }
 
@@ -6439,25 +6445,38 @@ async function showGlobalSettings() {
           saveConfig(config);
         }
       },
-      true // useHtml
+      true,
+      "settings-modal-content"
     );
 
-    // 绑定模式切换点击事件，实现即时视觉反馈
+    // 绑定交互事件
     setTimeout(() => {
+      // 左侧导航切换
+      const navItems = document.querySelectorAll(".settings-nav-item");
+      const panels = document.querySelectorAll(".settings-panel");
+      navItems.forEach((item) => {
+        item.addEventListener("click", () => {
+          const target = item.dataset.panel;
+          navItems.forEach((n) => n.classList.remove("active"));
+          panels.forEach((p) => p.classList.remove("active"));
+          item.classList.add("active");
+          const targetPanel = document.getElementById(`settings-panel-${target}`);
+          if (targetPanel) targetPanel.classList.add("active");
+        });
+      });
+
+      // 显示模式切换
       const modeOptions = document.querySelectorAll(".mode-option");
       modeOptions.forEach((option) => {
         option.addEventListener("click", function () {
-          // 移除所有 active
           modeOptions.forEach((opt) => opt.classList.remove("active"));
-          // 添加当前 active
           this.classList.add("active");
-          // 选中内部的 radio
           const radio = this.querySelector('input[type="radio"]');
           if (radio) radio.checked = true;
         });
       });
 
-      // 绑定优选IP开关切换，控制加速模式区域显示/隐藏
+      // 优选IP开关
       const ipToggle = document.getElementById("workshop-preferred-ip-check");
       const ipModeSection = document.getElementById("ip-mode-section");
       if (ipToggle && ipModeSection) {
@@ -6466,7 +6485,7 @@ async function showGlobalSettings() {
         });
       }
 
-      // 绑定IP模式radio切换，控制固定IP输入框显示/隐藏
+      // IP模式radio
       const ipModeRadios = document.getElementsByName("ip-mode");
       const fixedIPInput = document.getElementById("fixed-ip-input");
       for (const radio of ipModeRadios) {

@@ -4759,3 +4759,220 @@ body {
 .latency-tag.unknown {
   background-color: var(--gray-500);
 }
+
+/* ===== 设置界面两栏布局 ===== */
+
+.settings-modal-content {
+  max-width: 780px;
+  width: 90%;
+}
+
+.settings-layout {
+  display: flex;
+  min-height: 400px;
+}
+
+.settings-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-light);
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all var(--duration-150) var(--ease-out);
+  user-select: none;
+  position: relative;
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-nav-item.active {
+  background: var(--primary-50);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.settings-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background: linear-gradient(
+    180deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
+  border-radius: 0 2px 2px 0;
+}
+
+.settings-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.settings-content {
+  flex: 1;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-panel {
+  display: none;
+}
+
+.settings-panel.active {
+  display: block;
+  flex: 1;
+  animation: settingsFadeIn 0.2s ease;
+}
+
+@keyframes settingsFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.setting-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--border-light);
+}
+
+.setting-card + .setting-card {
+  margin-top: 16px;
+}
+
+.setting-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.setting-row + .setting-row {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.setting-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-row-label {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+}
+
+.setting-row-desc {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.setting-row-control {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.setting-row-status {
+  font-size: 0.85em;
+  margin-top: 4px;
+  display: block;
+}
+
+.setting-indent {
+  margin-top: 12px;
+  padding-left: 8px;
+}
+
+.setting-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-radio-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 6px;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+.setting-radio-label input[type="radio"] {
+  accent-color: var(--primary);
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+  .settings-layout {
+    flex-direction: column;
+  }
+
+  .settings-sidebar {
+    width: auto;
+    flex-direction: row;
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+    padding: 10px;
+    gap: 8px;
+    overflow-x: auto;
+  }
+
+  .settings-nav-item {
+    white-space: nowrap;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .settings-nav-item.active::before {
+    display: none;
+  }
+
+  .settings-content {
+    padding: 16px;
+  }
+}
