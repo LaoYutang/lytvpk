@@ -6716,9 +6716,8 @@ function renderWorkshopGrid(items) {
             <div class="card-info">
                 <div class="card-title">${item.title}</div>
                 <div class="card-meta">
-                    <span class="card-author">${item.creator}</span>
                     <div class="card-stats">
-                        <span>👁️ ${formatNumber(item.views)}</span>
+                        <span>🔥 ${formatNumber(item.views)}</span>
                         <span>⭐ ${formatNumber(item.favorited)}</span>
                     </div>
                 </div>

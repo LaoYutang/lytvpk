@@ -4293,6 +4293,7 @@ body {
 .card-stats {
   display: flex;
   gap: 8px;
+  white-space: nowrap;
 }
 
 /* 详情页视图 (覆盖在 Grid 上或单独的 View) */
