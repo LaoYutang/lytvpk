@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"image"
+	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -184,7 +185,8 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath s
 				// 确保是图片文件
 				if strings.HasSuffix(filename, ".png") ||
 					strings.HasSuffix(filename, ".jpg") ||
-					strings.HasSuffix(filename, ".jpeg") {
+					strings.HasSuffix(filename, ".jpeg") ||
+					strings.HasSuffix(filename, ".gif") {
 					previewFile = file
 					break
 				}
@@ -205,7 +207,7 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath s
 	// ========== 优先级 3: 查找外部同名图片文件 (.jpg, .png, .jpeg) ==========
 	// 例如: xxx.vpk -> xxx.jpg
 	basePath := strings.TrimSuffix(vpkFilePath, filepath.Ext(vpkFilePath))
-	exts := []string{".jpg", ".png", ".jpeg"}
+	exts := []string{".jpg", ".png", ".jpeg", ".gif"}
 
 	for _, ext := range exts {
 		externalPath := basePath + ext
@@ -267,7 +269,7 @@ func encodeImageToBase64(data []byte) string {
 
 	// 如果是VTF格式（Valve纹理格式），我们暂时跳过
 	// 因为需要特殊的VTF解码器
-	if format != "png" && format != "jpeg" {
+	if format != "png" && format != "jpeg" && format != "gif" {
 		return ""
 	}
 
@@ -281,6 +283,8 @@ func encodeImageToBase64(data []byte) string {
 		dataURL = "data:image/png;base64," + base64Str
 	case "jpeg":
 		dataURL = "data:image/jpeg;base64," + base64Str
+	case "gif":
+		dataURL = "data:image/gif;base64," + base64Str
 	default:
 		return ""
 	}
@@ -355,24 +359,28 @@ func ExtractVPKResources(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKF
 
 // extractPreviewImageFromFiles 从找到的文件中提取预览图
 func extractPreviewImageFromFiles(opener *vpk.Opener, addonImageFile, previewFile *vpk.File, vpkFilePath string) string {
-	// 优先级1: addonimage.jpg
+	// 优先级1: 外部同名图片文件
+	basePath := strings.TrimSuffix(vpkFilePath, filepath.Ext(vpkFilePath))
+	exts := []string{".jpg", ".png", ".jpeg", ".gif"}
+	for _, ext := range exts {
+		externalPath := basePath + ext
+		if fileExists(externalPath) {
+			if base64Data := readExternalImageFile(externalPath); base64Data != "" {
+				return base64Data
+			}
+		}
+	}
+
+	// 优先级2: addonimage.jpg
 	if addonImageFile != nil {
 		if base64Data := readAndEncodeImage(opener, addonImageFile); base64Data != "" {
 			return base64Data
 		}
 	}
 
-	// 优先级2: 其他预览图
+	// 优先级3: 其他预览图
 	if previewFile != nil {
 		if base64Data := readAndEncodeImage(opener, previewFile); base64Data != "" {
-			return base64Data
-		}
-	}
-
-	// 优先级3: 外部同名.jpg文件
-	externalJpgPath := strings.TrimSuffix(vpkFilePath, filepath.Ext(vpkFilePath)) + ".jpg"
-	if fileExists(externalJpgPath) {
-		if base64Data := readExternalImageFile(externalJpgPath); base64Data != "" {
 			return base64Data
 		}
 	}

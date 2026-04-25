@@ -525,7 +525,7 @@ func (a *App) processVPKFileWithCache(filePath string) {
 	// 检查外部图片状态
 	var imgModTime time.Time
 	basePath := strings.TrimSuffix(filePath, filepath.Ext(filePath))
-	exts := []string{".jpg", ".png", ".jpeg"}
+	exts := []string{".jpg", ".png", ".jpeg", ".gif"}
 	for _, ext := range exts {
 		if imgInfo, statErr := os.Stat(basePath + ext); statErr == nil {
 			imgModTime = imgInfo.ModTime()

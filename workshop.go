@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"mime"
 	"net"
@@ -695,21 +699,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 
 	// 尝试下载预览图作为同名文件
 	if task.PreviewUrl != "" {
-		// 确定图片扩展名和目标路径
-		// 默认使用 jpg，或者根据 url 后缀
-		imgExt := ".jpg"
-		if strings.HasSuffix(strings.ToLower(task.PreviewUrl), ".png") {
-			imgExt = ".png"
-		} else if strings.HasSuffix(strings.ToLower(task.PreviewUrl), ".jpeg") {
-			imgExt = ".jpeg"
-		}
-
-		vpkExt := filepath.Ext(targetPath)
-		imgPath := strings.TrimSuffix(targetPath, vpkExt) + imgExt
-
 		// 同步下载图片，确保任务完成时图片已就绪
 		// 设置较短的超时，避免长时间阻塞
-		func(url, path string) {
+		func(url, vpkPath string) {
 			client := &http.Client{
 				Timeout: 10 * time.Second,
 			}
@@ -719,14 +711,36 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			}
 			defer resp.Body.Close()
 
-			out, err := os.Create(path)
+			data, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return
+			}
+
+			// 根据实际内容格式确定扩展名
+			imgExt := ".jpg"
+			_, format, err := image.DecodeConfig(bytes.NewReader(data))
+			if err == nil {
+				switch format {
+				case "png":
+					imgExt = ".png"
+				case "gif":
+					imgExt = ".gif"
+				case "jpeg":
+					imgExt = ".jpg"
+				}
+			}
+
+			vpkExt := filepath.Ext(vpkPath)
+			imgPath := strings.TrimSuffix(vpkPath, vpkExt) + imgExt
+
+			out, err := os.Create(imgPath)
 			if err != nil {
 				return
 			}
 			defer out.Close()
 
-			io.Copy(out, resp.Body)
-		}(task.PreviewUrl, imgPath)
+			out.Write(data)
+		}(task.PreviewUrl, targetPath)
 	}
 
 	// Save meta file
@@ -993,16 +1007,6 @@ func (a *App) downloadPreviewImage(task *DownloadTask, targetPath string) {
 		return
 	}
 
-	imgExt := ".jpg"
-	if strings.HasSuffix(strings.ToLower(task.PreviewUrl), ".png") {
-		imgExt = ".png"
-	} else if strings.HasSuffix(strings.ToLower(task.PreviewUrl), ".jpeg") {
-		imgExt = ".jpeg"
-	}
-
-	vpkExt := filepath.Ext(targetPath)
-	imgPath := strings.TrimSuffix(targetPath, vpkExt) + imgExt
-
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(task.PreviewUrl)
 	if err != nil {
@@ -1010,13 +1014,35 @@ func (a *App) downloadPreviewImage(task *DownloadTask, targetPath string) {
 	}
 	defer resp.Body.Close()
 
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	// 根据实际内容格式确定扩展名
+	imgExt := ".jpg"
+	_, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err == nil {
+		switch format {
+		case "png":
+			imgExt = ".png"
+		case "gif":
+			imgExt = ".gif"
+		case "jpeg":
+			imgExt = ".jpg"
+		}
+	}
+
+	vpkExt := filepath.Ext(targetPath)
+	imgPath := strings.TrimSuffix(targetPath, vpkExt) + imgExt
+
 	out, err := os.Create(imgPath)
 	if err != nil {
 		return
 	}
 	defer out.Close()
 
-	io.Copy(out, resp.Body)
+	out.Write(data)
 }
 
 // handleArchiveExtraction handles auto extraction for archive files

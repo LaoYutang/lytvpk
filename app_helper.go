@@ -17,7 +17,7 @@ func (a *App) handleSidecarFile(srcPath, destPath string, op string) {
 	srcBase := strings.TrimSuffix(srcPath, srcExt)
 
 	// 可能的图片扩展名和meta扩展名
-	exts := []string{".jpg", ".jpeg", ".png", ".meta"}
+	exts := []string{".jpg", ".jpeg", ".png", ".gif", ".meta"}
 
 	for _, ext := range exts {
 		srcImg := srcBase + ext
