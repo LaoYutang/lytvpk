@@ -441,14 +441,16 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			a.handleArchiveExtraction(task, targetPath, updateStatus)
 
 			// Save meta file
-			metaDetails := WorkshopFileDetails{
-				PublishedFileId: task.WorkshopID,
-				Title:           task.Title,
-				PreviewUrl:      task.PreviewUrl,
-				FileUrl:         task.FileUrl,
-				Description:     task.Description,
+			if a.workshopMetaEnabled {
+				metaDetails := WorkshopFileDetails{
+					PublishedFileId: task.WorkshopID,
+					Title:           task.Title,
+					PreviewUrl:      task.PreviewUrl,
+					FileUrl:         task.FileUrl,
+					Description:     task.Description,
+				}
+				SaveWorkshopMeta(targetPath, metaDetails)
 			}
-			SaveWorkshopMeta(targetPath, metaDetails)
 
 			updateStatus("completed", "")
 			return
@@ -728,14 +730,16 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 
 	// Save meta file
-	metaDetails := WorkshopFileDetails{
-		PublishedFileId: task.WorkshopID,
-		Title:           task.Title,
-		PreviewUrl:      task.PreviewUrl,
-		FileUrl:         task.FileUrl,
-		Description:     task.Description,
+	if a.workshopMetaEnabled {
+		metaDetails := WorkshopFileDetails{
+			PublishedFileId: task.WorkshopID,
+			Title:           task.Title,
+			PreviewUrl:      task.PreviewUrl,
+			FileUrl:         task.FileUrl,
+			Description:     task.Description,
+		}
+		SaveWorkshopMeta(targetPath, metaDetails)
 	}
-	SaveWorkshopMeta(targetPath, metaDetails)
 
 	// 如果是直连下载且是压缩文件，自动解压
 	ext := strings.ToLower(filepath.Ext(targetPath))
