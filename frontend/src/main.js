@@ -2082,7 +2082,7 @@ function renderFileList() {
     container.classList.add("file-list-grid");
     container.classList.remove("file-list");
     if (listHeader) listHeader.style.display = "none";
-    if (statusBar) statusBar.style.display = "none";
+    if (statusBar) statusBar.style.display = "flex";
 
     appState.vpkFiles.forEach((file) => {
       const cardItem = createFileCard(file);
@@ -2347,6 +2347,7 @@ function createFileCard(file) {
         <img class="card-preview-img ${
           showPlaceholder ? "hidden" : ""
         }" src="${previewSrc}" alt="${displayTitle}" style="${imgStyle}" loading="lazy" />
+        <div class="card-checkbox-container"></div>
         <div class="card-badges">
             <span class="card-badge location-badge">${getLocationDisplayName(
               file.location
@@ -2369,6 +2370,21 @@ function createFileCard(file) {
     </div>
   `;
 
+  // 复选框（与列表视图共用 .file-checkbox 类，复用全选/反选/同步逻辑）
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "file-checkbox card-checkbox";
+  checkbox.checked = appState.selectedFiles.has(file.path);
+  checkbox.addEventListener("change", function () {
+    toggleFileSelection(file.path, checkbox.checked);
+  });
+  const checkboxContainer = card.querySelector(".card-checkbox-container");
+  checkboxContainer.appendChild(checkbox);
+  // 阻止冒泡，避免触发卡片的"打开详情"
+  checkboxContainer.addEventListener("click", function (e) {
+    e.stopPropagation();
+  });
+
   // 懒加载预览图
   const img = card.querySelector(".card-preview-img");
   const placeholder = card.querySelector(".card-preview-placeholder");
@@ -2388,10 +2404,11 @@ function createFileCard(file) {
 
   // 点击卡片显示详情
   card.addEventListener("click", function (e) {
-    // 忽略按钮点击
+    // 忽略按钮、下拉菜单与复选框
     if (
       e.target.closest("button") ||
-      e.target.closest(".more-actions-dropdown")
+      e.target.closest(".more-actions-dropdown") ||
+      e.target.closest(".card-checkbox-container")
     ) {
       return;
     }
@@ -6269,7 +6286,6 @@ async function showGlobalSettings() {
                 <div class="setting-row-info">
                   <div class="setting-row-label">显示模式</div>
                   <div class="setting-row-desc">切换文件列表的显示布局</div>
-                  <div class="setting-row-status" style="color: var(--warning);">⚠ 仅列表模式支持批量操作</div>
                 </div>
                 <div class="setting-row-control">
                   <div class="mode-toggle-group">

@@ -160,6 +160,11 @@ html.dark-mode .file-item.selected {
   border-left-color: var(--primary);
 }
 
+html.dark-mode .file-checkbox.card-checkbox {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
 /* 状态栏 - 与头部保持一致 */
 html.dark-mode .status-bar {
   background: rgba(15, 23, 42, 0.9);

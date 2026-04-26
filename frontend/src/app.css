@@ -1196,12 +1196,37 @@ body {
 .card-badges {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   z-index: 2;
   pointer-events: none;
+  justify-content: flex-end;
+  max-width: calc(100% - 40px);
+}
+
+.card-checkbox-container {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+}
+
+.file-checkbox.card-checkbox {
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  box-shadow: var(--shadow-sm);
+}
+
+.file-checkbox.card-checkbox:checked {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--primary-light) 100%
+  );
 }
 
 .card-badge {
@@ -1211,11 +1236,14 @@ body {
   font-weight: 500; /* 统一改为 500 */
   color: white;
   box-shadow: var(--shadow-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   line-height: 1.2;
   border: 1px solid transparent; /* 统一边框占位 */
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .card-badge.location-badge {
