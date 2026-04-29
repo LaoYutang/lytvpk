@@ -160,20 +160,30 @@ func (a *App) ParseWorkshopID(workshopUrl string) (string, error) {
 		return "", fmt.Errorf("invalid URL")
 	}
 
-	q := u.Query()
-	id := q.Get("id")
-	if id != "" {
-		return id, nil
+	// 只有 Steam 相关域名才提取 id 参数
+	host := strings.ToLower(u.Hostname())
+	isSteamHost := strings.HasSuffix(host, "steamcommunity.com") ||
+		strings.HasSuffix(host, "steampowered.com") ||
+		strings.HasSuffix(host, "steamworkshop.download")
+
+	if isSteamHost {
+		q := u.Query()
+		id := q.Get("id")
+		if id != "" && isValidWorkshopID(id) {
+			return id, nil
+		}
 	}
 
-	// Fallback regex if URL structure is different or just ID provided
-	re := regexp.MustCompile(`\d+`)
-	matches := re.FindStringSubmatch(workshopUrl)
-	if len(matches) > 0 {
-		return matches[0], nil
+	// 回退：仅当 URL 整体看起来像 Steam 链接时才用正则匹配
+	if isSteamHost || strings.Contains(workshopUrl, "steamcommunity.com/sharedfiles") {
+		re := regexp.MustCompile(`\d+`)
+		matches := re.FindStringSubmatch(workshopUrl)
+		if len(matches) > 0 && isValidWorkshopID(matches[0]) {
+			return matches[0], nil
+		}
 	}
 
-	return "", fmt.Errorf("could not find ID in URL")
+	return "", fmt.Errorf("could not find valid workshop ID in URL")
 }
 
 // GetWorkshopDetails fetches details from steamworkshopdownloader.io

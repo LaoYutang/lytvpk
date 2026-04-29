@@ -588,7 +588,7 @@ func (a *App) processVPKFileWithCache(filePath string) {
 			if meta.Description != "" {
 				vpkFile.Desc = meta.Description
 			}
-			if meta.WorkshopID != "" && !strings.HasPrefix(meta.WorkshopID, "direct-") {
+			if meta.WorkshopID != "" && !strings.HasPrefix(meta.WorkshopID, "direct-") && isValidWorkshopID(meta.WorkshopID) {
 				vpkFile.WorkshopID = meta.WorkshopID
 			}
 		}

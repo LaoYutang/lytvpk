@@ -68,7 +68,7 @@ func ParseProtocolURL(url string) (*ProtocolURL, error) {
 }
 
 // isValidWorkshopID 验证工坊ID是否有效
-// Steam工坊ID是正整数
+// Steam工坊ID是正整数且通常较大（最小值设为100000以过滤无效ID）
 func isValidWorkshopID(id string) bool {
 	// 使用正则验证是否为纯数字
 	matched, _ := regexp.MatchString(`^\d+$`, id)
@@ -82,7 +82,7 @@ func isValidWorkshopID(id string) bool {
 		return false
 	}
 
-	return num > 0
+	return num >= 100000
 }
 
 // String 返回协议URL的字符串表示
