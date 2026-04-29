@@ -23,7 +23,7 @@ export function DoUpdate(arg1:string):Promise<string>;
 
 export function ExportServersToFile(arg1:string):Promise<string>;
 
-export function ExportVPKFilesToZip(arg1:Array<string>):Promise<string>;
+export function ExportVPKFilesToZip(arg1:Array<string>,arg2:boolean):Promise<string>;
 
 export function ExtractVPKFrom7z(arg1:string,arg2:string):Promise<void>;
 

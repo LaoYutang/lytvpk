@@ -2660,35 +2660,53 @@ async function exportZipSelected() {
     return;
   }
 
-  // 监听进度事件
-  const cleanup = EventsOn("export-progress", (progress) => {
-    updateLoadingMessage(
-      `${progress.message} (${progress.current}/${progress.total})`
-    );
-  });
+  const confirmMessage = `
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <p>共选择了 ${selectedFiles.length} 个文件，是否同时包含以下附加文件？</p>
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" id="export-include-extra" class="file-checkbox" checked>
+        <span>缩略图与工坊信息(.meta)文件</span>
+      </label>
+    </div>
+  `;
 
-  showLoadingScreen();
-  updateLoadingMessage("正在准备导出...");
+  showConfirmModal(
+    "导出ZIP",
+    confirmMessage,
+    async () => {
+      // 立即关闭确认框，避免挡住导出进度
+      document.getElementById("confirm-modal").classList.add("hidden");
 
-  try {
-    const result = await ExportVPKFilesToZip(selectedFiles);
-    if (result === "cancelled") {
-      return;
-    }
-    showSuccess(result);
-  } catch (error) {
-    console.error("导出ZIP失败:", error);
-    showError("导出ZIP失败: " + error);
-  } finally {
-    showMainScreen();
-    // 清理事件监听（虽然 EventsOn 返回的不是清理函数，但这里我们不需要手动清理，因为下次会重新注册或者覆盖）
-    // 注意：Wails 的 EventsOn 返回的是一个清理函数，如果版本较新。
-    // 如果 EventsOn 不返回清理函数，可能需要手动管理，但这里简单处理即可。
-    // 实际上 Wails v2 的 EventsOn 返回一个取消订阅的函数。
-    if (typeof cleanup === "function") {
-      cleanup();
-    }
-  }
+      const includeExtra = document.getElementById("export-include-extra").checked;
+
+      // 监听进度事件
+      const cleanup = EventsOn("export-progress", (progress) => {
+        updateLoadingMessage(
+          `${progress.message} (${progress.current}/${progress.total})`
+        );
+      });
+
+      showLoadingScreen();
+      updateLoadingMessage("正在准备导出...");
+
+      try {
+        const result = await ExportVPKFilesToZip(selectedFiles, includeExtra);
+        if (result === "cancelled") {
+          return;
+        }
+        showSuccess(result);
+      } catch (error) {
+        console.error("导出ZIP失败:", error);
+        showError("导出ZIP失败: " + error);
+      } finally {
+        showMainScreen();
+        if (typeof cleanup === "function") {
+          cleanup();
+        }
+      }
+    },
+    true
+  );
 }
 
 // 加载顺序编辑相关
