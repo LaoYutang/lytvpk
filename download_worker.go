@@ -240,7 +240,7 @@ func buildDownloadTransport(bestIP string, downloadUrl string) *http.Transport {
 
 // downloadWorker processes blocks from the queue, reusing a single http.Client per worker
 func (a *App) downloadWorker(
-	workerID int,
+	_ int,
 	bm *BlockManager,
 	file *os.File,
 	downloadUrl string,

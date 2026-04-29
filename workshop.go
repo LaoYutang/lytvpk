@@ -70,7 +70,6 @@ type DownloadTask struct {
 	cancelFunc     context.CancelFunc `json:"-"`
 }
 
-
 // TaskManager manages download tasks
 type TaskManager struct {
 	tasks map[string]*DownloadTask
@@ -903,7 +902,7 @@ func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, do
 
 	// 5. Start workers
 	var wg sync.WaitGroup
-	for i := 0; i < workerCount; i++ {
+	for i := range workerCount {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
