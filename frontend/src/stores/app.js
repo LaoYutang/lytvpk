@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { WindowSetDarkTheme, WindowSetLightTheme } from '../api/wails.js'
 
+const CONFIG_KEY = 'vpk-manager-config'
+
 export const useAppStore = defineStore('app', () => {
   // State
   const currentDirectory = ref('')
@@ -11,6 +13,27 @@ export const useAppStore = defineStore('app', () => {
 
   // Getters
   const isDark = computed(() => theme.value === 'dark')
+
+  // Config helpers
+  function getConfig() {
+    const config = localStorage.getItem(CONFIG_KEY)
+    return config ? JSON.parse(config) : { defaultDirectory: '' }
+  }
+
+  function saveConfig(config) {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config))
+  }
+
+  // Directory persistence
+  function loadSavedDirectory() {
+    return getConfig().defaultDirectory || ''
+  }
+
+  function saveDirectory(dir) {
+    const config = getConfig()
+    config.defaultDirectory = dir
+    saveConfig(config)
+  }
 
   // Actions
   function initTheme() {
@@ -64,5 +87,7 @@ export const useAppStore = defineStore('app', () => {
     toggleTheme,
     addToast,
     removeToast,
+    loadSavedDirectory,
+    saveDirectory,
   }
 })

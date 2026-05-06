@@ -37,10 +37,19 @@ const sortOptions = [
 
 onMounted(async () => {
   try {
-    const dir = await GetRootDirectory()
-    if (dir) appStore.currentDirectory = dir
+    const savedDir = appStore.loadSavedDirectory()
+    if (savedDir) {
+      await SetRootDirectory(savedDir)
+      appStore.currentDirectory = savedDir
+      await vpkStore.scanFiles()
+    } else {
+      const dir = await GetRootDirectory()
+      if (dir) {
+        appStore.currentDirectory = dir
+        await vpkStore.loadFiles()
+      }
+    }
   } catch (e) { }
-  await vpkStore.loadFiles()
 })
 
 watch(() => vpkStore.searchQuery, () => vpkStore.applyFilters())
@@ -56,6 +65,7 @@ async function selectDirectory() {
     if (dir) {
       await SetRootDirectory(dir)
       appStore.currentDirectory = dir
+      appStore.saveDirectory(dir)
       await vpkStore.scanFiles()
     }
   } catch (e) {
