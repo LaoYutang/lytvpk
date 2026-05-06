@@ -56,7 +56,7 @@ async function selectDirectory() {
     if (dir) {
       await SetRootDirectory(dir)
       appStore.currentDirectory = dir
-      await vpkStore.loadFiles()
+      await vpkStore.scanFiles()
     }
   } catch (e) {
     console.error(e)
