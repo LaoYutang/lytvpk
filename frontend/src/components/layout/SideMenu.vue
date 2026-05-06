@@ -128,6 +128,8 @@ const indicatorStyle = computed(() => ({
 .side-menu {
   width: 68px;
   flex-shrink: 0;
+  position: relative;
+  z-index: var(--z-sticky);
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.7) 0%,
