@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>LytVPK - L4D2 MOD管理工具</title>
+    <script type="module" crossorigin src="/assets/index.53538a4f.js"></script>
+    <link rel="stylesheet" href="/assets/index.27ddb2d3.css">
+  </head>
+  <body>
+    <div id="app">
+      <!-- 自定义标题栏 -->
+      <div id="custom-title-bar">
+        <div class="title-drag-region" style="--wails-draggable: drag">
+          <span class="app-title">LytVPK MOD管理器</span>
+        </div>
+        <div class="window-controls">
+          <div class="control-btn" id="w-min-btn" title="最小化">
+            <svg viewBox="0 0 12 12">
+              <path
+                d="M2,6 L10,6"
+                stroke="currentColor"
+                stroke-width="1.2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+          <div class="control-btn" id="w-max-btn" title="最大化/还原">
+            <svg viewBox="0 0 12 12">
+              <path
+                d="M2.5,2.5 L9.5,2.5 L9.5,9.5 L2.5,9.5 Z"
+                stroke="currentColor"
+                stroke-width="1.2"
+                fill="none"
+              />
+            </svg>
+          </div>
+          <div class="control-btn" id="w-close-btn" title="关闭">
+            <svg viewBox="0 0 12 12">
+              <path
+                d="M3,3 L9,9 M9,3 L3,9"
+                stroke="currentColor"
+                stroke-width="1.2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 加载界面 -->
+      <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+          <div class="loading-spinner"></div>
+          <p id="loading-message" class="loading-text">正在加载...</p>
+        </div>
+      </div>
+
+      <!-- 主界面 -->
+      <div id="main-screen" class="main-screen hidden">
+        <!-- 头部工具栏 -->
+        <header class="header">
+          <div class="header-left">
+            <h1 style="display: none">LytVPK</h1>
+            <div class="directory-selector">
+              <button id="select-directory-btn" class="btn btn-primary">
+                <span class="icon">📁</span> 选择addons目录
+              </button>
+              <span id="current-directory" class="current-directory"></span>
+            </div>
+          </div>
+          <div class="header-right">
+            <button
+              id="launch-l4d2-btn"
+              class="btn btn-success"
+              title="启动L4D2"
+            >
+              <svg
+                class="icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>启动 L4D2</span>
+            </button>
+            <button id="browser-btn" class="btn btn-primary" title="创意工坊">
+              <svg
+                class="icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+              <span>创意工坊</span>
+            </button>
+            <button id="workshop-btn" class="btn btn-primary" title="下载">
+              <svg
+                class="icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>下载</span>
+            </button>
+            <button id="upload-btn" class="btn btn-primary" title="上传文件">
+              <svg
+                class="icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span>上传</span>
+            </button>
+            <button
+              id="server-favorites-btn"
+              class="btn btn-primary"
+              title="收藏服务器"
+            >
+              <svg
+                class="icon-svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                ></polygon>
+              </svg>
+              <span>收藏服务器</span>
+            </button>
+            <button id="theme-toggle-btn" class="btn-icon" title="切换主题">
+              <svg
+                class="icon-svg sun-icon"
+                style="display: none; width: 20px; height: 20px"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg
+              ><svg
+                class="icon-svg moon-icon"
+                style="width: 20px; height: 20px"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                ></path>
+              </svg>
+            </button>
+            <button id="global-settings-btn" class="btn-icon" title="设置">
+              <svg
+                class="icon-svg"
+                style="width: 20px; height: 20px"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="3"></circle>
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                ></path>
+              </svg>
+            </button>
+            <button id="info-btn" class="btn-icon" title="关于">
+              <svg
+                class="icon-svg"
+                style="width: 20px; height: 20px"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- 搜索和筛选栏 -->
+        <div class="filter-bar">
+          <!-- 第一行：搜索、位置、批量操作 -->
+          <div class="filter-row filter-row-main">
+            <div class="search-box">
+              <input
+                type="text"
+                id="search-input"
+                placeholder="搜索VPK文件..."
+                class="search-input"
+              />
+            </div>
+            <div class="filter-section" id="location-filter-section">
+              <!-- 动态生成位置筛选 -->
+            </div>
+            <div class="filter-actions">
+              <button id="refresh-btn" class="btn btn-small btn-outline">
+                <span class="icon">↻</span> 刷新
+              </button>
+              <button id="reset-filter-btn" class="btn btn-small btn-outline">
+                <span class="icon">↻</span> 重置筛选
+              </button>
+              <button
+                id="conflict-check-btn"
+                class="btn btn-small btn-outline"
+                title="检测Mod冲突"
+              >
+                <span class="icon">⚠</span> 冲突检测
+              </button>
+              <button
+                id="mod-rotation-btn"
+                class="btn btn-small btn-outline"
+                title="Mod随机轮换"
+              >
+                <span class="icon">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="icon-svg"
+                  >
+                    <path
+                      d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"
+                    ></path>
+                    <path d="M3 3v5h5"></path>
+                    <path
+                      d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"
+                    ></path>
+                    <path d="M16 21h5v-5"></path>
+                  </svg>
+                </span>
+                轮换已禁用
+              </button>
+            </div>
+          </div>
+
+          <!-- 第二行：标签筛选 -->
+          <div class="filter-row filter-row-tags">
+            <div class="hidden-filter-container">
+              <label class="toggle-switch">
+                <input type="checkbox" id="show-hidden-checkbox" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">显示隐藏VPK</span>
+              </label>
+            </div>
+            <div id="tag-filters" class="tag-filters">
+              <!-- 动态生成标签筛选按钮 -->
+            </div>
+            <div class="sort-container" style="margin-left: auto">
+              <div class="batch-actions-dropdown-container">
+                <button
+                  id="sort-btn"
+                  class="btn btn-small btn-outline"
+                  title="排序方式"
+                >
+                  <span class="icon">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="icon-svg"
+                    >
+                      <path d="M11 5h10" />
+                      <path d="M11 9h7" />
+                      <path d="M11 13h4" />
+                      <path d="M3 17l3 3 3-3" />
+                      <path d="M6 18V4" />
+                    </svg>
+                  </span>
+                  <span id="sort-btn-text">文件名排序</span>
+                </button>
+                <div
+                  id="sort-dropdown-content"
+                  class="dropdown-content hidden sort-dropdown-content"
+                >
+                  <button id="sort-name-btn" class="dropdown-item active">
+                    <span class="btn-icon">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path
+                          d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"
+                        />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" x2="8" y1="13" y2="13" />
+                        <line x1="16" x2="8" y1="17" y2="17" />
+                        <line x1="10" x2="8" y1="9" y2="9" />
+                      </svg>
+                    </span>
+                    文件名排序
+                  </button>
+                  <button id="sort-date-btn" class="dropdown-item">
+                    <span class="btn-icon">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </span>
+                    更新时间排序
+                  </button>
+                  <button id="sort-load-order-btn" class="dropdown-item">
+                    <span class="btn-icon">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <line x1="10" y1="6" x2="21" y2="6"></line>
+                        <line x1="10" y1="12" x2="21" y2="12"></line>
+                        <line x1="10" y1="18" x2="21" y2="18"></line>
+                        <path d="M4 6h1v4"></path>
+                        <path d="M4 10h2"></path>
+                        <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+                      </svg>
+                    </span>
+                    加载顺序排序
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="file-list-container">
+          <div class="file-list-header">
+            <div class="column-header checkbox-column"></div>
+            <div class="column-header name-column">文件名</div>
+            <div class="column-header size-column">大小</div>
+            <div class="column-header status-column">状态</div>
+            <div class="column-header location-column">位置</div>
+            <div class="column-header tags-column">标签</div>
+            <div class="column-header actions-column">操作</div>
+          </div>
+          <div id="file-list" class="file-list">
+            <!-- 动态生成文件列表 -->
+          </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <footer class="status-bar">
+          <div class="status-info">
+            <span id="total-files">总文件数: 0</span>
+            <span id="enabled-files">已启用: 0</span>
+            <span id="disabled-files">已禁用: 0</span>
+            <span id="selected-files">已选择: 0</span>
+          </div>
+          <div class="status-actions">
+            <button id="select-all-btn" class="btn btn-small btn-outline">
+              <span class="icon">☑</span> 全选
+            </button>
+            <button id="deselect-all-btn" class="btn btn-small btn-outline">
+              <span class="icon">☐</span> 取消全选
+            </button>
+            <button id="enable-selected-btn" class="btn btn-small btn-success">
+              <span class="icon">✓</span> 启用选中
+            </button>
+            <button id="disable-selected-btn" class="btn btn-small btn-danger">
+              <span class="icon">✗</span> 禁用选中
+            </button>
+
+            <div class="batch-actions-dropdown-container">
+              <button id="batch-more-btn" class="btn btn-small btn-outline">
+                <span class="icon">⚡</span> 更多操作
+              </button>
+              <div
+                id="batch-dropdown-content"
+                class="dropdown-content hidden batch-dropdown-content"
+              >
+                <button id="hide-selected-btn" class="dropdown-item">
+                  <span class="btn-icon">👁️‍🗨️</span> 隐藏选中
+                </button>
+                <button id="unhide-selected-btn" class="dropdown-item">
+                  <span class="btn-icon">👁️</span> 取消隐藏
+                </button>
+                <button id="export-zip-selected-btn" class="dropdown-item">
+                  <span class="btn-icon">📦</span> 导出ZIP
+                </button>
+                <button id="move-selected-btn" class="dropdown-item">
+                  <span class="btn-icon">📂</span> 移动到...
+                </button>
+                <button
+                  id="delete-selected-btn"
+                  class="dropdown-item delete-btn"
+                >
+                  <span class="btn-icon">🗑️</span> 删除选中
+                </button>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+
+      <!-- 关于信息弹窗 -->
+      <div id="info-modal" class="modal hidden">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h3>关于LytVPK</h3>
+            <button id="close-info-modal-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="info-section">
+              <div class="info-item">
+                <label>作者:</label>
+                <span>LaoYutang</span>
+              </div>
+
+              <div class="info-item">
+                <label>GitHub:</label>
+                <a
+                  href="https://github.com/LaoYutang/lytvpk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="info-link"
+                >
+                  https://github.com/LaoYutang/lytvpk
+                </a>
+              </div>
+
+              <div class="info-item">
+                <label>开源协议:</label>
+                <a
+                  href="https://github.com/LaoYutang/lytvpk?tab=Apache-2.0-1-ov-file"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="info-link"
+                >
+                  Apache-2.0
+                </a>
+              </div>
+
+              <div class="info-item update-section">
+                <label>版本信息:</label>
+                <div class="version-control">
+                  <span id="current-version-display">检测中...</span>
+                  <button
+                    id="check-update-btn"
+                    class="btn btn-small btn-primary"
+                  >
+                    检查更新
+                  </button>
+                </div>
+              </div>
+              <div id="update-status-msg" class="update-msg hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 更新确认弹窗 -->
+      <div id="update-modal" class="modal hidden">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h3>发现新版本</h3>
+            <button id="close-update-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="update-info-container">
+              <div class="update-header">
+                <span class="version-tag current"
+                  >当前: v<span id="current-version-number"></span
+                ></span>
+                <span class="version-arrow">→</span>
+                <span class="version-tag new"
+                  >v<span id="new-version-number"></span
+                ></span>
+              </div>
+
+              <div class="update-notes">
+                <h4>更新内容:</h4>
+                <div id="release-notes-content" class="notes-content"></div>
+              </div>
+
+              <div class="update-options">
+                <label for="mirror-select-value">下载源选择:</label>
+                <div
+                  class="mirror-selection-group"
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    width: 100%;
+                  "
+                >
+                  <div
+                    class="select-wrapper custom-dropdown-wrapper"
+                    style="flex: 1"
+                  >
+                    <div
+                      class="custom-select-container"
+                      id="mirror-select-container"
+                    >
+                      <div class="selected-option" id="mirror-selected-display">
+                        <span class="selected-text">GitHub 直连</span>
+                        <span class="select-arrow">▼</span>
+                      </div>
+                      <div class="options-list hidden" id="mirror-options-list">
+                        <!-- 动态生成选项 -->
+                      </div>
+                    </div>
+                    <input type="hidden" id="mirror-select-value" value="" />
+                  </div>
+                  <button
+                    id="refresh-mirrors-btn"
+                    class="btn btn-icon-only"
+                    title="重新检测延迟"
+                  >
+                    <svg
+                      class="icon-svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M21.5 2v6h-6"></path>
+                      <path d="M21.34 15.57a10 10 0 1 1-.57-8.38"></path>
+                    </svg>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  id="custom-mirror-input"
+                  class="form-input hidden custom-mirror-input"
+                  placeholder="输入镜像地址 (例如 https://mirror.example.com/)"
+                />
+              </div>
+
+              <!-- 进度条区域 -->
+              <div
+                id="update-progress-container"
+                class="update-progress hidden"
+              >
+                <div class="progress-info">
+                  <span>正在下载更新...</span>
+                  <span id="update-progress-text">0%</span>
+                </div>
+                <div class="progress-bar">
+                  <div
+                    id="update-progress-fill"
+                    class="progress-fill update-progress-fill"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer" id="update-modal-footer">
+            <button
+              id="ignore-update-btn"
+              class="btn btn-outline-danger ignore-update-btn"
+            >
+              不再提醒
+            </button>
+            <button id="cancel-update-btn" class="btn btn-secondary">
+              稍后提醒
+            </button>
+            <button id="confirm-update-btn" class="btn btn-primary">
+              立即更新
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文件详情弹窗 -->
+      <div id="file-detail-modal" class="modal hidden">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="detail-file-name">文件详情</h3>
+            <button id="close-modal-header-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-section" id="preview-section">
+              <h4>预览图</h4>
+              <div class="preview-container">
+                <img
+                  id="detail-preview-image"
+                  class="preview-image"
+                  alt="预览图"
+                />
+              </div>
+            </div>
+            <div class="detail-section" id="vpk-info-section">
+              <h4>VPK信息</h4>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <label>标题:</label>
+                  <span id="detail-vpk-title"></span>
+                </div>
+                <div class="detail-item" id="detail-vpk-author-item">
+                  <label>作者:</label>
+                  <span id="detail-vpk-author"></span>
+                </div>
+                <div class="detail-item" id="detail-vpk-version-item">
+                  <label>版本:</label>
+                  <span id="detail-vpk-version"></span>
+                </div>
+                <div class="detail-item-full" id="detail-vpk-desc-item">
+                  <label>描述:</label>
+                  <span id="detail-vpk-desc"></span>
+                </div>
+                <div class="detail-item-full" id="detail-vpk-url-item">
+                  <label>链接:</label>
+                  <a
+                    href="#"
+                    id="detail-vpk-url"
+                    class="info-link"
+                    target="_blank"
+                  ></a>
+                </div>
+              </div>
+            </div>
+            <div class="detail-section" id="map-info-section">
+              <h4>地图信息</h4>
+              <div class="map-info-content">
+                <div class="campaign-name" id="detail-campaign"></div>
+                <div class="chapters-list" id="detail-chapters-list">
+                  <!-- 动态生成章节列表 -->
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <h4>基本信息</h4>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <label>文件名:</label>
+                  <span id="detail-name"></span>
+                </div>
+                <div class="detail-item">
+                  <label>文件大小:</label>
+                  <span id="detail-size"></span>
+                </div>
+                <div class="detail-item">
+                  <label>位置:</label>
+                  <span id="detail-location"></span>
+                </div>
+                <div class="detail-item">
+                  <label>状态:</label>
+                  <span id="detail-status"></span>
+                </div>
+                <div class="detail-item">
+                  <label>最后修改:</label>
+                  <span id="detail-modified"></span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <h4>标签</h4>
+              <div id="detail-tags" class="tag-list">
+                <!-- 动态生成标签 -->
+              </div>
+            </div>
+            <div class="detail-section">
+              <h4>详细标签</h4>
+              <div id="detail-detail-tags" class="tag-list">
+                <!-- 动态生成详细标签 -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 下载模态框 -->
+      <div id="workshop-modal" class="modal hidden">
+        <div class="modal-content workshop-modal-content">
+          <div class="modal-header">
+            <h2>下载</h2>
+            <button id="close-workshop-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="input-group">
+              <label for="workshop-url" class="input-label">创意工坊链接</label>
+              <div class="url-input-container">
+                <input
+                  type="text"
+                  id="workshop-url"
+                  placeholder="粘贴 Steam 创意工坊链接..."
+                />
+                <button
+                  id="paste-workshop-url-btn"
+                  class="btn btn-ghost btn-icon-only"
+                  title="粘贴"
+                >
+                  <span class="icon">📋</span>
+                </button>
+                <button id="check-workshop-btn" class="btn btn-primary">
+                  <span class="icon">🔍</span> 解析
+                </button>
+                <button
+                  id="open-browser-btn"
+                  class="btn btn-success"
+                  title="浏览工坊"
+                >
+                  <span class="icon">⚙️</span> 工坊
+                </button>
+              </div>
+            </div>
+
+            <div class="input-group mt-15">
+              <label for="download-url" class="input-label">下载链接</label>
+              <div class="url-input-container">
+                <input
+                  type="text"
+                  id="download-url"
+                  placeholder="解析后自动填充，或手动输入直链..."
+                />
+                <button
+                  id="paste-download-url-btn"
+                  class="btn btn-ghost btn-icon-only"
+                  title="粘贴"
+                >
+                  <span class="icon">📋</span>
+                </button>
+                <button id="download-workshop-btn" class="btn btn-primary">
+                  <svg
+                    class="icon-svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>下载</span>
+                </button>
+                <button id="copy-url-btn" class="btn btn-success">
+                  <span class="icon">📄</span> 复制
+                </button>
+              </div>
+            </div>
+
+            <div id="workshop-result" class="workshop-result hidden mt-20">
+              <!-- 动态生成内容 -->
+            </div>
+
+            <div class="workshop-actions">
+              <!-- Button moved to input group -->
+            </div>
+
+            <div class="task-list-container mt-30 border-top-light pt-20">
+              <div class="task-list-header">
+                <h3>下载任务队列</h3>
+                <button
+                  id="clear-completed-tasks-btn"
+                  class="btn btn-sm btn-outline"
+                >
+                  清理已完成
+                </button>
+              </div>
+              <div id="download-tasks-list" class="download-tasks-list">
+                <!-- 任务列表项将动态插入这里 -->
+                <div class="empty-tasks">暂无下载任务</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 服务器收藏对话框 -->
+      <div id="server-modal" class="modal hidden">
+        <div class="modal-content server-modal-content">
+          <div class="modal-header">
+            <h2>服务器收藏</h2>
+            <button id="close-server-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="server-toolbar">
+              <button id="open-add-server-modal-btn" class="btn btn-success">
+                <span class="icon">➕</span> 添加服务器
+              </button>
+              <button
+                id="refresh-all-servers-btn"
+                class="btn btn-outline"
+                title="刷新所有服务器"
+              >
+                <span class="icon">↻</span> 刷新
+              </button>
+            </div>
+            <div class="server-list-container">
+              <ul id="server-list" class="server-list">
+                <!-- 动态生成服务器列表 -->
+              </ul>
+            </div>
+
+            <div class="server-data-section">
+              <div class="server-data-header" id="toggle-data-mgmt-btn">
+                <h3>数据管理</h3>
+                <span class="icon">▼</span>
+              </div>
+              <div
+                id="server-data-container"
+                class="server-data-actions hidden"
+              >
+                <button
+                  id="export-clipboard-btn"
+                  class="btn btn-small btn-outline"
+                  title="导出到剪贴板"
+                >
+                  <span class="icon">📋</span> 复制配置
+                </button>
+                <button
+                  id="export-file-btn"
+                  class="btn btn-small btn-outline"
+                  title="导出到文件"
+                >
+                  <span class="icon">💾</span> 导出文件
+                </button>
+                <button
+                  id="import-clipboard-btn"
+                  class="btn btn-small btn-outline"
+                  title="从剪贴板导入"
+                >
+                  <span class="icon">📋</span> 粘贴导入
+                </button>
+                <button
+                  id="import-file-btn"
+                  class="btn btn-small btn-outline"
+                  title="从文件导入"
+                >
+                  <span class="icon">📂</span> 文件导入
+                </button>
+                <input
+                  type="file"
+                  id="import-file-input"
+                  accept=".json"
+                  class="d-none"
+                  aria-label="导入服务器配置JSON文件"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 全局下拉菜单 -->
+      <div id="global-dropdown" class="dropdown-content fixed-dropdown hidden">
+        <button id="global-details-server-btn" class="dropdown-item">
+          <span class="icon">ℹ️</span> 详情
+        </button>
+        <button id="global-edit-server-btn" class="dropdown-item">
+          <span class="icon">✏️</span> 编辑
+        </button>
+        <button id="global-delete-server-btn" class="dropdown-item danger">
+          <span class="icon">🗑️</span> 删除
+        </button>
+      </div>
+
+      <!-- 服务器详情模态框 -->
+      <div id="server-details-modal" class="modal hidden z-1070">
+        <div class="modal-content server-details-modal-content">
+          <div class="modal-header">
+            <h2 id="details-server-name">服务器详情</h2>
+            <button id="close-server-details-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div
+              id="server-details-loading"
+              class="loading-text server-details-loading"
+            >
+              正在获取玩家信息...
+            </div>
+            <div id="server-details-content" class="hidden">
+              <div class="server-info-summary">
+                <div class="server-info-item">
+                  <span class="server-info-label">地图</span>
+                  <span class="server-info-value" id="details-map"></span>
+                </div>
+                <div class="server-info-item">
+                  <span class="server-info-label">玩家</span>
+                  <span class="server-info-value" id="details-players"></span>
+                </div>
+              </div>
+              <h3 class="player-list-title">玩家列表</h3>
+              <div class="player-list-container">
+                <table class="player-table">
+                  <thead>
+                    <tr>
+                      <th>名称</th>
+                      <th class="text-right">分数</th>
+                      <th class="text-right">时长</th>
+                    </tr>
+                  </thead>
+                  <tbody id="details-player-list">
+                    <!-- 动态生成 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 编辑/添加服务器模态框 -->
+      <div id="server-form-modal" class="modal hidden z-1060">
+        <div class="modal-content server-form-modal-content">
+          <div class="modal-header server-form-header">
+            <h2 id="server-form-title" class="server-form-title">编辑服务器</h2>
+            <button id="close-server-form-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group mb-20">
+              <label for="form-server-name" class="form-label"
+                >服务器名称</label
+              >
+              <input
+                type="text"
+                id="form-server-name"
+                class="form-input w-100"
+                placeholder="例如: My L4D2 Server"
+              />
+            </div>
+            <div class="form-group mb-20">
+              <label for="form-server-address" class="form-label"
+                >服务器地址 (IP:Port)</label
+              >
+              <input
+                type="text"
+                id="form-server-address"
+                class="form-input w-100"
+                placeholder="例如: 127.0.0.1:27015"
+              />
+            </div>
+            <div class="form-group mb-25">
+              <label for="form-server-weight" class="form-label"
+                >排序权重</label
+              >
+              <div class="flex-align-center-gap-10">
+                <input
+                  type="number"
+                  id="form-server-weight"
+                  class="form-input w-100px"
+                  value="0"
+                />
+                <span class="text-sm-tertiary">数值越大，排序越靠前</span>
+              </div>
+            </div>
+            <div class="modal-footer server-form-footer">
+              <button
+                id="cancel-server-form-btn"
+                class="btn btn-secondary btn-padding-lg"
+              >
+                取消
+              </button>
+              <button
+                id="save-server-form-btn"
+                class="btn btn-primary btn-padding-lg"
+              >
+                保存
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 退出确认对话框 -->
+      <div id="exit-confirm-modal" class="modal hidden">
+        <div class="modal-content confirm-modal-content">
+          <div class="modal-header">
+            <h2>确认退出</h2>
+            <button id="close-exit-modal-btn" class="close-btn">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p>
+              当前有正在进行的下载任务，退出将导致任务中断。<br />确定要退出吗？
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button id="exit-cancel-btn" class="btn btn-secondary">取消</button>
+            <button id="exit-confirm-btn" class="btn btn-danger">退出</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 重命名对话框 -->
+      <div id="rename-modal" class="modal hidden">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h2>重命名文件</h2>
+            <button id="close-rename-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="rename-input" class="input-label">新文件名</label>
+              <div class="input-group input-with-suffix-group">
+                <input
+                  type="text"
+                  id="rename-input"
+                  class="form-input flex-1"
+                  placeholder="输入新文件名"
+                />
+                <span class="input-suffix ml-8 text-sm-tertiary">.vpk</span>
+              </div>
+              <p class="help-text mt-8 text-sm-tertiary">
+                无需输入 .vpk 后缀，保持原有隐藏状态
+              </p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="cancel-rename-btn" class="btn btn-secondary">
+              取消
+            </button>
+            <button id="confirm-rename-btn" class="btn btn-primary">
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 加载顺序编辑弹窗 -->
+      <div id="load-order-modal" class="modal hidden">
+        <div class="modal-content load-order-modal-content">
+          <div class="load-order-header">
+            <h2>编辑加载顺序</h2>
+            <button id="close-load-order-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="load-order-body">
+            <div class="load-order-section">
+              <label class="load-order-label">当前文件</label>
+              <div id="load-order-filename" class="load-order-filename"></div>
+            </div>
+
+            <div class="load-order-grid">
+              <div class="load-order-input-wrapper">
+                <label class="load-order-label">当前序号</label>
+                <div class="load-order-current-box">
+                  <div id="load-order-current" class="load-order-current-value">
+                    未生成
+                  </div>
+                </div>
+              </div>
+
+              <div class="load-order-input-wrapper">
+                <label for="load-order-input" class="load-order-label"
+                  >新序号</label
+                >
+                <div class="input-group" style="flex: 1">
+                  <input
+                    type="number"
+                    id="load-order-input"
+                    class="load-order-input no-arrow"
+                    placeholder="输入"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="load-order-tips">
+              <div class="load-order-tips-content">
+                <div class="load-order-tips-icon">💡</div>
+                <div class="load-order-tips-text">
+                  <p class="load-order-tips-title">加载顺序说明</p>
+                  <ul class="load-order-tips-list">
+                    <li>
+                      数值
+                      <span class="load-order-tips-highlight">越小</span
+                      >，加载优先级
+                      <span class="load-order-tips-highlight">越高</span>。
+                    </li>
+                    <li>若文件未在列表中，将按此序号插入。</li>
+                    <li>若已存在，将移动到此位置。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="load-order-footer">
+            <button
+              id="cancel-load-order-btn"
+              class="btn btn-secondary load-order-btn-cancel"
+            >
+              取消
+            </button>
+            <button
+              id="confirm-load-order-btn"
+              class="btn btn-primary load-order-btn-confirm"
+            >
+              保存更改
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 冲突检测弹窗 -->
+    <div id="conflict-modal" class="modal hidden">
+      <div class="modal-content conflict-modal-content">
+        <div class="modal-header">
+          <h2>Mod冲突检测</h2>
+          <button class="close-btn" id="close-conflict-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div
+            id="conflict-progress-container"
+            class="progress-container hidden"
+          >
+            <div class="progress-bar-bg">
+              <div
+                id="conflict-progress-bar"
+                class="progress-bar-fill w-0"
+              ></div>
+            </div>
+            <p id="conflict-progress-text">准备开始...</p>
+          </div>
+
+          <div id="conflict-results" class="conflict-results hidden">
+            <div class="conflict-toolbar">
+              <div class="conflict-summary">
+                <span class="icon">⚠</span> 发现
+                <span id="conflict-count">0</span> 组冲突
+              </div>
+              <div class="conflict-filters">
+                <button
+                  class="btn btn-small filter-btn active"
+                  data-filter="critical"
+                >
+                  严重
+                </button>
+                <button class="btn btn-small filter-btn" data-filter="warning">
+                  警告
+                </button>
+                <button class="btn btn-small filter-btn" data-filter="info">
+                  普通
+                </button>
+                <button class="btn btn-small filter-btn" data-filter="all">
+                  全部
+                </button>
+              </div>
+            </div>
+            <div id="conflict-list" class="conflict-list">
+              <!-- 动态生成冲突列表 -->
+            </div>
+          </div>
+
+          <div id="conflict-empty" class="conflict-empty hidden">
+            <div class="empty-state">
+              <span class="icon">✓</span>
+              <p>未发现Mod冲突</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="start-conflict-check-btn">
+            开始检测
+          </button>
+          <button class="btn btn-secondary" id="close-conflict-btn">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- 设置标签对话框 -->
+    <div id="set-tags-modal" class="modal hidden">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h2>设置自定义标签</h2>
+          <button id="close-set-tags-modal-btn" class="close-btn">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="primary-tag-select" class="input-label">一级标签</label>
+            <select
+              id="primary-tag-select"
+              class="form-select form-select-styled"
+            >
+              <option value="">无</option>
+              <option value="地图">地图</option>
+              <option value="人物">人物</option>
+              <option value="武器">武器</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="form-group mt-16">
+            <label class="input-label">二级标签</label>
+            <div id="secondary-tags-list" class="tags-container">
+              <!-- Tags will be injected here -->
+            </div>
+            <div class="input-group input-group-flex">
+              <input
+                type="text"
+                id="new-secondary-tag-input"
+                class="form-input flex-1"
+                placeholder="输入标签按回车添加"
+              />
+              <button
+                id="add-secondary-tag-btn"
+                class="btn btn-small btn-primary ml-8"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between">
+          <button id="clear-tags-btn" class="btn btn-danger-outline">
+            重置
+          </button>
+          <div style="display: flex; gap: 8px">
+            <button id="cancel-set-tags-btn" class="btn btn-secondary">
+              取消
+            </button>
+            <button id="save-tags-btn" class="btn btn-primary">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 创意工坊浏览弹窗 -->
+    <div id="browser-modal" class="modal hidden" style="z-index: 2000">
+      <div class="modal-content browser-modal-content">
+        <div class="browser-header">
+          <h3>求生之路2 创意工坊</h3>
+          <button id="close-browser-modal-btn" class="close-btn">
+            &times;
+          </button>
+        </div>
+        <div class="browser-body">
+          <aside class="browser-sidebar">
+            <div class="filter-group">
+              <h4>排序</h4>
+              <ul class="filter-list" id="browser-sort-list">
+                <li class="filter-item active" data-sort="trend">
+                  热门 (Trend)
+                </li>
+                <li class="filter-item" data-sort="recent">最新 (Recent)</li>
+                <li class="filter-item" data-sort="top">
+                  评分最高 (Top Rated)
+                </li>
+              </ul>
+            </div>
+            <!-- 动态生成的分类 -->
+            <div id="browser-sidebar-content"></div>
+          </aside>
+          <div class="browser-content" style="position: relative">
+            <div class="browser-toolbar">
+              <div class="search-input-wrapper" style="flex: 1">
+                <span class="search-icon-inside">🔍</span>
+                <input
+                  type="text"
+                  id="browser-search-input"
+                  class="form-input"
+                  placeholder="搜索 Mod..."
+                />
+              </div>
+              <button id="browser-search-btn" class="btn btn-primary">
+                <span class="icon">🔍</span> 查询
+              </button>
+              <button id="browser-reset-btn" class="btn btn-outline">
+                <span class="icon">↺</span> 重置
+              </button>
+            </div>
+            <div class="browser-grid-container" id="browser-scroll-container">
+              <div id="browser-grid" class="workshop-grid">
+                <!-- Items rendered here -->
+              </div>
+              <div id="browser-loading" class="loading-placeholder hidden">
+                加载中...
+              </div>
+              <button
+                id="browser-load-more"
+                class="btn btn-outline load-more-btn hidden"
+              >
+                加载更多
+              </button>
+            </div>
+
+            <!-- 详情页覆盖层 (默认隐藏) -->
+            <div
+              id="browser-detail-view"
+              class="workshop-detail-view hidden"
+              style="
+                background: var(--bg-app);
+                position: absolute;
+                inset: 0;
+                z-index: 10;
+              "
+            >
+              <!-- Rendered by JS -->
+              <div class="loading-placeholder" style="margin: auto">
+                加载详情中...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 确认对话框 -->
+    <div id="confirm-modal" class="modal hidden" style="z-index: 20000">
+      <div class="modal-content confirm-modal-content">
+        <div class="modal-header">
+          <h2 id="confirm-title">确认</h2>
+          <button id="close-confirm-modal-btn" class="close-btn">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="confirm-message" class="confirm-message"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="confirm-cancel-btn" class="btn btn-secondary">
+            取消
+          </button>
+          <button id="confirm-ok-btn" class="btn btn-primary">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 通用消息弹窗 -->
+    <div id="message-modal" class="modal hidden" style="z-index: 20001">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h3 id="message-modal-title">提示</h3>
+          <button id="close-message-modal-btn" class="close-btn">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="message-modal-content" class="message-content"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="message-modal-confirm-btn" class="btn btn-primary">
+            确定
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="image-preview-modal" class="image-modal">
+      <span class="image-modal-close">&times;</span>
+      <img class="image-modal-content" id="full-image" />
+    </div>
+  </body>
+</html>

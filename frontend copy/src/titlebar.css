@@ -1,0 +1,144 @@
+/* ==========================================================================
+  自定义标题栏样式 (Wails Frameless Window)
+  ========================================================================== */
+
+#custom-title-bar {
+  height: 32px;
+  background: var(--bg-app); /* 与背景一致或稍微不同 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9000; /* 高于大部分内容，但低于模态框(1050? wait, 9000 is higher) */
+  /* 如果希望模态框覆盖标题栏，这里z-index需要调整，或者模态框z-index调高 */
+  user-select: none;
+  -webkit-user-select: none;
+  border-bottom: 1px solid var(--border-default);
+  /* 确保顶部有圆角（Windows 11风格） */
+}
+
+/* 调整模态框层级，确保覆盖标题栏 */
+.modal,
+.loading-screen {
+  z-index: 9999 !important; /* 强制最高 */
+}
+
+/* 标题栏拖拽区域 */
+.title-drag-region {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 16px; /* 增加左侧间距 */
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  letter-spacing: 0.5px;
+}
+
+.app-title {
+  opacity: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  line-height: 1; /* 强制行高为1，避免字体自身的对齐偏移 */
+  height: 100%; /* 占满高度，确保align-items生效 */
+  font-family: "Nunito", "Segoe UI", "Microsoft YaHei", sans-serif; /* 尝试使用更有趣的字体 */
+  letter-spacing: 0.5px;
+}
+
+.app-title small {
+  opacity: 0.6;
+  margin-left: 8px;
+  font-weight: normal;
+  font-size: 12px; /* 明确像素大小而非 em */
+  /* 移除任何可能导致偏移的属性 */
+  line-height: 1;
+  display: inline-block; /* 允许设置高宽，虽然这里不需要 */
+}
+
+/* 窗口控制按钮组 */
+.window-controls {
+  display: flex;
+  height: 100%;
+  overflow: hidden; /* 防止内容溢出 */
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
+}
+
+/* 单个控制按钮 - Windows 11 Style */
+.control-btn {
+  width: 46px; /* Windows 标准宽度 */
+  height: 32px; /* 明确设置高度，不使用 100% */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: default;
+  transition: background-color 0.08s ease;
+  color: var(--text-primary);
+  border-radius: 0;
+  background-color: transparent;
+  overflow: hidden; /* 确保内容不溢出 */
+}
+
+/* 移除之前的顺序重排和Mac颜色 */
+#w-close-btn,
+#w-min-btn,
+#w-max-btn {
+  order: unset;
+  border: none;
+}
+
+/* 按钮图标尺寸 */
+.control-btn svg {
+  width: 12px;
+  height: 12px;
+  pointer-events: none; /* 防止SVG干扰hover */
+}
+
+/* 单个悬停效果 */
+.control-btn:hover {
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.05
+  ) !important; /* 浅灰底，Windows 11 标准 */
+}
+
+/* 关闭按钮悬停 - Windows 红色 */
+#w-close-btn:hover {
+  background-color: #c42b1c !important;
+}
+
+#w-close-btn:hover svg {
+  color: white;
+}
+
+#w-close-btn:hover svg path {
+  stroke: white;
+}
+
+/* 为主容器腾出标题栏空间，确保内容不被遮挡 */
+#app {
+  padding-top: 32px;
+}
+
+/* 如果原来的header被遮挡，可能需要给main-screen也加一点padding或者调整header */
+.main-screen {
+  /* 确保主屏幕内容在标题栏下方 */
+  height: calc(100vh - 32px);
+  margin-top: 0;
+}
+
+/* 修复 loading screen 全屏遮挡问题 */
+.loading-screen {
+  top: 32px; /* 让出标题栏? 或者 top:0 覆盖标题栏? 通常 loading 应该全屏 */
+  /* 如果要全屏覆盖，z-index 必须 > custom-title-bar */
+  top: 0;
+}
