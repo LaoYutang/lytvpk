@@ -37,9 +37,9 @@ onMounted(() => {
 
 <template>
   <div class="app-layout">
-    <SideMenu />
-    <div class="right-area">
-      <TitleBar />
+    <TitleBar />
+    <div class="main-area">
+      <SideMenu />
       <main class="main-content">
         <RouterView />
       </main>
@@ -53,14 +53,14 @@ onMounted(() => {
 <style scoped>
 .app-layout {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
 
-.right-area {
+.main-area {
   flex: 1;
   display: flex;
-  flex-direction: column;
   overflow: hidden;
 }
 
@@ -68,5 +68,6 @@ onMounted(() => {
   flex: 1;
   overflow: auto;
   min-width: 0;
+  padding: var(--spacing-6);
 }
 </style>

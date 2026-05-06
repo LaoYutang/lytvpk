@@ -30,7 +30,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+  background: linear-gradient(135deg, #f0f4f8 0%, #f8fafc 50%, #ffffff 100%);
 }
 
 /* Selection */

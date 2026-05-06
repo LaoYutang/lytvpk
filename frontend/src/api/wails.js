@@ -81,6 +81,7 @@ export {
   EventsEmit,
   WindowMinimise,
   WindowToggleMaximise,
+  WindowIsMaximised,
   WindowSetDarkTheme,
   WindowSetLightTheme,
   Quit,

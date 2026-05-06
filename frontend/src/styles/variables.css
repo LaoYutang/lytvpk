@@ -8,13 +8,13 @@
 }
 
 :root {
-  /* 主色调 - 现代蓝 */
-  --primary: #4f46e5;
-  --primary-light: #6366f1;
-  --primary-dark: #3730a3;
-  --primary-50: rgba(79, 70, 229, 0.05);
-  --primary-100: rgba(79, 70, 229, 0.1);
-  --primary-200: rgba(79, 70, 229, 0.2);
+  /* 主色调 - 现代蓝紫 */
+  --primary: #6366f1;
+  --primary-light: #818cf8;
+  --primary-dark: #4f46e5;
+  --primary-50: rgba(99, 102, 241, 0.08);
+  --primary-100: rgba(99, 102, 241, 0.15);
+  --primary-200: rgba(99, 102, 241, 0.25);
 
   /* 辅助色 */
   --accent: #06b6d4;
@@ -80,6 +80,7 @@
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
   --radius-full: 9999px;
+  --radius-3xl: 1.25rem;
 
   /* 过渡动画 */
   --duration-75: 75ms;
