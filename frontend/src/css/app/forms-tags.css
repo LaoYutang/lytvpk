@@ -1,0 +1,371 @@
+/* Extracted styles for workshop modal */
+.input-label {
+  margin-bottom: 8px;
+  display: block;
+  font-weight: 500;
+}
+
+.mt-15 {
+  margin-top: 15px;
+}
+
+.mt-12 {
+  margin-top: 12px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mt-30 {
+  margin-top: 30px;
+}
+
+.pt-20 {
+  padding-top: 20px;
+}
+
+.border-top-light {
+  border-top: 1px solid var(--border-light, #eee);
+}
+
+.workshop-actions {
+  text-align: right;
+  margin-top: 20px;
+  display: none;
+}
+
+.task-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.download-tasks-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.empty-tasks {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+}
+
+.mode-toggle-group {
+  display: flex;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  gap: 4px;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-tertiary);
+  transition: all 0.2s ease;
+  font-size: 0.9em;
+  font-weight: 500;
+  user-select: none;
+}
+
+.mode-option:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.mode-option.active {
+  background: var(--bg-app);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+.mode-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Extracted styles for server modal */
+.server-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.server-data-section {
+  margin-top: var(--spacing-4);
+  padding: var(--spacing-4);
+  border-top: 1px solid var(--border-light);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.server-data-header {
+  margin-bottom: var(--spacing-3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.server-data-header h3 {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 700;
+  margin: 0;
+}
+
+.server-data-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.server-data-actions .btn {
+  background: var(--bg-app);
+}
+
+/* Server details modal */
+.server-details-modal-content {
+  max-width: 600px;
+}
+
+.server-details-loading {
+  text-align: center;
+  padding: 20px;
+}
+
+.player-list-title {
+  font-size: 1rem;
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+}
+
+.player-list-container {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Server form modal */
+.server-form-modal-content {
+  max-width: 450px;
+  border-radius: 12px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.server-form-header {
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+.server-form-title {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.form-group.mb-20 {
+  margin-bottom: 20px;
+}
+
+.form-group.mb-25 {
+  margin-bottom: 25px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.w-100 {
+  width: 100%;
+}
+
+.w-100px {
+  width: 100px;
+}
+
+.flex-align-center-gap-10 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.text-sm-tertiary {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.server-form-footer {
+  background: transparent;
+  border-top: none;
+  padding: 0;
+  padding-top: 10px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .server-toolbar,
+  .server-item,
+  .server-actions,
+  .server-data-actions {
+    align-items: stretch;
+  }
+
+  .server-toolbar,
+  .server-item {
+    flex-direction: column;
+  }
+
+  .server-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .connect-server-btn {
+    flex: 1;
+  }
+
+  .server-data-actions .btn {
+    flex: 1 1 9rem;
+  }
+}
+
+.btn-padding-lg {
+  padding: 8px 20px;
+}
+
+/* Rename modal */
+.input-with-suffix-group {
+  display: flex;
+  align-items: center;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.ml-8 {
+  margin-left: 8px;
+}
+
+.mt-8 {
+  margin-top: 8px;
+}
+
+/* Utilities */
+.d-none {
+  display: none !important;
+}
+
+.z-1070 {
+  z-index: 1070;
+}
+
+.z-1060 {
+  z-index: 1060;
+}
+
+.w-100-percent {
+  width: 100%;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+/* Set Tags Modal */
+.form-select-styled {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light, #eee);
+  background: var(--bg-surface, #f8fafc);
+  color: var(--text-primary, #333);
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.input-group-flex {
+  display: flex;
+  align-items: center;
+}
+
+.w-0 {
+  width: 0% !important;
+}
+
+/* Tag Styles in Modal */
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1;
+  background: var(--bg-hover, #f1f5f9);
+  border: 1px solid var(--border-default, #cbd5e1);
+  color: var(--text-secondary, #475569);
+  transition: all 0.2s ease;
+}
+
+.tag-badge:hover {
+  background: var(--bg-active, #e2e8f0);
+  border-color: var(--border-strong, #94a3b8);
+}
+
+.tag-remove-btn {
+  margin-left: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.tag-remove-btn:hover {
+  background-color: var(--danger, #ef4444);
+  color: white;
+  opacity: 1;
+}
+
+/* Clear Button Style in footer */
+.btn-danger-outline {
+  border: 1px solid var(--danger, #ef4444);
+  color: var(--danger, #ef4444);
+  background: transparent;
+}
+
+.btn-danger-outline:hover {
+  background: var(--danger, #ef4444);
+  color: white;
+}
+

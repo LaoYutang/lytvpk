@@ -1,0 +1,448 @@
+.mod-management-page .header {
+  flex: 0 0 auto;
+  padding: var(--spacing-4) var(--spacing-6);
+  background: var(--bg-app);
+  box-shadow: none;
+}
+
+.mod-management-page .header::before,
+.mod-management-page .header-right {
+  display: none;
+}
+
+.mod-management-page .filter-bar {
+  position: relative;
+  top: auto;
+  z-index: 5;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4) var(--spacing-6);
+  background: var(--bg-app);
+}
+
+.mod-management-page .filter-row {
+  gap: var(--spacing-3);
+}
+
+.mod-management-page .filter-row-tools {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.mod-management-page .filter-row-tags {
+  border-top: 0;
+  padding: 0;
+  align-items: center;
+}
+
+.mod-management-page .tag-filters {
+  width: auto;
+  flex: 0 1 auto;
+  flex-direction: row;
+  align-items: center;
+}
+
+.filter-select,
+.multi-select-trigger {
+  height: 2.5rem;
+  min-width: 8.25rem;
+  padding: 0 var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.filter-select:focus,
+.multi-select-trigger:focus {
+  outline: 2px solid var(--primary-100);
+  border-color: var(--primary);
+}
+
+.filter-select-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.secondary-filter-dropdown {
+  position: relative;
+}
+
+.multi-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  cursor: pointer;
+}
+
+.multi-select-trigger::after {
+  content: "⌄";
+  color: var(--text-tertiary);
+}
+
+.multi-select-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: var(--z-dropdown);
+  min-width: 13rem;
+  max-height: 16rem;
+  overflow: auto;
+  padding: var(--spacing-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-app);
+  box-shadow: var(--shadow-lg);
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.multi-select-option:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+html.dark-mode .filter-select,
+html.dark-mode .multi-select-trigger,
+html.dark-mode .multi-select-menu {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+
+/* Refined mod management toolbar */
+.mod-management-page .header {
+  display: none;
+}
+
+.mod-management-page .filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem 0.9rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mod-management-page .filter-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.mod-management-page .filter-row-tags {
+  min-height: 2.4rem;
+}
+
+.mod-management-page .directory-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 0 1 26rem;
+  min-width: 0;
+  max-width: 26rem;
+}
+
+.mod-management-page .directory-selector .btn {
+  flex: 0 0 auto;
+  width: max-content;
+  min-height: 2.5rem;
+  min-width: max-content;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.16);
+}
+
+.mod-management-page .current-directory {
+  flex: 1 1 auto;
+  min-width: 5rem;
+  max-width: 16rem;
+  height: 2.5rem;
+  display: block;
+  padding: 0 0.9rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 2.5rem;
+  cursor: help;
+}
+
+.mod-management-page .search-box {
+  flex: 1 1 14rem;
+  min-width: 12rem;
+  max-width: 21rem;
+}
+
+.mod-management-page .search-input {
+  height: 2.5rem;
+  border-radius: 0.85rem;
+  border-color: var(--border-light);
+  background: var(--bg-surface);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.mod-management-page .filter-section,
+.mod-management-page .tag-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.location-tag-btn {
+  height: 2.45rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.location-tag-btn:hover,
+.location-tag-btn.active {
+  border-color: rgba(79, 70, 229, 0.35);
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.filter-select,
+.multi-select-trigger,
+.sort-container #sort-btn {
+  height: 2.5rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition:
+    border-color var(--duration-150) var(--ease-out),
+    box-shadow var(--duration-150) var(--ease-out),
+    background var(--duration-150) var(--ease-out);
+}
+
+.filter-select {
+  appearance: none;
+  min-width: 8.5rem;
+  padding: 0 2.2rem 0 0.9rem;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #64748b 50%),
+    linear-gradient(135deg, #64748b 50%, transparent 50%);
+  background-position:
+    calc(100% - 17px) 50%,
+    calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.filter-select:hover,
+.multi-select-trigger:hover,
+.sort-container #sort-btn:hover {
+  border-color: rgba(79, 70, 229, 0.38);
+  background-color: var(--bg-app);
+}
+
+.filter-select:focus,
+.multi-select-trigger:focus,
+.sort-container #sort-btn:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+
+.secondary-filter-dropdown {
+  position: relative;
+}
+
+.multi-select-trigger {
+  min-width: 8.5rem;
+  padding: 0 0.85rem;
+}
+
+.multi-select-trigger::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-left: 0.35rem;
+  border-right: 1.7px solid currentColor;
+  border-bottom: 1.7px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  opacity: 0.58;
+}
+
+.mod-management-page .select-menu,
+.mod-management-page .multi-select-menu {
+  top: calc(100% + 0.35rem);
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  padding: 0.35rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background: var(--bg-app);
+  box-shadow:
+    0 18px 50px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.dropdown-content {
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background: var(--bg-app);
+  box-shadow:
+    0 18px 50px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.mod-management-page .select-option,
+.mod-management-page .multi-select-option,
+.dropdown-item {
+  min-height: 2rem;
+  border-radius: 0.55rem;
+  color: var(--text-secondary);
+  transition:
+    background var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.multi-select-option input {
+  accent-color: var(--primary);
+}
+
+.mod-management-page .select-option:hover,
+.mod-management-page .select-option.active,
+.mod-management-page .multi-select-option:hover,
+.dropdown-item:hover,
+.dropdown-item.active {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.filter-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.filter-actions > .btn,
+.filter-actions .sort-container > .batch-actions-dropdown-container > .btn {
+  min-height: 2.5rem;
+  border-radius: 0.75rem;
+  background: var(--bg-app);
+  border-color: var(--border-light);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.mod-management-page .filter-actions .sort-container #sort-btn {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.mod-management-page .filter-actions .sort-container #sort-btn .icon,
+.mod-management-page .filter-actions .sort-container #sort-btn .icon-svg,
+.mod-management-page .filter-actions .sort-container #sort-btn-text {
+  color: currentColor;
+  font-weight: inherit;
+}
+
+.filter-actions > .btn:hover,
+.filter-actions .sort-container > .batch-actions-dropdown-container > .btn:hover {
+  border-color: rgba(79, 70, 229, 0.36);
+  color: var(--primary);
+  background: var(--primary-50);
+}
+
+.sort-container {
+  margin-left: 0;
+}
+
+.sort-container .batch-actions-dropdown-container {
+  position: relative;
+}
+
+.sort-dropdown-content {
+  right: 0;
+  left: auto;
+  min-width: 12.5rem;
+  padding: 0.45rem;
+}
+
+.hidden-filter-container {
+  flex: 0 0 auto;
+}
+
+html.dark-mode .mod-management-page .filter-bar {
+  border-bottom-color: var(--border-default);
+}
+
+html.dark-mode .mod-management-page .current-directory,
+html.dark-mode .mod-management-page .search-input,
+html.dark-mode .location-tag-btn,
+html.dark-mode .filter-select,
+html.dark-mode .multi-select-trigger,
+html.dark-mode .filter-actions > .btn,
+html.dark-mode .filter-actions .sort-container > .batch-actions-dropdown-container > .btn,
+html.dark-mode .mod-management-page .select-menu,
+html.dark-mode .multi-select-menu,
+html.dark-mode .dropdown-content {
+  background: var(--bg-surface);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+html.dark-mode .location-tag-btn:hover,
+html.dark-mode .location-tag-btn.active,
+html.dark-mode .filter-actions > .btn:hover,
+html.dark-mode .filter-actions .sort-container > .batch-actions-dropdown-container > .btn:hover,
+html.dark-mode .mod-management-page .select-option:hover,
+html.dark-mode .mod-management-page .select-option.active,
+html.dark-mode .multi-select-option:hover,
+html.dark-mode .dropdown-item:hover,
+html.dark-mode .dropdown-item.active {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(129, 140, 248, 0.34);
+  color: var(--primary-light);
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 11.5rem minmax(0, 1fr);
+  }
+
+}

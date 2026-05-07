@@ -1,8 +1,8 @@
 build/bin
 node_modules
-frontend/dist
+frontend/dist/*
+!frontend/dist/.gitkeep
 *.vpk
-workshop
-disabled
 *.exe
 .claude
+.codex

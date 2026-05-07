@@ -1,0 +1,16 @@
+@import "./global.css";
+@import "./app/base.css";
+@import "./app/mods.css";
+@import "./app/modals-details.css";
+@import "./app/downloads.css";
+@import "./app/servers.css";
+@import "./app/updates.css";
+@import "./app/forms-tags.css";
+@import "./app/workshop-browser.css";
+@import "./app/settings.css";
+@import "./dark-mode.css";
+@import "./titlebar.css";
+@import "./rotation.css";
+@import "./layout.css";
+@import "./mod-management.css";
+@import "./pages.css";

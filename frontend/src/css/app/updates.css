@@ -1,0 +1,349 @@
+/* 更新弹窗样式调整 */
+.modal-small {
+  max-width: 550px; /* 加宽弹窗 */
+}
+
+.player-name {
+  font-weight: 500;
+}
+
+.empty-state {
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+/* 更新弹窗样式 */
+.update-info-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.update-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.version-tag {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.version-tag.new {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.version-tag.current {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--gray-600);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.version-arrow {
+  color: var(--text-tertiary);
+}
+
+.update-notes h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.95em;
+  color: var(--text-primary);
+}
+
+.notes-content {
+  background: var(--bg-secondary);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.update-options {
+  margin-top: 8px;
+}
+
+.update-options label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+
+.form-select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.form-input.hidden {
+  display: none;
+}
+
+/* 美化下拉框 */
+.select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  padding-right: 30px; /* 为箭头留出空间 */
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.9em;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none; /* 移除原生样式 */
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.form-select:hover {
+  border-color: var(--border-strong);
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-10);
+}
+
+.select-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 0.7em;
+  color: var(--text-tertiary);
+}
+
+/* 镜像源选择组 */
+.mirror-select-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.select-wrapper-custom {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9em;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.custom-select-trigger:hover {
+  border-color: var(--border-strong);
+}
+
+.selected-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 8px; /* 增加内容之间的间距 */
+}
+
+.mirror-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latency-tag {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4em;
+  height: 1.8em;
+  padding: 0 0.5em;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap; /* 确保文字不换行 */
+}
+
+.latency-tag.good {
+  background-color: #10b981; /* var(--success) */
+  color: #ffffff;
+}
+
+.latency-tag.medium {
+  background-color: #f59e0b; /* var(--warning) */
+  color: #ffffff;
+}
+
+.latency-tag.bad {
+  background-color: #ef4444; /* var(--danger) */
+  color: #ffffff;
+}
+
+.latency-tag.unknown {
+  background-color: #94a3b8; /* var(--text-muted) or Gray 400 */
+  color: #ffffff;
+}
+
+.select-arrow {
+  margin-left: 12px; /* 增加小三角与内容的间距 */
+  font-size: 0.7em;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* 刷新按钮样式优化 */
+#refresh-mirrors-btn {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+#refresh-mirrors-btn:hover {
+  background: var(--bg-hover);
+  color: var(--primary);
+  border-color: var(--primary-light);
+}
+
+#refresh-mirrors-btn .icon-svg {
+  width: 16px;
+  height: 16px;
+  fill: none; /* 覆盖 .btn-icon-only svg 的 fill: currentColor */
+}
+
+/* 下拉菜单列表 */
+.custom-options-list {
+  position: fixed; /* 使用fixed定位避免被父元素遮挡 */
+  z-index: 10000;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+  max-height: 250px;
+  overflow-y: auto;
+  /* width, top, left 会由 JS 动态计算 */
+}
+
+.custom-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.9em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.custom-option:last-child {
+  border-bottom: none;
+}
+
+.custom-option:hover {
+  background-color: var(--bg-hover);
+}
+
+/* 消息弹窗内容样式 */
+.message-content {
+  padding: 20px 0;
+  text-align: center;
+  font-size: 1.1em;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+/* 进度条样式 */
+.update-progress {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s ease;
+}
+
+.map-badge {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.map-badge:hover {
+  background-color: var(--primary-50);
+  border-color: var(--primary-light);
+  color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.map-badge:active {
+  transform: translateY(0);
+  background-color: var(--primary-100);
+}
+
