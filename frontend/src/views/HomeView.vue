@@ -2,12 +2,20 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useVpkStore } from '../stores/vpk.js'
 import { useAppStore } from '../stores/app.js'
+import { useRotationStore } from '../stores/rotation.js'
 import {
   SelectDirectory,
   LaunchL4D2,
   GetRootDirectory,
   SetRootDirectory,
   OpenFileLocation,
+  BrowserOpenURL,
+  HandleFileDrop,
+  SelectFiles,
+  AutoDiscoverAddons,
+  ValidateDirectory,
+  MoveVpkFiles,
+  GetSecondaryTags,
 } from '../api/wails.js'
 import LytButton from '../components/ui/LytButton.vue'
 import LytInput from '../components/ui/LytInput.vue'
@@ -16,9 +24,12 @@ import LytTag from '../components/ui/LytTag.vue'
 import LytModal from '../components/ui/LytModal.vue'
 import FileDetailModal from '../components/modals/FileDetailModal.vue'
 import ConflictModal from '../components/modals/ConflictModal.vue'
+import TagModal from '../components/modals/TagModal.vue'
+import LoadOrderModal from '../components/modals/LoadOrderModal.vue'
 
 const vpkStore = useVpkStore()
 const appStore = useAppStore()
+const rotationStore = useRotationStore()
 
 const showSortDropdown = ref(false)
 const showBatchDropdown = ref(false)
@@ -28,6 +39,12 @@ const showRename = ref(false)
 const renameTarget = ref({ oldName: '', newName: '' })
 const showLoadOrder = ref(false)
 const loadOrderTarget = ref({ name: '', current: 0, newOrder: 0 })
+const tagModalRef = ref(null)
+const loadOrderModalRef = ref(null)
+const activeDropdownFile = ref(null)
+const showRotationModal = ref(false)
+const rotationConfigLocal = ref({ enableCharacters: false, enableWeapons: false })
+const secondaryTagOptions = ref([])
 
 const sortOptions = [
   { value: 'name', label: '文件名排序' },
@@ -49,15 +66,28 @@ onMounted(async () => {
         await vpkStore.loadFiles()
       }
     }
+    await loadSecondaryTags()
   } catch (e) { }
 })
 
 watch(() => vpkStore.searchQuery, () => vpkStore.applyFilters())
 watch(() => vpkStore.showHidden, () => vpkStore.applyFilters())
-watch(() => vpkStore.selectedPrimaryTag, () => vpkStore.applyFilters())
+watch(() => vpkStore.selectedPrimaryTag, () => {
+  vpkStore.applyFilters()
+  loadSecondaryTags()
+})
 watch(() => vpkStore.selectedSecondaryTags, () => vpkStore.applyFilters())
 watch(() => vpkStore.selectedLocations, () => vpkStore.applyFilters())
 watch(() => vpkStore.sortType, () => vpkStore.applyFilters())
+
+async function loadSecondaryTags() {
+  try {
+    const tags = await GetSecondaryTags(vpkStore.selectedPrimaryTag)
+    secondaryTagOptions.value = tags || []
+  } catch (e) {
+    secondaryTagOptions.value = []
+  }
+}
 
 async function selectDirectory() {
   try {
@@ -69,6 +99,44 @@ async function selectDirectory() {
       await vpkStore.scanFiles()
     }
   } catch (e) {
+    console.error(e)
+  }
+}
+
+async function handleAutoDiscover() {
+  try {
+    const dir = await AutoDiscoverAddons()
+    if (dir) {
+      const valid = await ValidateDirectory(dir)
+      if (valid) {
+        await SetRootDirectory(dir)
+        appStore.currentDirectory = dir
+        appStore.saveDirectory(dir)
+        await vpkStore.scanFiles()
+        appStore.addToast('已自动找到并设置 L4D2 addons 目录', 'success')
+      } else {
+        appStore.addToast('自动找到的目录无效', 'error')
+      }
+    } else {
+      appStore.addToast('未找到 L4D2 安装目录', 'error')
+    }
+  } catch (e) {
+    appStore.addToast('自动查找失败', 'error')
+    console.error(e)
+  }
+}
+
+async function handleUpload() {
+  try {
+    const paths = await SelectFiles()
+    if (paths && paths.length > 0) {
+      appStore.addToast('正在处理文件...', 'info')
+      await HandleFileDrop(paths)
+      appStore.addToast('文件处理完成', 'success')
+      await vpkStore.scanFiles()
+    }
+  } catch (e) {
+    appStore.addToast('上传文件失败', 'error')
     console.error(e)
   }
 }
@@ -126,6 +194,7 @@ function resetFilters() {
   vpkStore.selectedLocations = []
   vpkStore.showHidden = false
   vpkStore.applyFilters()
+  loadSecondaryTags()
 }
 
 const hasSelected = computed(() => vpkStore.selectedCount > 0)
@@ -145,6 +214,115 @@ async function disableSelected() {
     }
   }
 }
+
+async function batchHide() {
+  for (const f of vpkStore.filteredFiles) {
+    if (vpkStore.selectedFiles.has(f.name) && !f.hidden) {
+      await vpkStore.toggleVisibility(f.name)
+    }
+  }
+}
+
+async function batchUnhide() {
+  for (const f of vpkStore.filteredFiles) {
+    if (vpkStore.selectedFiles.has(f.name) && f.hidden) {
+      await vpkStore.toggleVisibility(f.name)
+    }
+  }
+}
+
+async function batchMove() {
+  try {
+    const dir = await SelectDirectory()
+    if (dir) {
+      const names = Array.from(vpkStore.selectedFiles)
+      await MoveVpkFiles(names, dir)
+      appStore.addToast(`已移动 ${names.length} 个文件`, 'success')
+      vpkStore.selectedFiles.clear()
+      await vpkStore.scanFiles()
+    }
+  } catch (e) {
+    appStore.addToast('移动文件失败', 'error')
+    console.error(e)
+  }
+}
+
+// Rotation modal
+function openRotationModal() {
+  rotationConfigLocal.value = {
+    enableCharacters: rotationStore.config.enableCharacters,
+    enableWeapons: rotationStore.config.enableWeapons,
+  }
+  showRotationModal.value = true
+}
+
+async function saveRotationConfig() {
+  await rotationStore.updateConfig({ ...rotationConfigLocal.value })
+  showRotationModal.value = false
+}
+
+async function manualRotate(type) {
+  try {
+    await rotationStore.manualRotate()
+    appStore.addToast('手动轮换完成', 'success')
+  } catch (e) {
+    appStore.addToast('手动轮换失败', 'error')
+  }
+}
+
+// Dropdown menu actions
+function openDropdown(file, event) {
+  event.stopPropagation()
+  if (activeDropdownFile.value === file.name) {
+    activeDropdownFile.value = null
+  } else {
+    activeDropdownFile.value = file.name
+  }
+}
+
+function closeDropdown() {
+  activeDropdownFile.value = null
+}
+
+function handleFileAction(action, file) {
+  closeDropdown()
+  switch (action) {
+    case 'detail':
+      openDetail(file)
+      break
+    case 'workshop':
+      if (file.workshopUrl) BrowserOpenURL(file.workshopUrl)
+      break
+    case 'hide':
+      vpkStore.toggleVisibility(file.name)
+      break
+    case 'tags':
+      tagModalRef.value?.open(file)
+      break
+    case 'rename':
+      openRename(file)
+      break
+    case 'loadOrder':
+      loadOrderModalRef.value?.open(file)
+      break
+    case 'location':
+      OpenFileLocation(file.name)
+      break
+    case 'delete':
+      vpkStore.deleteFile(file.name)
+      break
+  }
+}
+
+function onCardClick(file, event) {
+  if (event.target.closest('.dropdown-menu') || event.target.closest('.more-btn')) return
+  openDetail(file)
+}
+
+function refreshFiles() {
+  vpkStore.loadFiles()
+  loadSecondaryTags()
+}
 </script>
 
 <template>
@@ -158,9 +336,38 @@ async function disableSelected() {
           </svg>
           选择addons目录
         </LytButton>
+        <LytButton variant="outline" size="small" @click="handleAutoDiscover">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="16 12 12 8 8 12"/>
+            <line x1="12" y1="16" x2="12" y2="8"/>
+          </svg>
+          自动查找
+        </LytButton>
+        <LytButton variant="outline" size="small" @click="handleUpload">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          上传
+        </LytButton>
         <span v-if="appStore.currentDirectory" class="current-dir">{{ appStore.currentDirectory }}</span>
       </div>
       <div class="header-right">
+        <LytButton
+          :variant="rotationStore.isEnabled() ? 'accent' : 'outline'"
+          size="small"
+          @click="openRotationModal"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 21h5v-5"/>
+          </svg>
+          {{ rotationStore.isEnabled() ? '轮换已启用' : 'Mod随机轮换' }}
+        </LytButton>
         <LytButton variant="success" @click="LaunchL4D2">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="5 3 19 12 5 21 5 3"/>
@@ -191,7 +398,7 @@ async function disableSelected() {
           </LytTag>
         </div>
         <div class="filter-actions">
-          <LytButton variant="outline" size="small" @click="vpkStore.loadFiles()">
+          <LytButton variant="outline" size="small" @click="refreshFiles">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="23 4 23 10 17 10"/>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -282,10 +489,24 @@ async function disableSelected() {
           </button>
         </div>
       </div>
+      <!-- Secondary tag filters -->
+      <div v-if="secondaryTagOptions.length > 0 && vpkStore.selectedPrimaryTag" class="filter-row secondary-tags-row">
+        <span class="secondary-label">二级标签:</span>
+        <div class="tag-filters">
+          <LytTag
+            v-for="tag in secondaryTagOptions"
+            :key="tag"
+            :active="vpkStore.selectedSecondaryTags.includes(tag)"
+            @click="toggleTag(tag)"
+          >
+            {{ tag }}
+          </LytTag>
+        </div>
+      </div>
     </div>
 
     <!-- File List -->
-    <div class="file-list-container">
+    <div class="file-list-container" @click="closeDropdown">
       <div v-if="vpkStore.filteredFiles.length === 0" class="empty-state">
         暂无VPK文件
       </div>
@@ -333,6 +554,8 @@ async function disableSelected() {
           <div class="col-location">{{ file.location }}</div>
           <div class="col-tags">
             <LytTag v-if="file.primaryTag">{{ file.primaryTag }}</LytTag>
+            <LytTag v-for="stag in (file.secondaryTags || []).slice(0, 2)" :key="stag" variant="secondary">{{ stag }}</LytTag>
+            <span v-if="(file.secondaryTags || []).length > 2" class="more-tags">+{{ (file.secondaryTags || []).length - 2 }}</span>
           </div>
           <div class="col-actions">
             <LytButton variant="ghost" size="small" icon-only @click="openDetail(file)">
@@ -354,13 +577,25 @@ async function disableSelected() {
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
             </LytButton>
-            <LytButton variant="ghost" size="small" icon-only @click="OpenFileLocation(file.name)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </LytButton>
+            <div class="dropdown-wrapper">
+              <LytButton variant="ghost" size="small" icon-only @click="openDropdown(file, $event)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="5" r="1"/>
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="12" cy="19" r="1"/>
+                </svg>
+              </LytButton>
+              <div v-if="activeDropdownFile === file.name" class="dropdown-menu">
+                <button @click="handleFileAction('detail', file)"><span>&#128196;</span> 详情</button>
+                <button v-if="file.workshopUrl" @click="handleFileAction('workshop', file)"><span>&#127760;</span> 跳转工坊</button>
+                <button @click="handleFileAction('hide', file)"><span>&#128065;</span> {{ file.hidden ? '取消隐藏' : '隐藏' }}</button>
+                <button @click="handleFileAction('tags', file)"><span>&#127991;</span> 设置标签</button>
+                <button @click="handleFileAction('rename', file)"><span>&#9998;</span> 重命名</button>
+                <button @click="handleFileAction('loadOrder', file)"><span>&#128260;</span> 加载顺序</button>
+                <button @click="handleFileAction('location', file)"><span>&#128194;</span> 打开位置</button>
+                <button class="danger" @click="handleFileAction('delete', file)"><span>&#128465;</span> 删除</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -372,17 +607,55 @@ async function disableSelected() {
           :key="file.name"
           class="file-card"
           :class="{ disabled: file.disabled }"
-          @click="openDetail(file)"
+          @click="onCardClick(file, $event)"
         >
           <div class="card-preview">
             <img v-if="file.previewUrl" :src="file.previewUrl" :alt="file.name" />
             <div v-else class="preview-placeholder">{{ file.name.slice(0, 2) }}</div>
           </div>
+          <div class="card-checkbox">
+            <input
+              type="checkbox"
+              :checked="vpkStore.selectedFiles.has(file.name)"
+              @change.stop="vpkStore.toggleFileSelection(file.name)"
+            />
+          </div>
+          <div class="card-badges">
+            <span v-if="file.primaryTag" class="card-badge primary">{{ file.primaryTag }}</span>
+            <span v-if="file.hidden" class="card-badge hidden">已隐藏</span>
+          </div>
           <div class="card-body">
             <div class="card-title">{{ file.title || file.name }}</div>
             <div class="card-filename">{{ file.name }}</div>
             <div class="card-tags">
-              <LytTag v-if="file.primaryTag">{{ file.primaryTag }}</LytTag>
+              <LytTag v-for="stag in (file.secondaryTags || []).slice(0, 2)" :key="stag" variant="secondary" size="small">{{ stag }}</LytTag>
+            </div>
+          </div>
+          <div class="card-actions">
+            <LytButton variant="ghost" size="small" icon-only @click.stop="vpkStore.toggleFile(file.name)">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path v-if="file.disabled" d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+                <line x1="12" y1="2" x2="12" y2="12"/>
+              </svg>
+            </LytButton>
+            <div class="dropdown-wrapper">
+              <LytButton variant="ghost" size="small" icon-only @click.stop="openDropdown(file, $event)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="5" r="1"/>
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="12" cy="19" r="1"/>
+                </svg>
+              </LytButton>
+              <div v-if="activeDropdownFile === file.name" class="dropdown-menu">
+                <button @click="handleFileAction('detail', file)"><span>&#128196;</span> 详情</button>
+                <button v-if="file.workshopUrl" @click="handleFileAction('workshop', file)"><span>&#127760;</span> 跳转工坊</button>
+                <button @click="handleFileAction('hide', file)"><span>&#128065;</span> {{ file.hidden ? '取消隐藏' : '隐藏' }}</button>
+                <button @click="handleFileAction('tags', file)"><span>&#127991;</span> 设置标签</button>
+                <button @click="handleFileAction('rename', file)"><span>&#9998;</span> 重命名</button>
+                <button @click="handleFileAction('loadOrder', file)"><span>&#128260;</span> 加载顺序</button>
+                <button @click="handleFileAction('location', file)"><span>&#128194;</span> 打开位置</button>
+                <button class="danger" @click="handleFileAction('delete', file)"><span>&#128465;</span> 删除</button>
+              </div>
             </div>
           </div>
         </div>
@@ -401,26 +674,27 @@ async function disableSelected() {
         <span v-if="vpkStore.selectedCount > 0">已选择 {{ vpkStore.selectedCount }}</span>
       </div>
       <div class="status-actions">
-        <template v-if="hasSelected">
-          <LytButton variant="success" size="small" @click="enableSelected">
-            启用选中
+        <div class="batch-dropdown-wrapper">
+          <LytButton v-if="hasSelected" variant="outline" size="small" @click="showBatchDropdown = !showBatchDropdown">
+            批量操作
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </LytButton>
-          <LytButton variant="danger" size="small" @click="disableSelected">
-            禁用选中
-          </LytButton>
-          <LytButton variant="outline" size="small" @click="vpkStore.deleteSelected">
-            删除选中
-          </LytButton>
-          <LytButton variant="outline" size="small" @click="vpkStore.exportSelected">
-            导出ZIP
-          </LytButton>
-        </template>
-        <LytButton variant="ghost" size="small" @click="vpkStore.selectAll">
-          全选
-        </LytButton>
-        <LytButton variant="ghost" size="small" @click="vpkStore.deselectAll">
-          取消全选
-        </LytButton>
+          <Transition name="dropdown">
+            <div v-if="showBatchDropdown && hasSelected" class="batch-dropdown">
+              <button @click="enableSelected(); showBatchDropdown = false"><span>&#10003;</span> 启用选中</button>
+              <button @click="disableSelected(); showBatchDropdown = false"><span>&#10007;</span> 禁用选中</button>
+              <button @click="batchHide(); showBatchDropdown = false"><span>&#128065;</span> 隐藏选中</button>
+              <button @click="batchUnhide(); showBatchDropdown = false"><span>&#128064;</span> 取消隐藏选中</button>
+              <button @click="vpkStore.exportSelected(); showBatchDropdown = false"><span>&#128230;</span> 导出ZIP</button>
+              <button @click="batchMove(); showBatchDropdown = false"><span>&#128229;</span> 移动到...</button>
+              <button class="danger" @click="vpkStore.deleteSelected(); showBatchDropdown = false"><span>&#128465;</span> 删除选中</button>
+            </div>
+          </Transition>
+        </div>
+        <LytButton variant="ghost" size="small" @click="vpkStore.selectAll">全选</LytButton>
+        <LytButton variant="ghost" size="small" @click="vpkStore.deselectAll">取消全选</LytButton>
       </div>
     </div>
 
@@ -437,10 +711,42 @@ async function disableSelected() {
       </template>
     </LytModal>
 
+    <!-- Rotation Modal -->
+    <LytModal v-model="showRotationModal" title="Mod 随机轮换设置" size="small">
+      <div class="form-body">
+        <p class="rotation-desc">开启后，每次启动游戏将自动从已安装的 Mod 中随机选择并替换。系统会按具体子分类进行随机，确保每个子分类只有一个 Mod 生效。</p>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">人物轮换</span>
+            <span class="setting-desc">随机切换人物 Mod</span>
+          </div>
+          <LytToggle v-model="rotationConfigLocal.enableCharacters" />
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">武器轮换</span>
+            <span class="setting-desc">随机切换武器 Mod</span>
+          </div>
+          <LytToggle v-model="rotationConfigLocal.enableWeapons" />
+        </div>
+        <div class="manual-rotate-row">
+          <LytButton variant="outline" size="small" @click="manualRotate"><span>&#128260;</span> 立即执行轮换</LytButton>
+        </div>
+      </div>
+      <template #footer>
+        <LytButton variant="secondary" @click="showRotationModal = false">取消</LytButton>
+        <LytButton variant="primary" @click="saveRotationConfig">保存</LytButton>
+      </template>
+    </LytModal>
+
     <!-- File Detail Modal -->
     <FileDetailModal v-model="showDetail" :file="detailFile" />
     <!-- Conflict Modal -->
     <ConflictModal ref="conflictModal" />
+    <!-- Tag Modal -->
+    <TagModal ref="tagModalRef" @saved="vpkStore.loadFiles()" />
+    <!-- Load Order Modal -->
+    <LoadOrderModal ref="loadOrderModalRef" @saved="vpkStore.loadFiles()" />
   </div>
 </template>
 
@@ -500,6 +806,18 @@ async function disableSelected() {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.secondary-tags-row {
+  padding-top: 6px;
+  border-top: 1px solid var(--border-light);
+}
+
+.secondary-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .search-box {
@@ -692,6 +1010,10 @@ async function disableSelected() {
   color: var(--text-muted);
 }
 
+.file-item.hidden {
+  opacity: 0.5;
+}
+
 .col-check {
   display: flex;
   align-items: center;
@@ -748,9 +1070,70 @@ async function disableSelected() {
   color: var(--text-secondary);
 }
 
+.col-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.more-tags {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
 .col-actions {
   display: flex;
   gap: 2px;
+  align-items: center;
+}
+
+/* Dropdown */
+.dropdown-wrapper {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--bg-app);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  min-width: 160px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-150);
+}
+
+.dropdown-menu button:hover {
+  background: var(--bg-hover);
+}
+
+.dropdown-menu button.danger {
+  color: var(--danger);
+}
+
+.dropdown-menu button.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
 }
 
 /* Card View */
@@ -768,6 +1151,7 @@ async function disableSelected() {
   overflow: hidden;
   cursor: pointer;
   transition: all var(--duration-200);
+  position: relative;
 }
 
 .file-card:hover {
@@ -807,6 +1191,44 @@ async function disableSelected() {
   opacity: 0.3;
 }
 
+.card-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+}
+
+.card-checkbox input {
+  width: 18px;
+  height: 18px;
+}
+
+.card-badges {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
+}
+
+.card-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
+.card-badge.primary {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.card-badge.hidden {
+  background: rgba(100, 100, 100, 0.15);
+  color: var(--text-tertiary);
+}
+
 .card-body {
   padding: 12px;
 }
@@ -834,6 +1256,15 @@ async function disableSelected() {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
+}
+
+.card-actions {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
 }
 
 /* Status Bar */
@@ -866,6 +1297,53 @@ async function disableSelected() {
   gap: 6px;
 }
 
+.batch-dropdown-wrapper {
+  position: relative;
+}
+
+.batch-dropdown {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  background: var(--bg-app);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  min-width: 160px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.batch-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-align: left;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-150);
+}
+
+.batch-dropdown button:hover {
+  background: var(--bg-hover);
+}
+
+.batch-dropdown button.danger {
+  color: var(--danger);
+}
+
+.batch-dropdown button.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* Form body */
 .form-body {
   display: flex;
@@ -882,6 +1360,47 @@ async function disableSelected() {
 .suffix {
   font-size: var(--text-sm);
   color: var(--text-tertiary);
+}
+
+/* Rotation modal */
+.rotation-desc {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.setting-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.setting-desc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.manual-rotate-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
 }
 
 /* Dropdown transition */

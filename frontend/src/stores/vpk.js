@@ -48,6 +48,7 @@ export const useVpkStore = defineStore('vpk', () => {
       allFiles.value = files || []
       applyFilters()
       extractLocations()
+      await loadTags()
     } catch (e) {
       console.error('Failed to load VPK files:', e)
     }
@@ -59,6 +60,16 @@ export const useVpkStore = defineStore('vpk', () => {
       await loadFiles()
     } catch (e) {
       console.error('Failed to scan VPK files:', e)
+    }
+  }
+
+  async function loadTags() {
+    try {
+      const tags = await GetPrimaryTags()
+      primaryTags.value = tags || []
+    } catch (e) {
+      console.error('Failed to load primary tags:', e)
+      primaryTags.value = []
     }
   }
 
@@ -211,6 +222,7 @@ export const useVpkStore = defineStore('vpk', () => {
     selectedCount,
     loadFiles,
     scanFiles,
+    loadTags,
     applyFilters,
     toggleFileSelection,
     selectAll,

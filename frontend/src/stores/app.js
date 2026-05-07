@@ -11,6 +11,10 @@ export const useAppStore = defineStore('app', () => {
   const theme = ref('light')
   const toasts = ref([])
 
+  // Protocol handling state (cross-view communication)
+  const pendingProtocolWorkshopId = ref(null)
+  const pendingProtocolParseId = ref(null)
+
   // Getters
   const isDark = computed(() => theme.value === 'dark')
 
@@ -81,6 +85,8 @@ export const useAppStore = defineStore('app', () => {
     isLoading,
     theme,
     toasts,
+    pendingProtocolWorkshopId,
+    pendingProtocolParseId,
     isDark,
     initTheme,
     setTheme,
