@@ -11,7 +11,13 @@ export function getActionButton(file) {
   if (file.location === "workshop") {
     return `
       <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move">
-        <span class="btn-icon">📦</span>
+        <span class="btn-icon">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
+            <path d="m3.3 7 8.7 5 8.7-5"></path>
+            <path d="M12 22V12"></path>
+          </svg>
+        </span>
         <span class="btn-text">转移</span>
       </button>
     `;
@@ -20,20 +26,17 @@ export function getActionButton(file) {
       <button class="btn-small action-btn toggle-btn ${
         file.enabled ? "toggle-disable" : "toggle-enable"
       }" data-file-path="${file.path}" data-action="toggle">
-        <span class="btn-icon">${file.enabled ? "⛔" : "✅"}</span>
+        <span class="btn-icon">
+          ${
+            file.enabled
+              ? `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>`
+              : `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`
+          }
+        </span>
         <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
       </button>
     `;
   }
-}
-
-export function getLocationIcon(location) {
-  const icons = {
-    root: "📁",
-    workshop: "🔧",
-    disabled: "🚫",
-  };
-  return icons[location] || "📄";
 }
 
 export function formatFileSize(bytes) {
@@ -50,17 +53,24 @@ export function formatTags(primaryTag, secondaryTags = []) {
   const tags = [];
 
   if (primaryTag) {
-    tags.push(`<span class="tag primary-tag">${primaryTag}</span>`);
+    tags.push(
+      `<span class="tag primary-tag" title="${escapeHtml(primaryTag)}">${escapeHtml(primaryTag)}</span>`
+    );
   }
 
   if (secondaryTags && secondaryTags.length > 0) {
     secondaryTags.slice(0, 2).forEach((tag) => {
-      tags.push(`<span class="tag secondary-tag">${tag}</span>`);
+      tags.push(
+        `<span class="tag secondary-tag" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`
+      );
     });
 
     if (secondaryTags.length > 2) {
       tags.push(
-        `<span class="tag more-tags">+${secondaryTags.length - 2}</span>`
+        `<span class="tag more-tags" title="${secondaryTags
+          .slice(2)
+          .map(escapeHtml)
+          .join(", ")}">+${secondaryTags.length - 2}</span>`
       );
     }
   }

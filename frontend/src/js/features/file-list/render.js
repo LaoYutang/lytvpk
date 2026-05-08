@@ -2,9 +2,9 @@ import { appState, toggleFileSelection } from "../state.js";
 import {
   formatFileSize,
   getLocationDisplayName,
-  getLocationIcon,
   getActionButton,
   formatTags,
+  escapeHtml,
 } from "../../core/utils.js";
 import { showFileDetail } from "../modals/detail.js";
 import { GetVPKPreviewImage } from "../../../../wailsjs/go/app/App";
@@ -50,12 +50,11 @@ export function createFileItem(file) {
     toggleFileSelection(file.path, checkbox.checked);
   });
 
-  const statusIcon = file.enabled ? "✅" : "❌";
-  const locationIcon = getLocationIcon(file.location);
   const displayTitle = file.title || file.name;
   const isHidden = file.name.startsWith("_");
   const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
-  const hideBtnIcon = isHidden ? "👁️" : "👁️‍🗨️";
+  const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
+  const locationBadgeClass = `location-${file.location || "unknown"}`;
 
   const moreActionsHtml = `
     <div class="more-actions-dropdown">
@@ -66,21 +65,21 @@ export function createFileItem(file) {
       </button>
       <div class="dropdown-content hidden">
         <button class="dropdown-item detail-btn" data-file-path="${file.path}">
-          <span class="btn-icon">🔍</span> 详情
+          <span class="btn-icon">${iconSvg("search")}</span> 详情
         </button>
         ${file.workshopId ? `
         <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
-          <span class="btn-icon">🌐</span> 跳转工坊
+          <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
         ` : ""}
         <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
           <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
         </button>
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
-          <span class="btn-icon">🏷️</span> 设置标签
+          <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
         <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
-          <span class="btn-icon">✏️</span> 重命名
+          <span class="btn-icon">${iconSvg("edit")}</span> 重命名
         </button>
         <button class="dropdown-item load-order-btn" data-file-path="${file.path}" data-action="load-order">
           <span class="btn-icon">
@@ -95,10 +94,10 @@ export function createFileItem(file) {
           </span> 加载顺序
         </button>
         <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
-          <span class="btn-icon">📂</span> 位置
+          <span class="btn-icon">${iconSvg("folderOpen")}</span> 位置
         </button>
         <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
-          <span class="btn-icon">🗑️</span> 删除
+          <span class="btn-icon">${iconSvg("trash")}</span> 删除
         </button>
       </div>
     </div>
@@ -111,12 +110,16 @@ export function createFileItem(file) {
       <div class="file-filename">${file.name}</div>
     </div>
     <div class="file-size">${formatFileSize(file.size)}</div>
-    <div class="file-status">${statusIcon} ${file.enabled ? "启用" : "禁用"}</div>
-    <div class="file-location">${locationIcon} ${getLocationDisplayName(file.location)}</div>
+    <div class="file-location">
+      <span class="location-state-tag ${locationBadgeClass}">
+        ${getLocationSvg(file.location)}
+        <span>${getLocationDisplayName(file.location)}</span>
+      </span>
+    </div>
     <div class="file-tags">${formatTags(file.primaryTag, file.secondaryTags)}</div>
     <div class="file-actions">
       <button class="btn-small action-btn detail-btn" data-file-path="${file.path}">
-        <span class="btn-icon">🔍</span>
+        <span class="btn-icon">${iconSvg("search")}</span>
         <span class="btn-text">详情</span>
       </button>
       ${getActionButton(file)}
@@ -155,7 +158,7 @@ export function createFileCard(file) {
   const displayTitle = file.title || file.name;
   const isHidden = file.name.startsWith("_");
   const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
-  const hideBtnIcon = isHidden ? "👁️" : "👁️‍🗨️";
+  const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
 
   let previewSrc = "";
   let showPlaceholder = true;
@@ -171,11 +174,17 @@ export function createFileCard(file) {
     const hasMore = file.secondaryTags.length > 2;
 
     secondaryTagsHtml = displayTags
-      .map((tag) => `<span class="card-badge secondary-tag-badge">${tag}</span>`)
+      .map(
+        (tag) =>
+          `<span class="card-badge secondary-tag-badge" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`
+      )
       .join("");
 
     if (hasMore) {
-      secondaryTagsHtml += `<span class="card-badge more-tag-badge">+${file.secondaryTags.length - 2}</span>`;
+      secondaryTagsHtml += `<span class="card-badge more-tag-badge" title="${file.secondaryTags
+        .slice(2)
+        .map(escapeHtml)
+        .join(", ")}">+${file.secondaryTags.length - 2}</span>`;
     }
   }
 
@@ -183,7 +192,7 @@ export function createFileCard(file) {
   if (file.location === "workshop") {
     actionBtn = `
       <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move" title="转移到addons">
-        <span class="btn-icon">📦</span>
+        <span class="btn-icon">${iconSvg("package")}</span>
         <span class="btn-text">转移</span>
       </button>
     `;
@@ -192,7 +201,7 @@ export function createFileCard(file) {
       <button class="btn-small action-btn toggle-btn ${file.enabled ? "toggle-disable" : "toggle-enable"}"
               data-file-path="${file.path}" data-action="toggle"
               title="${file.enabled ? "点击禁用" : "点击启用"}">
-        <span class="btn-icon">${file.enabled ? "⛔" : "✅"}</span>
+        <span class="btn-icon">${iconSvg(file.enabled ? "x" : "check")}</span>
         <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
       </button>
     `;
@@ -207,21 +216,21 @@ export function createFileCard(file) {
       </button>
       <div class="dropdown-content hidden">
         <button class="dropdown-item detail-btn" data-file-path="${file.path}">
-          <span class="btn-icon">🔍</span> 详情
+          <span class="btn-icon">${iconSvg("search")}</span> 详情
         </button>
         ${file.workshopId ? `
         <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
-          <span class="btn-icon">🌐</span> 跳转工坊
+          <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
         ` : ""}
         <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
           <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
         </button>
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
-          <span class="btn-icon">🏷️</span> 设置标签
+          <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
         <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
-          <span class="btn-icon">✏️</span> 重命名
+          <span class="btn-icon">${iconSvg("edit")}</span> 重命名
         </button>
         <button class="dropdown-item load-order-btn" data-file-path="${file.path}" data-action="load-order">
           <span class="btn-icon">
@@ -236,10 +245,10 @@ export function createFileCard(file) {
           </span> 加载顺序
         </button>
         <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
-          <span class="btn-icon">📂</span> 位置
+          <span class="btn-icon">${iconSvg("folderOpen")}</span> 位置
         </button>
         <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
-          <span class="btn-icon">🗑️</span> 删除
+          <span class="btn-icon">${iconSvg("trash")}</span> 删除
         </button>
       </div>
     </div>
@@ -258,7 +267,11 @@ export function createFileCard(file) {
       <div class="card-checkbox-container"></div>
       <div class="card-badges">
         <span class="card-badge location-badge">${getLocationDisplayName(file.location)}</span>
-        ${file.primaryTag ? `<span class="card-badge tag-badge">${file.primaryTag}</span>` : ""}
+        ${
+          file.primaryTag
+            ? `<span class="card-badge tag-badge" title="${escapeHtml(file.primaryTag)}">${escapeHtml(file.primaryTag)}</span>`
+            : ""
+        }
         ${secondaryTagsHtml}
       </div>
     </div>
@@ -312,6 +325,33 @@ export function createFileCard(file) {
   });
 
   return card;
+}
+
+function iconSvg(name) {
+  const icons = {
+    search: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>`,
+    external: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path></svg>`,
+    eye: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+    eyeOff: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 18"></path><path d="M10.6 10.6A2 2 0 0 0 13.4 13.4"></path><path d="M9.9 4.2A10.4 10.4 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-2.2 3.2"></path><path d="M6.6 6.6C3.6 8.6 2 12 2 12s3.5 8 10 8a10.6 10.6 0 0 0 4.1-.8"></path></svg>`,
+    tag: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"></path><circle cx="7.5" cy="7.5" r=".8"></circle></svg>`,
+    edit: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>`,
+    folderOpen: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 14 8 8h13l-2 8a2 2 0 0 1-2 1.5H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h4"></path></svg>`,
+    trash: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m19 6-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg>`,
+    package: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>`,
+    check: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`,
+    x: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>`,
+  };
+  return icons[name] || "";
+}
+
+function getLocationSvg(location) {
+  if (location === "workshop") {
+    return `<svg class="location-tag-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M5 7l1-3h12l1 3"></path><path d="M6 7v12h12V7"></path><path d="M9 11h6"></path></svg>`;
+  }
+  if (location === "disabled") {
+    return `<svg class="location-tag-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.7 5.7 12.6 12.6"></path></svg>`;
+  }
+  return `<svg class="location-tag-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"></path></svg>`;
 }
 
 export async function loadCardPreview(file, imgElement, placeholderElement) {

@@ -921,8 +921,8 @@
 .file-list-header {
   display: grid;
   grid-template-columns:
-    3rem minmax(13rem, 1.75fr) 7rem 6rem 7rem minmax(18rem, 1.5fr)
-    8rem;
+    3rem minmax(13rem, 1.8fr) 7rem minmax(8rem, 0.7fr)
+    minmax(18rem, 1.6fr) 13.5rem;
   gap: var(--spacing-3);
   padding: var(--spacing-3) var(--spacing-4);
   background: var(--bg-surface);
@@ -954,10 +954,10 @@
 .file-item {
   display: grid;
   grid-template-columns:
-    3rem minmax(13rem, 1.75fr) 7rem 6rem 7rem minmax(18rem, 1.5fr)
-    auto;
+    3rem minmax(13rem, 1.8fr) 7rem minmax(8rem, 0.7fr)
+    minmax(18rem, 1.6fr) 13.5rem;
   gap: var(--spacing-3);
-  padding: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
   border-bottom: 1px solid var(--border-default);
   transition:
     all var(--duration-200) var(--ease-out),
@@ -1080,15 +1080,17 @@
 }
 
 .card-badge {
-  padding: 2px 8px;
+  min-height: 1.5rem;
+  padding: 0 var(--spacing-2);
   border-radius: var(--radius-full);
-  font-size: 12px; /* 统一改为 12px */
-  font-weight: 500; /* 统一改为 500 */
+  font-size: var(--text-xs);
+  font-weight: 700;
   color: white;
   box-shadow: var(--shadow-sm);
-  display: inline-block;
-  line-height: 1.2;
-  border: 1px solid transparent; /* 统一边框占位 */
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  border: 1px solid transparent;
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1103,22 +1105,23 @@
 }
 
 .card-badge.tag-badge {
-  background-color: var(--primary);
+  background: rgba(99, 102, 241, 0.92);
+  border-color: rgba(255, 255, 255, 0.28);
   color: white !important;
-  font-weight: 500;
+  text-shadow: none;
 }
 
 .card-badge.secondary-tag-badge {
-  background-color: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--text-secondary);
-  border-color: var(--border-light);
+  border-color: rgba(15, 23, 42, 0.08);
   text-shadow: none;
 }
 
 .card-badge.more-tag-badge {
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
-  padding: 2px 6px;
+  color: white;
 }
 
 .card-content {
@@ -1405,19 +1408,54 @@
   font-variant-numeric: tabular-nums;
 }
 
-.file-status {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  font-size: var(--text-sm);
-}
-
 .file-location {
   display: flex;
   align-items: center;
-  gap: var(--spacing-2);
+  gap: var(--spacing-1);
+  flex-wrap: wrap;
+  min-width: 0;
   font-size: var(--text-sm);
   color: var(--text-tertiary);
+}
+
+.location-state-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.6rem;
+  padding: 0 var(--spacing-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.location-tag-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
+}
+
+.location-state-tag.location-root {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.24);
+  color: #2563eb;
+}
+
+.location-state-tag.location-workshop {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+  color: #b45309;
+}
+
+.location-state-tag.location-disabled {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.24);
+  color: #dc2626;
 }
 
 .file-tags {
@@ -1425,30 +1463,56 @@
   gap: var(--spacing-1);
   flex-wrap: wrap;
   overflow: hidden;
+  min-width: 0;
 }
 
-.tag {
+.file-tags .tag,
+.mod-info-tags .tag,
+#detail-tags .tag,
+#detail-detail-tags .tag {
   display: inline-flex;
   align-items: center;
-  padding: var(--spacing-1) var(--spacing-2);
+  min-height: 1.6rem;
+  max-width: 10rem;
+  padding: 0 var(--spacing-2);
   background: var(--bg-hover);
   color: var(--text-secondary);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 700;
+  line-height: 1;
   border-radius: var(--radius-full);
   white-space: nowrap;
   border: 1px solid var(--border-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: all var(--duration-150) var(--ease-out);
 }
 
-.detail-tag {
-  background: linear-gradient(
-    135deg,
-    var(--primary) 0%,
-    var(--primary-light) 100%
-  );
-  border-color: var(--primary);
-  color: white;
+.file-tags .tag.primary-tag,
+.mod-info-tags .tag.primary-tag,
+#detail-tags .tag.primary-tag,
+#detail-detail-tags .tag.primary-tag {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.28);
+  color: var(--primary);
+}
+
+.file-tags .tag.secondary-tag,
+.mod-info-tags .tag.secondary-tag,
+#detail-tags .tag.secondary-tag,
+#detail-detail-tags .tag.secondary-tag {
+  background: var(--bg-surface);
+  border-color: var(--border-light);
+  color: var(--text-secondary);
+}
+
+.file-tags .tag.more-tags,
+.mod-info-tags .tag.more-tags,
+#detail-tags .tag.more-tags,
+#detail-detail-tags .tag.more-tags {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-muted);
 }
 
 .file-actions {
