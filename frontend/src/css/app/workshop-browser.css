@@ -25,53 +25,143 @@
 
 /* 侧边栏筛选 */
 .browser-sidebar {
-  width: 260px;
+  width: 200px;
   background-color: var(--bg-card);
   border-right: 1px solid var(--border-color);
-  padding: 20px;
+  padding: 16px 12px;
   overflow-y: auto;
   flex-shrink: 0;
+  position: relative;
 }
 
-.filter-group {
-  margin-bottom: 24px;
+/* 分类分组全局指示器容器 */
+#browser-sidebar-content {
+  position: relative;
+}
+
+/* 排序分组 */
+.filter-group-sort {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 16px;
+}
+
+/* 分类分组 */
+.filter-group-category {
+  margin-bottom: 16px;
 }
 
 .filter-group h4 {
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   color: var(--text-tertiary);
-  margin-bottom: 12px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  margin-left: 2px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 .filter-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+
+/* 排序组指示器（独立，在filter-list内） */
+.browser-sort-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 38px;
+  border-radius: 0.5rem;
+  background-color: var(--primary-100);
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform var(--duration-300) var(--ease-out),
+    height var(--duration-300) var(--ease-out);
+}
+
+html.dark-mode .browser-sort-indicator {
+  background-color: rgba(79, 70, 229, 0.15);
+}
+
+/* 分类组全局指示器（在sidebar-content容器内） */
+.browser-category-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 38px;
+  border-radius: 0.5rem;
+  background-color: var(--primary-100);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition:
+    transform var(--duration-300) var(--ease-out),
+    height var(--duration-300) var(--ease-out),
+    opacity var(--duration-150) var(--ease-out);
+}
+
+html.dark-mode .browser-category-indicator {
+  background-color: rgba(79, 70, 229, 0.15);
+}
+
+.browser-category-indicator.visible {
+  opacity: 1;
 }
 
 .filter-item {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: color var(--duration-150) var(--ease-out);
+  user-select: none;
+  position: relative;
+  z-index: 1;
 }
 
 .filter-item:hover {
-  background-color: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .filter-item.active {
-  background-color: var(--primary-100);
   color: var(--primary);
-  font-weight: 500;
+  font-weight: 600;
+}
+
+/* 图标容器（仅用于排序项） */
+.filter-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 8px;
+  color: var(--text-tertiary);
+  transition: color var(--duration-150) var(--ease-out);
+}
+
+.filter-item-icon .icon-svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.filter-item:hover .filter-item-icon,
+.filter-item.active .filter-item-icon {
+  color: var(--primary);
 }
 
 /* 主内容区域 */

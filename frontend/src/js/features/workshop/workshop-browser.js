@@ -104,23 +104,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 排序筛选
+  // 排序筛选（独立组，不影响分类选中）
   document
     .querySelectorAll("#browser-sort-list .filter-item")
     .forEach((item) => {
       item.addEventListener("click", () => {
-        document
-          .querySelectorAll("#browser-sort-list .filter-item")
-          .forEach((i) => i.classList.remove("active"));
+        // 只清除排序组的选中
+        document.querySelectorAll("#browser-sort-list .filter-item").forEach(i => i.classList.remove("active"));
         item.classList.add("active");
+
+        // 更新排序组指示器
+        updateBrowserSortIndicator();
+
         browserState.sort = item.dataset.sort;
         resetWorkshopPaging();
         loadWorkshopList();
       });
     });
 
-  // 初始化动态侧边栏
-  renderWorkshopSidebar();
+  // 初始化动态指示器
+  initBrowserIndicators();
 
   // 加载更多
   const loadMoreBtn = document.getElementById("browser-load-more");
@@ -155,9 +158,15 @@ export function openBrowser(options = {}) {
 
   switchAppPage("workshop");
 
+  // 延迟初始化指示器（确保模态框已显示）
+  setTimeout(() => {
+    addFilterIcons();
+    initBrowserIndicators();
+  }, 100);
+
   // 如果是第一次打开且没数据，加载
   if (browserState.data.length === 0 && !browserState.loading) {
-    browserState.page = 1; // 确保从第一页开始
+    browserState.page = 1;
     loadWorkshopList();
   }
 }
@@ -849,9 +858,16 @@ function formatSize(bytes) {
 /* 创意工坊侧边栏数据与渲染                                                    */
 /* -------------------------------------------------------------------------- */
 
+// 排序图标定义
+const SORT_ICONS = {
+  trend: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V4"/><path d="M17 9l-5-5-5 5"/></svg>`,
+  recent: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  top: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+};
+
 const WORKSHOP_CATEGORIES = [
   {
-    name: "幸存者 (Survivors)",
+    name: "幸存者",
     children: [
       { name: "Bill", tag: "Bill" },
       { name: "Francis", tag: "Francis" },
@@ -864,9 +880,9 @@ const WORKSHOP_CATEGORIES = [
     ],
   },
   {
-    name: "感染者 (Infected)",
+    name: "感染者",
     children: [
-      { name: "特感 (Special Infected)", tag: "Special Infected" },
+      { name: "特感", tag: "Special Infected" },
       { name: "Tank", tag: "Tank" },
       { name: "Witch", tag: "Witch" },
       { name: "Hunter", tag: "Hunter" },
@@ -881,50 +897,50 @@ const WORKSHOP_CATEGORIES = [
   {
     name: "模式 & 战役",
     children: [
-      { name: "战役 (Campaigns)", tag: "Campaigns" },
-      { name: "合作 (Co-op)", tag: "Co-op" },
-      { name: "生存 (Survival)", tag: "Survival" },
-      { name: "对抗 (Versus)", tag: "Versus" },
-      { name: "清道夫 (Scavenge)", tag: "Scavenge" },
-      { name: "写实 (Realism)", tag: "Realism" },
+      { name: "战役", tag: "Campaigns" },
+      { name: "合作", tag: "Co-op" },
+      { name: "生存", tag: "Survival" },
+      { name: "对抗", tag: "Versus" },
+      { name: "清道夫", tag: "Scavenge" },
+      { name: "写实", tag: "Realism" },
       { name: "写实对抗", tag: "Realism Versus" },
-      { name: "突变 (Mutations)", tag: "Mutations" },
-      { name: "单人 (Single Player)", tag: "Single Player" },
+      { name: "突变", tag: "Mutations" },
+      { name: "单人", tag: "Single Player" },
     ],
   },
   {
-    name: "武器 (Weapons)",
+    name: "武器",
     children: [
-      { name: "步枪 (Rifle)", tag: "Rifle" },
-      { name: "冲锋枪 (SMG)", tag: "SMG" },
-      { name: "散弹枪 (Shotgun)", tag: "Shotgun" },
-      { name: "狙击枪 (Sniper)", tag: "Sniper" },
-      { name: "手枪 (Pistol)", tag: "Pistol" },
-      { name: "近战 (Melee)", tag: "Melee" },
-      { name: "榴弹 (Grenade Launcher)", tag: "Grenade Launcher" },
+      { name: "步枪", tag: "Rifle" },
+      { name: "冲锋枪", tag: "SMG" },
+      { name: "散弹枪", tag: "Shotgun" },
+      { name: "狙击枪", tag: "Sniper" },
+      { name: "手枪", tag: "Pistol" },
+      { name: "近战", tag: "Melee" },
+      { name: "榴弹", tag: "Grenade Launcher" },
       { name: "M60", tag: "M60" },
-      { name: "投掷物 (Throwable)", tag: "Throwable" },
+      { name: "投掷物", tag: "Throwable" },
     ],
   },
   {
-    name: "物品 (Items)",
+    name: "物品",
     children: [
-      { name: "治疗包 (Medkit)", tag: "Medkit" },
-      { name: "电击器 (Defibrillator)", tag: "Defibrillator" },
-      { name: "肾上腺素 (Adrenaline)", tag: "Adrenaline" },
-      { name: "止痛药 (Pills)", tag: "Pills" },
+      { name: "治疗包", tag: "Medkit" },
+      { name: "电击器", tag: "Defibrillator" },
+      { name: "肾上腺素", tag: "Adrenaline" },
+      { name: "止痛药", tag: "Pills" },
     ],
   },
   {
     name: "其他资源",
     children: [
       { name: "UI", tag: "UI" },
-      { name: "音效 (Sounds)", tag: "Sounds" },
-      { name: "脚本 (Scripts)", tag: "Scripts" },
-      { name: "模型 (Models)", tag: "Models" },
-      { name: "纹理 (Textures)", tag: "Textures" },
-      { name: "杂项 (Miscellaneous)", tag: "Miscellaneous" },
-      { name: "其他 (Other)", tag: "Other" },
+      { name: "音效", tag: "Sounds" },
+      { name: "脚本", tag: "Scripts" },
+      { name: "模型", tag: "Models" },
+      { name: "纹理", tag: "Textures" },
+      { name: "杂项", tag: "Miscellaneous" },
+      { name: "其他", tag: "Other" },
     ],
   },
 ];
@@ -938,7 +954,7 @@ export function renderWorkshopSidebar() {
   // 渲染 Categories
   WORKSHOP_CATEGORIES.forEach((cat) => {
     const group = document.createElement("div");
-    group.className = "filter-group";
+    group.className = "filter-group filter-group-category";
 
     // 分组标题
     if (cat.name !== "全部") {
@@ -965,6 +981,115 @@ export function renderWorkshopSidebar() {
     group.appendChild(list);
     container.appendChild(group);
   });
+
+  // 为所有筛选项添加图标
+  addFilterIcons();
+
+  // 初始化动态指示器
+  initBrowserIndicators();
+}
+
+// 为所有筛选项添加图标
+function addFilterIcons() {
+  // 为排序项添加图标
+  document.querySelectorAll("#browser-sort-list .filter-item").forEach((item) => {
+    const sort = item.dataset.sort;
+    if (!sort || item.querySelector(".filter-item-icon")) return;
+    item.insertAdjacentHTML(
+      "afterbegin",
+      `<span class="filter-item-icon">${SORT_ICONS[sort] || SORT_ICONS.trend}</span>`
+    );
+  });
+}
+
+/**
+ * 初始化动态指示器
+ */
+function initBrowserIndicators() {
+  // 排序组指示器（放在filter-list内部）
+  const sortList = document.querySelector("#browser-sort-list");
+  if (sortList && !sortList.querySelector(".browser-sort-indicator")) {
+    sortList.insertAdjacentHTML("afterbegin", `<div class="browser-sort-indicator" aria-hidden="true"></div>`);
+  }
+
+  // 分类组全局指示器（放在sidebar-content容器内）
+  const sidebarContent = document.getElementById("browser-sidebar-content");
+  if (sidebarContent && !sidebarContent.querySelector(".browser-category-indicator")) {
+    sidebarContent.insertAdjacentHTML("afterbegin", `<div class="browser-category-indicator" aria-hidden="true"></div>`);
+  }
+
+  updateBrowserSortIndicator(true);
+  updateBrowserCategoryIndicator(true);
+}
+
+/**
+ * 更新排序组指示器位置
+ */
+function updateBrowserSortIndicator(skipTransition = false) {
+  const sortList = document.querySelector("#browser-sort-list");
+  const indicator = sortList?.querySelector(".browser-sort-indicator");
+  const activeItem = sortList?.querySelector(".filter-item.active");
+
+  if (!sortList || !indicator || !activeItem) return;
+
+  if (skipTransition) {
+    indicator.style.transition = "none";
+  }
+
+  const listRect = sortList.getBoundingClientRect();
+  const itemRect = activeItem.getBoundingClientRect();
+
+  // 计算相对于filter-list的位置
+  const offset = itemRect.top - listRect.top;
+
+  indicator.style.height = `${itemRect.height}px`;
+  indicator.style.transform = `translateY(${offset}px)`;
+
+  if (skipTransition) {
+    indicator.offsetHeight;
+    indicator.style.transition = "";
+  }
+}
+
+/**
+ * 更新分类组指示器位置（全局单指示器）
+ */
+function updateBrowserCategoryIndicator(skipTransition = false) {
+  const sidebarContent = document.getElementById("browser-sidebar-content");
+  const indicator = sidebarContent?.querySelector(".browser-category-indicator");
+  const activeItem = sidebarContent?.querySelector(".filter-item.active");
+
+  if (!sidebarContent || !indicator) return;
+
+  // 没有选中项时隐藏指示器
+  if (!activeItem) {
+    indicator.classList.remove("visible");
+    return;
+  }
+
+  // 计算新位置
+  const containerRect = sidebarContent.getBoundingClientRect();
+  const itemRect = activeItem.getBoundingClientRect();
+  const newOffset = itemRect.top - containerRect.top;
+
+  // 如果指示器之前不可见，跳过transform动画（直接定位）
+  // 只保留opacity的fade效果
+  const wasVisible = indicator.classList.contains("visible");
+
+  if (!wasVisible || skipTransition) {
+    // 先设置位置，再添加visible类
+    indicator.style.transition = "none";
+    indicator.style.height = `${itemRect.height}px`;
+    indicator.style.transform = `translateY(${newOffset}px)`;
+    indicator.offsetHeight; // 强制重绘
+    indicator.style.transition = "";
+    indicator.classList.add("visible");
+  } else {
+    // 已经可见，正常滑动动画
+    indicator.classList.add("visible");
+    indicator.style.height = `${itemRect.height}px`;
+    indicator.style.transform = `translateY(${newOffset}px)`;
+  }
 }
 
 function renderFilterItem(
@@ -978,10 +1103,7 @@ function renderFilterItem(
   li.className = "filter-item";
 
   // Check active state
-  // Update active based on whether the PRIMARY tag matches
   const currentTag = browserState.tags[0] || "";
-
-  // If searchText is used logic needs to be careful, but here we prioritize Tag matching significantly
   if (tag === currentTag) {
     li.classList.add("active");
   }
@@ -991,19 +1113,18 @@ function renderFilterItem(
   li.textContent = name;
 
   li.addEventListener("click", () => {
-    // Clear all active
-    document
-      .querySelectorAll("#browser-sidebar-content .filter-item")
-      .forEach((i) => i.classList.remove("active"));
+    // 只清除分类组的选中，保持排序组选中
+    document.querySelectorAll("#browser-sidebar-content .filter-item").forEach(i => i.classList.remove("active"));
     li.classList.add("active");
 
+    // 更新分类组指示器（使用滑动动画）
+    updateBrowserCategoryIndicator();
+
     // Update State
-    // Simplify: Just send specific tag. Avoid strict AND logic failure.
     let tagsToSend = [];
     if (tag) {
       tagsToSend.push(tag);
     }
-
     browserState.tags = tagsToSend;
 
     // Handle Search Text Override
@@ -1012,10 +1133,6 @@ function renderFilterItem(
       const input = document.getElementById("browser-search-input");
       if (input) input.value = searchText;
     } else {
-      // Clear regular search unless user typed it?
-      // If we click a category, usually we want to see ALL of that category.
-      // But if user typed "skins" and clicked "Coach", maybe they want "Coach Skins"?
-      // Current behavior: Reset query to avoid confusion (like "AK47" query stuck on "Coach" tag)
       browserState.query = "";
       const input = document.getElementById("browser-search-input");
       if (input) input.value = "";
@@ -1088,13 +1205,23 @@ document.addEventListener("DOMContentLoaded", () => {
       // 清空状态
       browserState.query = "";
       browserState.tags = [];
+      browserState.sort = "trend";
       browserState.page = 1;
       browserState.data = [];
 
-      // 清空侧边栏选中
-      document
-        .querySelectorAll("#browser-sidebar-content .filter-item")
-        .forEach((i) => i.classList.remove("active"));
+      // 重置排序组选中
+      document.querySelectorAll("#browser-sort-list .filter-item").forEach(i => i.classList.remove("active"));
+      const defaultSortItem = document.querySelector("#browser-sort-list .filter-item[data-sort='trend']");
+      if (defaultSortItem) {
+        defaultSortItem.classList.add("active");
+      }
+
+      // 重置分类组选中（清除所有）
+      document.querySelectorAll("#browser-sidebar-content .filter-item").forEach(i => i.classList.remove("active"));
+
+      // 更新指示器（排序组需要更新，分类组会自动隐藏）
+      updateBrowserSortIndicator(true);
+      updateBrowserCategoryIndicator(true);
 
       loadWorkshopList();
     });
@@ -1198,17 +1325,21 @@ export async function handleProtocolWorkshop(workshopId) {
  */
 function waitForIPSelection() {
   return new Promise((resolve) => {
-    // 设置超时，最多等待30秒
     const timeout = setTimeout(() => {
       console.log("等待IP优选超时，继续执行");
       resolve();
     }, 30000);
 
-    // 监听优选完成事件
     const cleanup = EventsOn("ip_selection_end", () => {
       clearTimeout(timeout);
-      cleanup(); // 清理事件监听
+      cleanup();
       resolve();
     });
   });
 }
+
+// 窗口大小调整时更新指示器
+window.addEventListener("resize", () => {
+  updateBrowserSortIndicator(true);
+  updateBrowserCategoryIndicator(true);
+});
