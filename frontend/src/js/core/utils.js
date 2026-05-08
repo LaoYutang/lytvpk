@@ -27,11 +27,10 @@ export function getActionButton(file) {
         file.enabled ? "toggle-disable" : "toggle-enable"
       }" data-file-path="${file.path}" data-action="toggle">
         <span class="btn-icon">
-          ${
-            file.enabled
-              ? `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>`
-              : `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`
-          }
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 2v10"></path>
+            <path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path>
+          </svg>
         </span>
         <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
       </button>

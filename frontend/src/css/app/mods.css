@@ -1624,9 +1624,24 @@
 
 /* 文件列表按钮图标 */
 .action-btn .btn-icon {
-  font-size: 0.7em !important;
+  width: 0.875rem !important;
+  height: 0.875rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  font-size: 0.875rem !important;
   margin-right: 0.2rem !important;
   opacity: 0.9 !important;
+}
+
+.action-btn .btn-icon .icon-svg,
+.action-btn .btn-icon svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  color: currentColor !important;
 }
 
 .action-btn:hover .btn-icon {
