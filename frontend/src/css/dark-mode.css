@@ -350,6 +350,81 @@ html.dark-mode .tag-info {
   color: var(--accent-light);
 }
 
+html.dark-mode .conflict-modal-content .modal-body {
+  background: var(--bg-app);
+}
+
+html.dark-mode .conflict-summary {
+  color: var(--danger-light);
+}
+
+html.dark-mode .conflict-filters .filter-btn {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: var(--text-secondary);
+}
+
+html.dark-mode .conflict-filters .filter-btn:hover,
+html.dark-mode .conflict-filters .filter-btn.active {
+  color: var(--primary-light);
+}
+
+html.dark-mode .conflict-filters .filter-btn.active {
+  background: linear-gradient(
+    135deg,
+    rgba(79, 70, 229, 0.16),
+    rgba(59, 130, 246, 0.1)
+  );
+  border-color: rgba(129, 140, 248, 0.22);
+}
+
+html.dark-mode .conflict-header {
+  background: transparent;
+  border-bottom-color: var(--border-default);
+}
+
+html.dark-mode .conflict-group.critical .conflict-header {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+html.dark-mode .conflict-group.warning .conflict-header {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+html.dark-mode .conflict-group.info .conflict-header {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+html.dark-mode .conflict-details,
+html.dark-mode .file-tree {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+
+html.dark-mode .tree-children {
+  border-left-color: var(--border-default);
+}
+
+html.dark-mode .tree-folder-name:hover,
+html.dark-mode .tree-file:hover {
+  background: rgba(30, 41, 59, 0.72);
+}
+
+html.dark-mode .file-tag.tag-critical {
+  background: rgba(239, 68, 68, 0.16);
+  color: var(--danger-light);
+}
+
+html.dark-mode .file-tag.tag-warning {
+  background: rgba(245, 158, 11, 0.18);
+  color: var(--warning-light);
+}
+
+html.dark-mode .file-tag.tag-info {
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--accent-light);
+}
+
 /* 修正详情页边框问题 */
 html.dark-mode .detail-section {
   border: none;

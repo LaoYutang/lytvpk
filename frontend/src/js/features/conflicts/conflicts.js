@@ -175,9 +175,8 @@ function renderConflictResults(result) {
                           return `
                                     <div class="tree-folder">
                                         <div class="tree-folder-name">
-                                            <span class="folder-icon">📁</span> ${
-                                              node.name
-                                            }
+                                            <span class="folder-icon">${folderIconSvg()}</span>
+                                            <span class="tree-node-name">${node.name}</span>
                                         </div>
                                         <div class="tree-children">
                                             ${renderTree(node.children)}
@@ -188,7 +187,8 @@ function renderConflictResults(result) {
                           const category = getFileCategory(node.path);
                           return `
                                     <div class="tree-file">
-                                        <span class="file-tag ${category.className}">${category.label}</span> ${node.name}
+                                        <span class="file-tag ${category.className}">${category.label}</span>
+                                        <span class="tree-node-name">${node.name}</span>
                                     </div>
                                 `;
                         }
@@ -235,6 +235,10 @@ function registerConflictProgressEvents() {
       text.textContent = progress.message;
     }
   });
+}
+
+function folderIconSvg() {
+  return `<svg class="tree-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"></path></svg>`;
 }
 
 function getFileCategory(filePath) {

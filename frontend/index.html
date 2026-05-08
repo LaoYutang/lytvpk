@@ -1366,7 +1366,14 @@
           <div id="conflict-results" class="conflict-results hidden">
             <div class="conflict-toolbar">
               <div class="conflict-summary">
-                <span class="icon">⚠</span> 发现
+                <span class="conflict-summary-icon" aria-hidden="true">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path>
+                    <path d="M12 9v4"></path>
+                    <path d="M12 17h.01"></path>
+                  </svg>
+                </span>
+                发现
                 <span id="conflict-count">0</span> 组冲突
               </div>
               <div class="conflict-filters">
@@ -1394,7 +1401,12 @@
 
           <div id="conflict-empty" class="conflict-empty hidden">
             <div class="empty-state">
-              <span class="icon">✓</span>
+              <span class="conflict-empty-icon" aria-hidden="true">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9"></circle>
+                  <path d="M8 12.5 10.5 15 16 9"></path>
+                </svg>
+              </span>
               <p>未发现Mod冲突</p>
             </div>
           </div>
