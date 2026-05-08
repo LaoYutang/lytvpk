@@ -24,6 +24,19 @@
   text-align: left;
 }
 
+#confirm-modal .confirm-modal-content {
+  max-height: min(80vh, max-content);
+}
+
+#confirm-modal .confirm-modal-content .modal-body {
+  flex: 0 1 auto;
+  overflow-y: auto;
+}
+
+#confirm-modal .confirm-modal-content .confirm-message {
+  margin: 0;
+}
+
 .rotation-title {
   margin-bottom: 15px;
   font-size: 1rem;

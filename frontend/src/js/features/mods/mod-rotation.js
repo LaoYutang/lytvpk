@@ -2,6 +2,7 @@ import { showError, showNotification } from "../../core/toast.js";
 import { showLoadingScreen, showMainScreen, updateLoadingMessage } from "../state.js";
 import { getConfig, saveConfig } from "../../core/config.js";
 import { refreshFilesKeepFilter } from "../file-list/filters.js";
+import { showConfirmModal } from "../modals/confirm.js";
 import { ManualRotateMods, SetModRotation } from "../../../../wailsjs/go/app/App";
 
 const ROTATION_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg">
