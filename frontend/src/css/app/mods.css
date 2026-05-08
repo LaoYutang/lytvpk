@@ -1049,11 +1049,11 @@
   right: 8px;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   z-index: 2;
   pointer-events: none;
   justify-content: flex-end;
-  max-width: calc(100% - 40px);
+  max-width: calc(100% - 52px);
 }
 
 .card-checkbox-container {
@@ -1086,42 +1086,43 @@
   font-size: var(--text-xs);
   font-weight: 700;
   color: white;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
   display: inline-flex;
   align-items: center;
   line-height: 1;
   border: 1px solid transparent;
-  max-width: 120px;
+  max-width: 8.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   vertical-align: middle;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .card-badge.location-badge {
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.94);
 }
 
 .card-badge.tag-badge {
-  background: rgba(99, 102, 241, 0.92);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(99, 102, 241, 0.9);
+  border-color: rgba(199, 210, 254, 0.42);
   color: white !important;
-  text-shadow: none;
 }
 
 .card-badge.secondary-tag-badge {
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--text-secondary);
-  border-color: rgba(15, 23, 42, 0.08);
-  text-shadow: none;
+  background: rgba(30, 41, 59, 0.82);
+  color: rgba(248, 250, 252, 0.92);
+  border-color: rgba(226, 232, 240, 0.22);
 }
 
 .card-badge.more-tag-badge {
-  background-color: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(4px);
-  color: white;
+  background: rgba(51, 65, 85, 0.82);
+  border-color: rgba(226, 232, 240, 0.2);
+  color: rgba(248, 250, 252, 0.92);
 }
 
 .card-content {
