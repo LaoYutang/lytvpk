@@ -290,11 +290,12 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.82fr);
   gap: var(--spacing-5);
-  align-items: start;
+  align-items: stretch;
 }
 
 .about-info-panel {
   min-width: 0;
+  height: 100%;
   padding: var(--spacing-5);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
