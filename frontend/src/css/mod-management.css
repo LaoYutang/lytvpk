@@ -369,6 +369,9 @@ html.dark-mode .multi-select-menu {
 }
 
 .mod-management-page .filter-actions .sort-container #sort-btn {
+  background: var(--bg-app);
+  border-color: var(--border-light);
+  box-shadow: none;
   color: var(--text-secondary);
   font-weight: 700;
 }
@@ -385,6 +388,14 @@ html.dark-mode .multi-select-menu {
   border-color: rgba(79, 70, 229, 0.36);
   color: var(--primary);
   background: var(--primary-50);
+  box-shadow: none;
+}
+
+.mod-management-page .filter-actions .sort-container #sort-btn:hover {
+  border-color: rgba(79, 70, 229, 0.36);
+  color: var(--primary);
+  background: var(--primary-50);
+  box-shadow: none;
 }
 
 .sort-container {
