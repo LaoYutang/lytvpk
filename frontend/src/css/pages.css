@@ -186,10 +186,24 @@
 .servers-page .server-modal-content {
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+
+.servers-page .server-modal-content .modal-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
 }
 
 .servers-page .server-list-container {
+  flex: 1;
+  min-height: 0;
   max-height: none;
+}
+
+.servers-page .server-data-section {
+  flex-shrink: 0;
 }
 
 .settings-page .page-body {
