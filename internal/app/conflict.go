@@ -13,9 +13,9 @@ import (
 )
 
 type ConflictGroup struct {
-	VpkFiles []string `json:"vpk_files"`
-	Files    []string `json:"files"`
-	Severity string   `json:"severity"` // "critical", "warning", "info"
+	VpkFiles []parser.VPKFile `json:"vpk_files"` // 冲突的VPK文件完整信息
+	Files    []string         `json:"files"`
+	Severity string           `json:"severity"` // "critical", "warning", "info"
 }
 
 type ConflictResult struct {
@@ -126,7 +126,7 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 		Message: "开始扫描冲突...",
 	})
 
-	// 文件路径 -> VPK列表
+	// 文件路径 -> VPK列表（使用完整路径）
 	fileMap := make(map[string][]string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -163,13 +163,6 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 				return
 			}
 
-			// 计算相对路径作为显示名称，以便区分 workshop 和 根目录的文件
-			relPath, err := filepath.Rel(a.rootDir, p)
-			if err != nil {
-				relPath = filepath.Base(p)
-			}
-			vpkName := filepath.ToSlash(relPath)
-
 			mu.Lock()
 			for _, f := range files {
 				// 归一化 VPK 内部文件路径，确保跨平台兼容性
@@ -184,7 +177,8 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 				if strings.HasPrefix(lowerF, "materials/dev/") || strings.HasPrefix(lowerF, "materials/temp/") {
 					continue
 				}
-				fileMap[lowerF] = append(fileMap[lowerF], vpkName)
+				// 使用完整路径存储，便于后续从缓存查找
+				fileMap[lowerF] = append(fileMap[lowerF], p)
 			}
 			mu.Unlock()
 		})
@@ -204,7 +198,7 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 	})
 
 	// VPK组合 -> 冲突文件列表
-	// key: "vpk1.vpk|vpk2.vpk" (sorted)
+	// key: "vpkFullPath1|vpkFullPath2" (sorted)
 	conflictMap := make(map[string][]string)
 
 	for f, vpks := range fileMap {
@@ -218,8 +212,25 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 
 	var groups []ConflictGroup
 	for key, files := range conflictMap {
-		vpks := strings.Split(key, "|")
+		vpkFullPaths := strings.Split(key, "|")
 		sort.Strings(files) // 文件列表也排序
+
+		// 从缓存获取完整VPK信息
+		vpkInfos := make([]parser.VPKFile, 0, len(vpkFullPaths))
+		for _, fullPath := range vpkFullPaths {
+			if cached, ok := a.vpkCache.Load(fullPath); ok {
+				cache := cached.(*VPKFileCache)
+				vpkInfos = append(vpkInfos, cache.File)
+			} else {
+				// 缓存不存在时的兜底处理
+				vpkInfos = append(vpkInfos, parser.VPKFile{
+					Name:     filepath.Base(fullPath),
+					Path:     fullPath,
+					Title:    filepath.Base(fullPath),
+					Location: a.getLocationFromPath(fullPath),
+				})
+			}
+		}
 
 		// 计算严重程度
 		severity := "info"
@@ -235,7 +246,7 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 		}
 
 		groups = append(groups, ConflictGroup{
-			VpkFiles: vpks,
+			VpkFiles: vpkInfos,
 			Files:    files,
 			Severity: severity,
 		})

@@ -1,10 +1,12 @@
 let EventsOn;
 let showError;
 let CheckConflicts;
+let toggleFile;
+let moveFileToAddons;
 let conflictProgressRegistered = false;
 
 export function configureConflicts(deps) {
-  ({ EventsOn, showError, CheckConflicts } = deps);
+  ({ EventsOn, showError, CheckConflicts, toggleFile, moveFileToAddons } = deps);
   registerConflictProgressEvents();
 }
 
@@ -39,7 +41,15 @@ function resetConflictModal() {
   updateFilterButtons();
 }
 
-// 更新筛选按钮状态
+// 筛选说明文本
+const filterDescriptions = {
+  critical: "大概率导致客户端崩溃，建议立即处理",
+  warning: "可能导致功能异常或显示错误",
+  info: "一般性冲突，通常不影响游戏体验",
+  all: "显示所有冲突分组",
+};
+
+// 更新筛选按钮状态和说明
 function updateFilterButtons() {
   document.querySelectorAll(".filter-btn").forEach((btn) => {
     if (btn.dataset.filter === currentSeverityFilter) {
@@ -48,6 +58,11 @@ function updateFilterButtons() {
       btn.classList.remove("active");
     }
   });
+  // 更新说明文本
+  const descEl = document.getElementById("conflict-filter-desc");
+  if (descEl) {
+    descEl.textContent = filterDescriptions[currentSeverityFilter] || "";
+  }
 }
 
 // 初始化筛选按钮事件
@@ -112,9 +127,40 @@ function renderConflictResults(result) {
     // 添加严重程度 class
     groupEl.className = `conflict-group ${severity}`;
 
-    // 生成垂直排列的文件名列表
+    // 截断文本函数
+    const truncateText = (text, maxLen = 25) => {
+      if (!text || text.length <= maxLen) return text || "";
+      return text.substring(0, maxLen - 2) + "..";
+    };
+
+    // 生成VPK项列表（带标题、文件名和禁用按钮）
     const vpkListHtml = group.vpk_files
-      .map((name) => `<div>${name}</div>`)
+      .map((vpk) => {
+        const displayName = truncateText(vpk.title || vpk.name);
+        const fileName = truncateText(vpk.name);
+        const isWorkshop = vpk.location === "workshop";
+
+        // workshop显示转移按钮，其他显示禁用按钮
+        const btnText = isWorkshop ? "转移" : "禁用";
+        const btnClass = isWorkshop ? "btn-transfer" : "btn-disable";
+
+        return `
+          <div class="conflict-vpk-item">
+            <div class="conflict-vpk-info">
+              <span class="conflict-vpk-title" title="${vpk.title || vpk.name}">${displayName}</span>
+              <span class="conflict-vpk-filename" title="${vpk.name}">${fileName}</span>
+            </div>
+            <button
+              class="btn btn-small btn-conflict-action ${btnClass}"
+              data-path="${vpk.path}"
+              data-location="${vpk.location}"
+              title="${isWorkshop ? "转移到插件目录后可禁用" : "禁用此Mod"}"
+            >
+              <span>${btnText}</span>
+            </button>
+          </div>
+        `;
+      })
       .join("");
 
     // 严重程度标签文本
@@ -125,14 +171,14 @@ function renderConflictResults(result) {
     groupEl.innerHTML = `
             <div class="conflict-header">
                 <div class="conflict-title-section">
-                    <span class="severity-badge ${severity}">${severityText}</span>
+                    <div class="conflict-severity-row">
+                        <span class="severity-badge ${severity}">${severityText}</span>
+                        <span class="conflict-file-count">${group.files.length} 个冲突文件</span>
+                    </div>
                     <div class="conflict-vpk-names">
                         ${vpkListHtml}
                     </div>
                 </div>
-                <div class="conflict-file-count">${
-                  group.files.length
-                } 个冲突文件</div>
             </div>
             <div class="conflict-details">
                 ${(() => {
@@ -208,6 +254,38 @@ function renderConflictResults(result) {
 
     header.addEventListener("click", () => {
       details.classList.toggle("expanded");
+    });
+
+    // 添加禁用/转移按钮点击处理
+    groupEl.querySelectorAll(".btn-conflict-action").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation(); // 阻止触发 header click
+
+        const path = btn.dataset.path;
+        const location = btn.dataset.location;
+
+        try {
+          btn.disabled = true;
+          btn.innerHTML = '<span>处理中...</span>';
+
+          if (location === "workshop") {
+            // workshop文件需要先转移到插件目录
+            await moveFileToAddons(path);
+          } else {
+            // 其他位置直接禁用
+            await toggleFile(path);
+          }
+
+          // 刷新冲突检测
+          await startConflictCheck();
+        } catch (err) {
+          showError("操作失败: " + err);
+          // 恢复按钮状态
+          const isWorkshop = location === "workshop";
+          btn.innerHTML = `<span>${isWorkshop ? "转移" : "禁用"}</span>`;
+          btn.disabled = false;
+        }
+      });
     });
 
     list.appendChild(groupEl);

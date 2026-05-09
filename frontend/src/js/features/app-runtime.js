@@ -178,6 +178,8 @@ configureConflicts({
   EventsOn,
   showError,
   CheckConflicts,
+  toggleFile,
+  moveFileToAddons,
 });
 
 configureSettings({
