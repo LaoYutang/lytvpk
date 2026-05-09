@@ -451,6 +451,50 @@ html.dark-mode .dropdown-item.active {
   color: var(--primary-light);
 }
 
+/* 子标签筛选输入框 - 样式与现有下拉菜单统一 */
+.multi-select-search-wrapper {
+  padding: var(--spacing-2);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--spacing-1);
+}
+
+.multi-select-search-input {
+  width: 100%;
+  height: 1.75rem;
+  padding: 0 var(--spacing-2);
+  border: 1px solid var(--border-light);
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.multi-select-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.multi-select-search-input:focus {
+  outline: none;
+  border-color: rgba(79, 70, 229, 0.38);
+}
+
+.multi-select-options {
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+/* 暗色模式 - 与现有样式统一 */
+html.dark-mode .multi-select-search-input {
+  background: transparent;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+html.dark-mode .multi-select-search-input:focus {
+  border-color: rgba(129, 140, 248, 0.34);
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     grid-template-columns: 11.5rem minmax(0, 1fr);

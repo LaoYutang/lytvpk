@@ -169,57 +169,91 @@ async function renderSecondaryTagDropdown(secondaryGroup, primaryTag) {
   secondaryGroup.querySelectorAll(".secondary-filter-dropdown").forEach((el) => el.remove());
   secondaryGroup.querySelectorAll(".multi-select-trigger.is-disabled").forEach((el) => el.remove());
 
-  if (!primaryTag) {
-    secondaryGroup.classList.add("is-empty");
-    secondaryGroup.style.display = "flex";
-    secondaryGroup.style.visibility = "hidden";
-    return;
-  }
+  // 移除原有的隐藏逻辑，始终显示子标签
+  // 当 primaryTag 为空时，后端会返回所有文件的二级标签去重
+  secondaryGroup.classList.remove("is-empty");
+  secondaryGroup.style.display = "flex";
+  secondaryGroup.style.visibility = "visible";
 
   try {
-    const secondaryTags = await GetSecondaryTags(primaryTag);
+    // 后端已支持空 primaryTag，返回所有二级标签去重
+    const secondaryTags = await GetSecondaryTags(primaryTag || "");
     if (!secondaryTags.length) {
       secondaryGroup.classList.add("is-empty");
-      secondaryGroup.style.display = "flex";
       secondaryGroup.style.visibility = "hidden";
       return;
     }
 
     secondaryTags.sort((a, b) => a.localeCompare(b, "zh-CN"));
-    secondaryGroup.classList.remove("is-empty");
-    secondaryGroup.style.display = "flex";
-    secondaryGroup.style.visibility = "visible";
 
     const dropdown = document.createElement("div");
     dropdown.className = "multi-select-dropdown secondary-filter-dropdown";
     const selectedCount = appState.selectedSecondaryTags.length;
     dropdown.innerHTML = `
       <button type="button" class="select-trigger multi-select-trigger">${selectedCount ? `已选 ${selectedCount} 个` : "全部"}</button>
-      <div class="select-menu multi-select-menu hidden"></div>
+      <div class="select-menu multi-select-menu hidden">
+        <div class="multi-select-search-wrapper">
+          <input type="text" class="multi-select-search-input" placeholder="筛选子标签...">
+        </div>
+        <div class="multi-select-options"></div>
+      </div>
     `;
 
     const trigger = dropdown.querySelector(".multi-select-trigger");
     const menu = dropdown.querySelector(".multi-select-menu");
+    const searchInput = dropdown.querySelector(".multi-select-search-input");
+    const optionsContainer = dropdown.querySelector(".multi-select-options");
 
-    secondaryTags.forEach((tag) => {
-      const label = document.createElement("label");
-      label.className = "multi-select-option";
-      label.innerHTML = `
-        <input type="checkbox" value="${escapeHtml(tag)}" ${appState.selectedSecondaryTags.includes(tag) ? "checked" : ""}>
-        <span>${escapeHtml(tag)}</span>
-      `;
-      label.querySelector("input").addEventListener("change", (event) => {
-        if (event.target.checked) {
-          if (!appState.selectedSecondaryTags.includes(tag)) {
-            appState.selectedSecondaryTags.push(tag);
+    // 渲染选项的函数
+    const renderOptions = (filterText = "") => {
+      optionsContainer.innerHTML = "";
+      const filteredTags = filterText
+        ? secondaryTags.filter((tag) => tag.toLowerCase().includes(filterText.toLowerCase()))
+        : secondaryTags;
+
+      filteredTags.forEach((tag) => {
+        const label = document.createElement("label");
+        label.className = "multi-select-option";
+        label.innerHTML = `
+          <input type="checkbox" value="${escapeHtml(tag)}" ${appState.selectedSecondaryTags.includes(tag) ? "checked" : ""}>
+          <span>${escapeHtml(tag)}</span>
+        `;
+        label.querySelector("input").addEventListener("change", (event) => {
+          if (event.target.checked) {
+            if (!appState.selectedSecondaryTags.includes(tag)) {
+              appState.selectedSecondaryTags.push(tag);
+            }
+          } else {
+            appState.selectedSecondaryTags = appState.selectedSecondaryTags.filter((item) => item !== tag);
           }
-        } else {
-          appState.selectedSecondaryTags = appState.selectedSecondaryTags.filter((item) => item !== tag);
-        }
-        trigger.textContent = appState.selectedSecondaryTags.length ? `已选 ${appState.selectedSecondaryTags.length} 个` : "全部";
-        performSearch();
+          trigger.textContent = appState.selectedSecondaryTags.length ? `已选 ${appState.selectedSecondaryTags.length} 个` : "全部";
+
+          // 选中后清除输入框并重新渲染所有选项
+          searchInput.value = "";
+          renderOptions();
+
+          performSearch();
+        });
+        optionsContainer.appendChild(label);
       });
-      menu.appendChild(label);
+    };
+
+    // 初始渲染所有选项
+    renderOptions();
+
+    // 输入筛选事件
+    searchInput.addEventListener("input", (event) => {
+      renderOptions(event.target.value);
+    });
+
+    // 阻止输入框点击事件冒泡，避免关闭菜单
+    searchInput.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+
+    // 阻止输入框键盘事件冒泡
+    searchInput.addEventListener("keydown", (event) => {
+      event.stopPropagation();
     });
 
     trigger.addEventListener("click", (event) => {
