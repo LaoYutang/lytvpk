@@ -152,7 +152,6 @@ export function updateTriggerDisplay() {
 
   const path = appState.currentDirectory || getConfig().lastActiveDirectory || "";
   textEl.textContent = truncatePath(path);
-  textEl.title = path; // hover显示完整路径
 }
 
 // 添加新目录到保存列表
