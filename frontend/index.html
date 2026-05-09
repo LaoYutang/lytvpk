@@ -218,7 +218,26 @@
               >
                 <span class="icon">📁</span> 选择addons目录
               </button>
-              <span id="current-directory" class="current-directory"></span>
+              <!-- 目录下拉选择器 -->
+              <div id="directory-dropdown-container" class="directory-dropdown-container">
+                <button id="directory-dropdown-trigger" class="directory-dropdown-trigger" title="点击切换历史目录">
+                  <span id="current-directory" class="current-directory-text"></span>
+                  <svg class="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div id="directory-dropdown-menu" class="directory-dropdown-menu hidden">
+                  <div class="dropdown-header">
+                    <span>历史目录</span>
+                  </div>
+                  <div id="directory-list" class="directory-list">
+                    <!-- 动态生成目录项 -->
+                  </div>
+                  <div class="dropdown-empty hidden">
+                    <span>暂无保存的目录</span>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="filter-actions toolbar-actions">
               <button

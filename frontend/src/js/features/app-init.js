@@ -2,6 +2,12 @@ import { getConfig, saveConfig } from "../core/config.js";
 import { refreshActiveIndicator } from "../core/ui-shell.js";
 import { showError, showNotification } from "../core/toast.js";
 import {
+  initDirectoryDropdown,
+  addDirectory,
+  updateTriggerDisplay,
+  renderDirectoryList,
+} from "./directory-dropdown.js";
+import {
   appState,
   showLoadingScreen,
   showMainScreen,
@@ -30,13 +36,33 @@ import {
 
 export async function checkInitialDirectory() {
   try {
-    let dir = await GetRootDirectory();
+    // 初始化目录下拉组件（会自动执行配置迁移）
+    initDirectoryDropdown();
 
-    const defaultDir = getConfig().defaultDirectory;
+    let dir = await GetRootDirectory();
+    const config = getConfig();
+
+    // 优先使用上次激活的目录
+    const lastActive = config.lastActiveDirectory;
+    if (!dir && lastActive) {
+      try {
+        await ValidateDirectory(lastActive);
+        await SetRootDirectory(lastActive);
+        appState.currentDirectory = lastActive; // 先设置状态
+        dir = lastActive;
+      } catch (error) {
+        console.warn("上次激活的目录无效:", error);
+      }
+    }
+
+    // 兼容旧版配置
+    const defaultDir = config.defaultDirectory;
     if (!dir && defaultDir) {
       try {
         await ValidateDirectory(defaultDir);
         await SetRootDirectory(defaultDir);
+        appState.currentDirectory = defaultDir; // 先设置状态
+        addDirectory(defaultDir);
         dir = defaultDir;
       } catch (error) {
         console.warn("默认目录无效:", error);
@@ -56,7 +82,8 @@ export async function checkInitialDirectory() {
         if (autoDir) {
           console.log("自动发现目录:", autoDir);
           await SetRootDirectory(autoDir);
-          saveConfig({ ...getConfig(), defaultDirectory: autoDir });
+          appState.currentDirectory = autoDir; // 先设置状态
+          addDirectory(autoDir);
           dir = autoDir;
         } else {
           showError("未自动找到 L4D2 目录，请手动选择", 4000);
@@ -68,8 +95,9 @@ export async function checkInitialDirectory() {
     }
 
     if (dir) {
-      appState.currentDirectory = dir;
-      updateDirectoryDisplay();
+      // 状态已提前设置，这里只更新显示
+      updateTriggerDisplay();
+      renderDirectoryList(); // 渲染列表确保选中项正确
       showMainScreen();
       await loadFiles();
     } else {
@@ -96,9 +124,11 @@ export async function selectDirectory() {
     if (directory) {
       await ValidateDirectory(directory);
       await SetRootDirectory(directory);
+
+      // 先更新状态，再添加到保存列表（确保渲染时选中项正确）
       appState.currentDirectory = directory;
-      saveConfig({ ...getConfig(), defaultDirectory: directory });
-      updateDirectoryDisplay();
+      addDirectory(directory);
+      updateTriggerDisplay();
       await loadFiles();
     }
   } catch (error) {
@@ -139,12 +169,7 @@ export async function launchL4D2() {
 }
 
 export function updateDirectoryDisplay() {
-  const directoryElement = document.getElementById("current-directory");
-  if (!directoryElement) return;
-
-  const directory = appState.currentDirectory || "";
-  directoryElement.textContent = directory;
-  directoryElement.title = directory;
+  updateTriggerDisplay();
 }
 
 export async function loadFiles() {

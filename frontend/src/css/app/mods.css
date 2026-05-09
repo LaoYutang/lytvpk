@@ -256,6 +256,175 @@
   min-width: 10rem;
 }
 
+/* 目录下拉容器 */
+.directory-dropdown-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.directory-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: 0 var(--spacing-3);
+  height: 2.25rem;
+  min-width: 10rem;
+  max-width: 18rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.directory-dropdown-trigger:hover {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.directory-dropdown-trigger.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.current-directory-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  text-align: left;
+}
+
+.dropdown-arrow {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  stroke: var(--text-tertiary);
+  stroke-width: 2;
+  fill: none;
+  transition: transform 0.2s ease;
+}
+
+.directory-dropdown-trigger.active .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单 */
+.directory-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-width: 32rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 6000;
+  overflow: hidden;
+}
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 1px solid var(--border-light);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.btn-text-small {
+  padding: 0 var(--spacing-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.btn-text-small:hover {
+  color: var(--danger);
+}
+
+.directory-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--spacing-2);
+}
+
+.directory-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.directory-item:hover {
+  background: var(--bg-hover);
+}
+
+.directory-item.active {
+  background: var(--primary-50);
+}
+
+.directory-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.directory-item.active .directory-path {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.directory-delete-btn {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  opacity: 0.6;
+  transition: all 0.15s ease;
+}
+
+.directory-delete-btn:hover {
+  opacity: 1;
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.directory-delete-btn svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.dropdown-empty {
+  padding: var(--spacing-4);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
 .header-right {
   display: flex;
   align-items: center;
