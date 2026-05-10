@@ -26,6 +26,7 @@ import {
   SetRootDirectory,
   AutoDiscoverAddons,
   SelectDirectory,
+  SelectFiles,
   ScanVPKFiles,
   GetVPKFiles,
   GetPrimaryTags,
