@@ -97,6 +97,16 @@ export async function renderSettingsPage({
                 </label>
               </div>
             </div>
+            <div class="setting-row">
+              <div class="setting-row-info">
+                <div class="setting-row-label">框选模式</div>
+                <div class="setting-row-desc">拖拽绘制选择框，批量选择 VPK 文件</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settings-box-selection" ${appState.boxSelectionEnabled ? "checked" : ""}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -203,6 +213,14 @@ function bindSettingsPage(deps) {
       radio.closest(".mode-option")?.classList.add("active");
       deps.renderFileList();
     });
+  });
+
+  document.getElementById("settings-box-selection")?.addEventListener("change", (e) => {
+    deps.appState.boxSelectionEnabled = e.target.checked;
+    const config = deps.getConfig();
+    config.boxSelectionEnabled = e.target.checked;
+    deps.saveConfig(config);
+    deps.showNotification(e.target.checked ? "已开启框选模式" : "已关闭框选模式", "info");
   });
 
   document.getElementById("settings-meta-enabled")?.addEventListener("change", async (event) => {

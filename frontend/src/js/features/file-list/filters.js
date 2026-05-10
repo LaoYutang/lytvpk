@@ -3,6 +3,7 @@ import { showError } from "../../core/toast.js";
 import { renderFileList } from "./render.js";
 import { getLocationDisplayName, escapeHtml } from "../../core/utils.js";
 import { applySort, updateSortButtonUI } from "./sorting.js";
+import { resetBoxSelection } from "./box-selection.js";
 import { GetPrimaryTags, GetSecondaryTags, SearchVPKFiles, ScanVPKFiles, GetVPKFiles } from "../../../../wailsjs/go/app/App";
 
 export async function renderTagFilters() {
@@ -486,6 +487,8 @@ export function closeFilterMenus(exceptMenu = null) {
 }
 
 export async function refreshFilesKeepFilter() {
+  resetBoxSelection();
+
   if (!appState.currentDirectory) {
     showNotification("请先选择目录", "info");
     return;

@@ -28,6 +28,7 @@ export const appState = {
   sortOrder: "asc",
   loadOrderMap: new Map(),
   displayMode: getConfig().displayMode || "list",
+  boxSelectionEnabled: getConfig().boxSelectionEnabled || false,
 };
 
 export function toggleFileSelection(filePath, selected) {

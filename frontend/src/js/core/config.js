@@ -6,7 +6,7 @@ export const MAX_DIRECTORIES = 10;
 // 获取配置，自动迁移旧版本
 export function getConfig() {
   const stored = localStorage.getItem(CONFIG_KEY);
-  const config = stored ? JSON.parse(stored) : { defaultDirectory: "" };
+  const config = stored ? JSON.parse(stored) : { defaultDirectory: "", boxSelectionEnabled: false };
 
   // 配置迁移：将旧版 defaultDirectory 转换为新结构
   migrateConfigIfNeeded(config);

@@ -559,3 +559,14 @@ html.dark-mode .setting-row + .setting-row {
     border-bottom-color: var(--border-default);
   }
 }
+
+/* 框选模式深色适配 */
+html.dark-mode .selection-box {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--primary);
+}
+
+html.dark-mode .file-item.box-selected,
+html.dark-mode .file-card.box-selected {
+  background: rgba(99, 102, 241, 0.25) !important;
+}

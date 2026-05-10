@@ -1883,3 +1883,28 @@
   z-index: 1;
 }
 
+/* 框选模式样式 */
+.file-list-container {
+  position: relative;
+}
+
+.selection-box {
+  position: absolute;
+  border: 2px solid var(--primary);
+  background: rgba(79, 70, 229, 0.1);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.8;
+}
+
+.selection-box.hidden {
+  display: none;
+}
+
+.file-item.box-selected,
+.file-card.box-selected {
+  background: rgba(79, 70, 229, 0.15) !important;
+  border-left: 3px solid var(--primary) !important;
+}
+

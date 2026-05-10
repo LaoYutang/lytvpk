@@ -58,6 +58,7 @@ import {
   batchToggleVisibility,
 } from "./file-list/actions.js";
 import { setupFileListEventDelegation } from "./file-list/events.js";
+import { initBoxSelection } from "./file-list/box-selection.js";
 import {
   toggleFile,
   moveFileToAddons,
@@ -233,6 +234,7 @@ function initializeApp() {
   checkAndInstallUpdate();
   initModRotationState();
   initWorkshopState();
+  initBoxSelection();
 
   if (!window._ipEventsRegistered) {
     EventsOn("ip_selection_start", () => {
