@@ -49,11 +49,12 @@
 .workshop-page .browser-toolbar {
   background: transparent;
   padding: 0;
+  margin-bottom: var(--spacing-3);
 }
 
 .workshop-page .browser-grid-container {
   position: relative;
-  padding: var(--spacing-3) 0 0;
+  padding: 0;
 }
 
 .workshop-page #browser-loading {
