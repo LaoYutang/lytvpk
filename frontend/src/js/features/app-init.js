@@ -14,6 +14,7 @@ import {
   updateLoadingMessage,
   showFileListLoading,
   hideFileListLoading,
+  enableActionButtons,
 } from "./state.js";
 import { renderTagFilters, performSearch } from "./file-list/filters.js";
 import { applySort } from "./file-list/sorting.js";
@@ -116,6 +117,7 @@ export function showDirectorySelection() {
   document.getElementById("loading-screen").classList.add("hidden");
   document.getElementById("main-screen").classList.remove("hidden");
   updateLoadingMessage("请选择L4D2的addons目录");
+  enableActionButtons();
   refreshActiveIndicator();
 }
 

@@ -90,7 +90,7 @@ function disableActionButtons() {
   });
 }
 
-function enableActionButtons() {
+export function enableActionButtons() {
   const buttons = [
     "refresh-btn",
     "reset-filter-btn",
