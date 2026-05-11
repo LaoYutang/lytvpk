@@ -12,6 +12,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log"
 	"mime"
 	"net"
 	"net/http"
@@ -191,6 +192,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 				}
 				SaveWorkshopMeta(targetPath, metaDetails)
 			}
+
+			// 替换同workshopId的旧mod
+			a.replaceExistingMod(targetPath, task.WorkshopID)
 
 			updateStatus("completed", "")
 			return
@@ -491,6 +495,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		SaveWorkshopMeta(targetPath, metaDetails)
 	}
 
+	// 替换名workshopId的旧mod
+	a.replaceExistingMod(targetPath, task.WorkshopID)
+
 	// 如果是直连下载且是压缩文件，自动解压
 	ext := strings.ToLower(filepath.Ext(targetPath))
 	if strings.HasPrefix(task.WorkshopID, "direct-") && (ext == ".zip" || ext == ".rar" || ext == ".7z") {
@@ -510,4 +517,85 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 
 	updateStatus("completed", "")
+}
+
+
+// replaceExistingMod 下载完成后，查找同workshopId的旧mod并替换
+// 将新文件移动到旧mod所在目录，删才旧文件及其关联文件
+func (a *App) replaceExistingMod(newFilePath string, workshopID string) {
+	if workshopID == "" || strings.HasPrefix(workshopID, "direct-") {
+		return
+	}
+
+	var oldFilePath string
+	var oldLocation string
+
+	a.vpkCache.Range(func(key, value interface{}) bool {
+		cache := value.(*VPKFileCache)
+		if cache.File.WorkshopID == workshopID && cache.File.Path != newFilePath {
+			oldFilePath = cache.File.Path
+			oldLocation = cache.File.Location
+			return false
+		}
+		return true
+	})
+
+	if oldFilePath == "" {
+		return
+	}
+
+	log.Printf("发玏同ID旧Mod: %s (位置: %s)，准勇替换", oldFilePath, oldLocation)
+
+	// 标换旧mod位置确定目录
+	var targetDir string
+	switch oldLocation {
+	case "disabled":
+		targetDir = filepath.Join(a.rootDir, "disabled")
+	case "workshop":
+		targetDir = filepath.Join(a.rootDir, "workshop")
+	default:
+		targetDir = a.rootDir
+	}
+
+	// 删才旧文件及其关联文件（.meta, 预览图）
+	oldBase := strings.TrimSuffix(oldFilePath, filepath.Ext(oldFilePath))
+	for _, ext := range []string{filepath.Ext(oldFilePath), ".meta", ".jpg", ".png", ".jpeg", ".gif"} {
+		if ext == "" {
+			continue
+		}
+		associatePath := oldBase + ext
+		if err := os.Remove(associatePath); err != nil && !os.IsNotExist(err) {
+			log.Printf("删才旧关联文件失败: %s, %v", associatePath, err)
+		}
+	}
+
+	// 移动新文件到目录目录
+	newFilename := filepath.Base(newFilePath)
+	targetPath := filepath.Join(targetDir, newFilename)
+
+	// 如果目录目录与旧mod目录目录目录，无需移动
+	if filepath.Dir(newFilePath) == targetDir {
+		log.Printf("新文件圂目录目录: %s", targetPath)
+		return
+	}
+
+	if err := os.Rename(newFilePath, targetPath); err != nil {
+		log.Printf("移动新文件到目彗目录失败: %s -> %s, %v", newFilePath, targetPath, err)
+		return
+	}
+
+	// 同旦移动新文件的关联文件（.meta, 预览图）
+	newBase := strings.TrimSuffix(newFilePath, filepath.Ext(newFilePath))
+	targetBase := strings.TrimSuffix(targetPath, filepath.Ext(targetPath))
+	for _, ext := range []string{".meta", ".jpg", ".png", ".jpeg", ".gif"} {
+		srcPath := newBase + ext
+		dstPath := targetBase + ext
+		if _, err := os.Stat(srcPath); err == nil {
+			if err := os.Rename(srcPath, dstPath); err != nil {
+				log.Printf("移动关聚文件失败: %s -> %s, %v", srcPath, dstPath, err)
+			}
+		}
+	}
+
+	log.Printf("已替捩旧Mod，新文件位罎: %s", targetPath)
 }
