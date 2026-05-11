@@ -1550,6 +1550,16 @@
               <button id="browser-reset-btn" class="btn btn-outline">
                 <span class="icon">↺</span> 重置
               </button>
+              <button id="browser-watch-later-btn" class="btn btn-outline browser-watch-later-btn">
+                <span class="icon" aria-hidden="true">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 6v6l4 2"></path>
+                    <circle cx="12" cy="12" r="9"></circle>
+                  </svg>
+                </span>
+                <span>稍后再看</span>
+                <span id="browser-watch-later-count" class="watch-later-count hidden">0</span>
+              </button>
             </div>
             <div class="browser-grid-container" id="browser-scroll-container">
               <div id="browser-grid" class="workshop-grid">
@@ -1582,6 +1592,35 @@
                 加载详情中...
               </div>
             </div>
+          </div>
+          <div id="browser-watch-later-drawer-root" class="watch-later-drawer-root">
+            <div id="browser-watch-later-backdrop" class="watch-later-backdrop"></div>
+            <aside class="watch-later-drawer" aria-label="稍后再看列表">
+              <div class="watch-later-header">
+                <div>
+                  <h3>稍后再看</h3>
+                  <p><span id="browser-watch-later-title-count">0</span> 个物品</p>
+                </div>
+                <button
+                  id="browser-watch-later-close"
+                  class="close-btn watch-later-close"
+                  type="button"
+                  aria-label="关闭稍后再看列表"
+                >
+                  &times;
+                </button>
+              </div>
+              <div id="browser-watch-later-list" class="watch-later-list"></div>
+              <div id="browser-watch-later-empty" class="watch-later-empty hidden">
+                <div class="watch-later-empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 6v6l4 2"></path>
+                    <circle cx="12" cy="12" r="9"></circle>
+                  </svg>
+                </div>
+                <p>暂无稍后再看的物品</p>
+              </div>
+            </aside>
           </div>
         </div>
       </div>
