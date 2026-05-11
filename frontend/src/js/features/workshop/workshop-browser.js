@@ -804,7 +804,13 @@ async function openWorkshopDetail(item) {
     detailView.innerHTML = `
             <div class="detail-container">
                 <div class="detail-header-action">
-                    <button class="btn btn-outline" id="back-to-list-btn">← 返回列表</button>
+                    <button class="btn btn-outline detail-back-btn" id="back-to-list-btn">
+                        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M19 12H5"></path>
+                            <path d="m12 19-7-7 7-7"></path>
+                        </svg>
+                        <span>返回列表</span>
+                    </button>
                     <div class="detail-header-actions-right">
                         <button class="btn btn-outline watch-later-detail-btn" id="add-to-watch-later-btn" type="button">
                             <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -814,7 +820,12 @@ async function openWorkshopDetail(item) {
                             <span class="watch-later-label">添加到稍后再看</span>
                         </button>
                         <a href="javascript:void(0)" id="open-in-steam-browser" class="btn btn-outline">
-                            🔗 在浏览器打开
+                            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M15 3h6v6"></path>
+                                <path d="M10 14 21 3"></path>
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            </svg>
+                            <span>在浏览器打开</span>
                         </a>
                     </div>
                 </div>
@@ -847,6 +858,12 @@ async function openWorkshopDetail(item) {
                          <h1 class="detail-title-large">${detail.title}</h1>
                          
                          <div class="detail-stats-bar">
+                             <div class="stat-item">
+                                <span class="stat-value">${formatNumber(
+                                  detail.views
+                                )}</span>
+                                <span class="stat-label">点击</span>
+                            </div>
                              <div class="stat-item">
                                 <span class="stat-value">${formatNumber(
                                   detail.subscriptions
@@ -882,7 +899,7 @@ async function openWorkshopDetail(item) {
                         </div>
 
                          <div class="action-bar-large">
-                            <button class="btn btn-success btn-large" id="browser-download-btn" style="width: 100%;">
+                            <button class="btn btn-success btn-large" id="browser-download-btn">
                                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                     <polyline points="7 10 12 15 17 10"></polyline>

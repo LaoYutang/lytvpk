@@ -763,56 +763,80 @@ html.dark-mode .browser-category-indicator {
 .detail-header-action {
   display: flex;
   justify-content: space-between;
-  padding: 24px 24px 12px 24px;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px 14px;
   flex-shrink: 0;
   z-index: 10;
   background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .detail-scroll-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0 24px 24px 24px;
+  padding: 20px 24px 28px;
 }
 
 .detail-top-section {
-  display: flex;
-  gap: 32px;
+  display: grid;
+  grid-template-columns: minmax(520px, 1.25fr) minmax(420px, 0.95fr);
+  gap: 24px;
+  align-items: start;
   margin-bottom: 24px;
 }
 
 .detail-preview-wrapper {
-  width: 480px;
-  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .detail-info-wrapper {
-  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  min-width: 0;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-back-btn,
+.detail-header-actions-right .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.detail-back-btn .icon-svg,
+.detail-header-actions-right .icon-svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
 }
 
 .detail-preview-img-large {
   width: 100%;
-  aspect-ratio: 16/9;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
   border-radius: 8px;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border: none;
 }
 
 .detail-stats-bar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  background: var(--bg-card);
-  padding: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  background: var(--bg-app);
+  padding: 10px;
   border-radius: 8px;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-light);
 }
 
 .stat-item {
@@ -820,16 +844,24 @@ html.dark-mode .browser-category-indicator {
   flex-direction: column;
   align-items: center;
   text-align: center;
+  min-width: 0;
+  padding: 10px 8px;
+  border-radius: 6px;
+  background: var(--bg-surface);
 }
 
 .stat-value {
-  font-size: 1.1em;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 800;
   color: var(--text-primary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stat-label {
-  font-size: 0.85em;
+  font-size: 0.74rem;
   color: var(--text-tertiary);
   margin-top: 4px;
 }
@@ -838,6 +870,7 @@ html.dark-mode .browser-category-indicator {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-height: 24px;
 }
 
 .tag-badge {
@@ -850,22 +883,25 @@ html.dark-mode .browser-category-indicator {
 }
 
 .detail-title-large {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
+  font-weight: 800;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.25;
   margin: 0;
+  letter-spacing: 0;
 }
 
 .action-bar-large {
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  margin-top: auto;
 }
 
 .btn-large {
-  padding: 14px 24px;
-  font-size: 1.1rem;
-  font-weight: 600;
+  width: 100%;
+  padding: 13px 20px;
+  font-size: 1rem;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -873,10 +909,11 @@ html.dark-mode .browser-category-indicator {
 }
 
 .detail-description-box {
-  background: var(--bg-card);
-  padding: 24px;
+  background: var(--bg-surface);
+  padding: 22px 24px;
   border-radius: 8px;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Skeleton Loading Animation */
@@ -920,14 +957,19 @@ html.dark-mode .browser-category-indicator {
 .main-preview-container {
   width: 100%;
   aspect-ratio: 16/9;
-  background: var(--gray-100);
+  min-height: 360px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    #0f172a;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: zoom-in;
-  position: relative; /* Ensure absolute children are positioned relative to this */
+  position: relative;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Ensure skeleton animation overrides background when active */
@@ -943,7 +985,29 @@ html.dark-mode .browser-category-indicator {
 }
 
 .thumbnail-item {
+  width: 104px;
+  height: 58px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  opacity: 0.72;
   background: var(--gray-100);
+  transition:
+    opacity var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    transform var(--duration-150) var(--ease-out);
+}
+
+.thumbnail-item:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.thumbnail-item.active {
+  border-color: var(--primary);
+  opacity: 1;
 }
 
 .thumbnail-item.skeleton-anim {
@@ -959,16 +1023,16 @@ html.dark-mode .browser-category-indicator {
 
 .detail-description-box h3 {
   margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  border-bottom: 2px solid var(--border-default);
-  padding-bottom: 8px;
+  margin-bottom: 14px;
+  font-size: 1rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 10px;
 }
 
 .detail-description-text {
-  line-height: 1.6;
-  color: var(--text-primary);
+  line-height: 1.7;
+  color: var(--text-secondary);
   white-space: normal;
 }
 
@@ -1090,6 +1154,20 @@ html.dark-mode .watch-later-empty-icon {
   color: var(--primary-light);
 }
 
+@media (max-width: 1240px) {
+  .detail-top-section {
+    grid-template-columns: 1fr;
+  }
+
+  .main-preview-container {
+    min-height: 320px;
+  }
+
+  .detail-info-wrapper {
+    margin: 0;
+  }
+}
+
 @media (max-width: 760px) {
   .browser-toolbar {
     flex-wrap: wrap;
@@ -1112,6 +1190,27 @@ html.dark-mode .watch-later-empty-icon {
 
   .detail-header-actions-right .btn {
     flex: 1 1 12rem;
+  }
+
+  .detail-scroll-content {
+    padding: 16px;
+  }
+
+  .detail-top-section {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .main-preview-container {
+    min-height: 220px;
+  }
+
+  .detail-info-wrapper {
+    padding: 16px;
+  }
+
+  .detail-stats-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .watch-later-drawer {
