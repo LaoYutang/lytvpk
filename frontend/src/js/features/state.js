@@ -30,6 +30,7 @@ export const appState = {
   displayMode: getConfig().displayMode || "list",
   boxSelectionEnabled: getConfig().boxSelectionEnabled || false,
   filterLayoutMode: getConfig().filterLayoutMode || "compact",
+  workshopUpdateCheckEnabled: false,
 };
 
 export function toggleFileSelection(filePath, selected) {

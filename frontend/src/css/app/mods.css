@@ -1531,6 +1531,12 @@
   border-top: 1px solid var(--border-light);
 }
 
+.card-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* 复用现有的 btn-small 样式，微调 */
 .card-actions .action-btn {
   padding: 4px 12px !important;
@@ -1881,6 +1887,57 @@
   background: var(--bg-hover);
   border-color: var(--border-default);
   color: var(--text-muted);
+}
+
+/* 更新可用标签 - 列表模式（文件名后面内联） */
+.update-available-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  min-height: 1.6rem;
+  padding: 0 var(--spacing-2);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: var(--radius-full);
+  color: #059669;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.update-available-tag:hover {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+html.dark-mode .update-available-tag {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.32);
+  color: var(--success-light);
+}
+
+/* 更新按钮 - 卡片模式 */
+.update-btn {
+  cursor: pointer !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+  border: 1px solid rgba(16, 185, 129, 0.28) !important;
+  color: #059669 !important;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.update-btn:hover {
+  background: rgba(16, 185, 129, 0.22) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+html.dark-mode .update-btn {
+  background: rgba(16, 185, 129, 0.18) !important;
+  border-color: rgba(16, 185, 129, 0.32) !important;
+  color: var(--success-light) !important;
 }
 
 .file-actions {

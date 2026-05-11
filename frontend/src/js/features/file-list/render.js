@@ -55,6 +55,13 @@ export function createFileItem(file) {
   const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
   const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
   const locationBadgeClass = `location-${file.location || "unknown"}`;
+  const hasUpdate = file.hasUpdate;
+
+  const updateTagHtml = hasUpdate
+    ? `<span class="update-available-tag" data-workshop-id="${file.workshopId}" title="点击更新此Mod">待更新</span>`
+    : "";
+
+  // 列表模式：更新标签放在文件名后面
 
   const moreActionsHtml = `
     <div class="more-actions-dropdown">
@@ -107,7 +114,7 @@ export function createFileItem(file) {
     <div class="file-checkbox-container"></div>
     <div class="file-name" title="${file.path}">
       <div class="file-title">${displayTitle}</div>
-      <div class="file-filename">${file.name}</div>
+      <div class="file-filename">${file.name}${updateTagHtml}</div>
     </div>
     <div class="file-size">${formatFileSize(file.size)}</div>
     <div class="file-location">
@@ -159,6 +166,20 @@ export function createFileCard(file) {
   const isHidden = file.name.startsWith("_");
   const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
   const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
+  const hasUpdate = file.hasUpdate;
+
+  const updateBtnHtml = hasUpdate
+    ? `<button class="btn-small action-btn update-btn" data-workshop-id="${file.workshopId}" title="点击更新此Mod">
+        <span class="btn-icon">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </span>
+        <span class="btn-text">待更新</span>
+      </button>`
+    : "";
 
   let previewSrc = "";
   let showPlaceholder = true;
@@ -279,7 +300,10 @@ export function createFileCard(file) {
       <div class="card-title" title="${displayTitle}">${displayTitle}</div>
       <div class="card-filename" title="${file.name}">${file.name}</div>
       <div class="card-actions">
-        ${actionBtn}
+        <div class="card-actions-left">
+          ${actionBtn}
+          ${updateBtnHtml}
+        </div>
         ${moreActionsHtml}
       </div>
     </div>

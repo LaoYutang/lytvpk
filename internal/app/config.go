@@ -39,6 +39,9 @@ func (a *App) loadConfig() {
 	if config.WorkshopMetaEnabled != nil {
 		a.workshopMetaEnabled = *config.WorkshopMetaEnabled
 	}
+	if config.WorkshopUpdateCheckEnabled != nil {
+		a.workshopUpdateCheckEnabled = *config.WorkshopUpdateCheckEnabled
+	}
 	if config.WorkshopBrowserTarget != nil {
 		a.workshopBrowserTarget = *config.WorkshopBrowserTarget
 	}
@@ -53,14 +56,16 @@ func (a *App) saveConfig() {
 	v := a.workshopPreferredIP
 	fixedIP := a.workshopFixedIP
 	metaEnabled := a.workshopMetaEnabled
+	updateCheckEnabled := a.workshopUpdateCheckEnabled
 	browserTarget := a.workshopBrowserTarget
 	config := ConfigFile{
-		ModRotationConfig:     a.modRotationConfig,
-		WorkshopPreferredIP:   &v,
-		WorkshopFixedIP:       &fixedIP,
-		WorkshopMetaEnabled:   &metaEnabled,
-		WorkshopBrowserTarget: &browserTarget,
-		MigrationVersion:      a.migrationVersion,
+		ModRotationConfig:        a.modRotationConfig,
+		WorkshopPreferredIP:      &v,
+		WorkshopFixedIP:          &fixedIP,
+		WorkshopMetaEnabled:      &metaEnabled,
+		WorkshopUpdateCheckEnabled: &updateCheckEnabled,
+		WorkshopBrowserTarget:    &browserTarget,
+		MigrationVersion:         a.migrationVersion,
 	}
 	a.mu.RUnlock()
 
@@ -173,4 +178,26 @@ func (a *App) GetWorkshopBrowserTarget() string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.workshopBrowserTarget
+}
+
+// SetWorkshopUpdateCheckEnabled 开启/关闭工坊Mod更新检测
+func (a *App) SetWorkshopUpdateCheckEnabled(enabled bool) {
+	a.mu.Lock()
+	a.workshopUpdateCheckEnabled = enabled
+	a.mu.Unlock()
+
+	// 保存配置
+	a.saveConfig()
+
+	// 如果开启，立即触发一次检测
+	if enabled && a.workshopMetaEnabled {
+		go a.CheckModUpdates()
+	}
+}
+
+// GetWorkshopUpdateCheckEnabled 获取当前是否开启工坊Mod更新检测
+func (a *App) GetWorkshopUpdateCheckEnabled() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopUpdateCheckEnabled
 }

@@ -9,6 +9,8 @@ export function CancelDownloadTask(arg1:string):Promise<void>;
 
 export function CheckConflicts():Promise<app.ConflictResult>;
 
+export function CheckModUpdates():Promise<app.UpdateCheckResult>;
+
 export function CheckUpdate():Promise<app.UpdateInfo>;
 
 export function ClearCompletedTasks():Promise<void>;
@@ -83,6 +85,8 @@ export function GetWorkshopMetaEnabled():Promise<boolean>;
 
 export function GetWorkshopPreferredIP():Promise<boolean>;
 
+export function GetWorkshopUpdateCheckEnabled():Promise<boolean>;
+
 export function HandleFileDrop(arg1:Array<string>):Promise<void>;
 
 export function HandleProtocolURL(arg1:string):Promise<void>;
@@ -136,6 +140,8 @@ export function SetWorkshopFixedIP(arg1:string):Promise<void>;
 export function SetWorkshopMetaEnabled(arg1:boolean):Promise<void>;
 
 export function SetWorkshopPreferredIP(arg1:boolean):Promise<void>;
+
+export function SetWorkshopUpdateCheckEnabled(arg1:boolean):Promise<void>;
 
 export function StartDownloadTask(arg1:app.WorkshopFileDetails,arg2:boolean):Promise<string>;
 

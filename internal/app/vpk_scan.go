@@ -239,6 +239,13 @@ func (a *App) processVPKFileWithCache(filePath string) {
 			if meta.WorkshopID != "" && !strings.HasPrefix(meta.WorkshopID, "direct-") && protocol.IsValidWorkshopID(meta.WorkshopID) {
 				vpkFile.WorkshopID = meta.WorkshopID
 			}
+			if a.workshopUpdateCheckEnabled && meta.TimeUpdated != "" && meta.DownloadedAt != "" {
+				timeUpdated, tErr := time.Parse(time.RFC3339, meta.TimeUpdated)
+				downloadedAt, dErr := time.Parse(time.RFC3339, meta.DownloadedAt)
+				if tErr == nil && dErr == nil && timeUpdated.After(downloadedAt) {
+					vpkFile.HasUpdate = true
+				}
+			}
 		}
 	}
 

@@ -17,6 +17,7 @@ type WorkshopMeta struct {
 	PreviewURL   string `json:"preview_url"`
 	FileURL      string `json:"file_url"`
 	DownloadedAt string `json:"downloaded_at"`
+	TimeUpdated  string `json:"time_updated"` // 远端最后更新时间（RFC3339）
 }
 
 // GetMetaFilePath 根据VPK路径计算对应的.meta文件路径
@@ -65,4 +66,18 @@ func LoadWorkshopMeta(filePath string) (*WorkshopMeta, error) {
 	}
 
 	return &meta, nil
+}
+
+// UpdateWorkshopMetaTimeUpdated 更新meta文件中的TimeUpdated字段（保留其他字段）
+func UpdateWorkshopMetaTimeUpdated(filePath string, timeUpdated string) error {
+	meta, err := LoadWorkshopMeta(filePath)
+	if meta == nil || err != nil {
+		return err
+	}
+	meta.TimeUpdated = timeUpdated
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(GetMetaFilePath(filePath), data, 0644)
 }

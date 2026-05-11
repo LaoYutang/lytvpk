@@ -14,6 +14,10 @@ export function CheckConflicts() {
   return window['go']['app']['App']['CheckConflicts']();
 }
 
+export function CheckModUpdates() {
+  return window['go']['app']['App']['CheckModUpdates']();
+}
+
 export function CheckUpdate() {
   return window['go']['app']['App']['CheckUpdate']();
 }
@@ -162,6 +166,10 @@ export function GetWorkshopPreferredIP() {
   return window['go']['app']['App']['GetWorkshopPreferredIP']();
 }
 
+export function GetWorkshopUpdateCheckEnabled() {
+  return window['go']['app']['App']['GetWorkshopUpdateCheckEnabled']();
+}
+
 export function HandleFileDrop(arg1) {
   return window['go']['app']['App']['HandleFileDrop'](arg1);
 }
@@ -268,6 +276,10 @@ export function SetWorkshopMetaEnabled(arg1) {
 
 export function SetWorkshopPreferredIP(arg1) {
   return window['go']['app']['App']['SetWorkshopPreferredIP'](arg1);
+}
+
+export function SetWorkshopUpdateCheckEnabled(arg1) {
+  return window['go']['app']['App']['SetWorkshopUpdateCheckEnabled'](arg1);
 }
 
 export function StartDownloadTask(arg1, arg2) {

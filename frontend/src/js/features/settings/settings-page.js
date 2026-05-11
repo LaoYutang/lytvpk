@@ -15,13 +15,16 @@ export async function renderSettingsPage({
   GetWorkshopPreferredIP,
   GetWorkshopFixedIP,
   GetWorkshopMetaEnabled,
+  GetWorkshopUpdateCheckEnabled,
   GetWorkshopBrowserTarget,
   IsSelectingIP,
   GetCurrentBestIP,
   SetWorkshopPreferredIP,
   SetWorkshopFixedIP,
   SetWorkshopMetaEnabled,
+  SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
+  CheckModUpdates,
 }) {
   const container = document.getElementById("settings-page-content");
   if (!container) return;
@@ -30,6 +33,7 @@ export async function renderSettingsPage({
   const fixedIP = await GetWorkshopFixedIP();
   const useFixedIP = enabled && fixedIP !== "";
   const metaEnabled = await GetWorkshopMetaEnabled();
+  const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
   const browserTarget = await GetWorkshopBrowserTarget();
   const isSelecting = enabled ? await IsSelectingIP() : false;
   const bestIP = enabled && !isSelecting ? await GetCurrentBestIP() : "";
@@ -140,6 +144,22 @@ export async function renderSettingsPage({
                 <span class="toggle-slider"></span>
               </label>
             </div>
+            <div class="setting-row ${metaEnabled ? "" : "setting-row-disabled"}" id="settings-update-check-row">
+              <div class="setting-row-info">
+                <div class="setting-row-label">开启Mod更新检测</div>
+                <div class="setting-row-desc">每天自动检测含有工坊信息的Mod是否有新版本，需要先开启工坊信息存储</div>
+              </div>
+              <label class="toggle-switch ${metaEnabled ? "" : "toggle-switch-disabled"}">
+                <input type="checkbox" id="settings-update-check-enabled" ${updateCheckEnabled ? "checked" : ""} ${metaEnabled ? "" : "disabled"}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div id="settings-update-check-section" class="setting-indent" style="${updateCheckEnabled ? "" : "display:none"}">
+              <button class="trigger-check-btn" id="settings-manual-check-btn" ${metaEnabled && updateCheckEnabled ? "" : "disabled"}>
+                <svg class="trigger-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+                <span class="trigger-check-text">立即触发检测</span>
+              </button>
+            </div>
           </div>
           <div class="setting-card">
             <div class="setting-card-title">浏览器跳转</div>
@@ -164,6 +184,7 @@ export async function renderSettingsPage({
     enabled,
     fixedIP,
     metaEnabled,
+    updateCheckEnabled,
     browserTarget,
     appState,
     getConfig,
@@ -175,7 +196,9 @@ export async function renderSettingsPage({
     SetWorkshopPreferredIP,
     SetWorkshopFixedIP,
     SetWorkshopMetaEnabled,
+    SetWorkshopUpdateCheckEnabled,
     SetWorkshopBrowserTarget,
+    CheckModUpdates,
   });
 }
 
@@ -258,7 +281,73 @@ function bindSettingsPage(deps) {
   document.getElementById("settings-meta-enabled")?.addEventListener("change", async (event) => {
     await deps.SetWorkshopMetaEnabled(event.target.checked);
     deps.showNotification(event.target.checked ? "已开启工坊信息存储" : "已关闭工坊信息存储", event.target.checked ? "success" : "info");
+
+    // 更新更新检测开关的可用状态
+    const updateCheckRow = document.getElementById("settings-update-check-row");
+    const updateCheckToggle = document.getElementById("settings-update-check-enabled");
+    const toggleSwitch = updateCheckToggle?.closest(".toggle-switch");
+
+    if (event.target.checked) {
+      updateCheckRow?.classList.remove("setting-row-disabled");
+      toggleSwitch?.classList.remove("toggle-switch-disabled");
+      updateCheckToggle?.removeAttribute("disabled");
+      if (updateCheckToggle?.checked) {
+        const checkSection = document.getElementById("settings-update-check-section");
+        if (checkSection) checkSection.style.display = "";
+        document.getElementById("settings-manual-check-btn")?.removeAttribute("disabled");
+      }
+    } else {
+      updateCheckRow?.classList.add("setting-row-disabled");
+      toggleSwitch?.classList.add("toggle-switch-disabled");
+      updateCheckToggle?.setAttribute("disabled", "true");
+      // 关闭meta时也要关闭更新检测
+      if (updateCheckToggle?.checked) {
+        updateCheckToggle.checked = false;
+        await deps.SetWorkshopUpdateCheckEnabled(false);
+        const checkSection = document.getElementById("settings-update-check-section");
+        if (checkSection) checkSection.style.display = "none";
+      }
+    }
+
     await deps.refreshFilesKeepFilter();
+  });
+
+  document.getElementById("settings-update-check-enabled")?.addEventListener("change", async (event) => {
+    await deps.SetWorkshopUpdateCheckEnabled(event.target.checked);
+    deps.appState.workshopUpdateCheckEnabled = event.target.checked;
+    deps.showNotification(event.target.checked ? "已开启Mod更新检测" : "已关闭Mod更新检测", event.target.checked ? "success" : "info");
+
+    const checkSection = document.getElementById("settings-update-check-section");
+    const manualCheckBtn = document.getElementById("settings-manual-check-btn");
+    const metaEnabled = document.getElementById("settings-meta-enabled")?.checked;
+
+    if (event.target.checked && metaEnabled) {
+      if (checkSection) checkSection.style.display = "";
+      manualCheckBtn?.removeAttribute("disabled");
+    } else {
+      if (checkSection) checkSection.style.display = "none";
+      manualCheckBtn?.setAttribute("disabled", "true");
+    }
+  });
+
+  document.getElementById("settings-manual-check-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("settings-manual-check-btn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> 检测中...';
+    btn.style.pointerEvents = "none";
+    try {
+      const result = await deps.CheckModUpdates();
+      localStorage.setItem("lastUpdateCheckTime", String(Date.now()));
+      const count = result.total_updates || 0;
+      deps.showNotification(count > 0 ? `检测完成，发现 ${count} 个Mod有更新` : "检测完成，所有Mod均为最新版本", count > 0 ? "info" : "success");
+      await deps.refreshFilesKeepFilter();
+    } catch (err) {
+      deps.showNotification("检测失败: " + err, "error");
+    }
+    btn.disabled = false;
+    const checkIcon = '<svg class="trigger-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>';
+    btn.innerHTML = checkIcon + '<span class="trigger-check-text">立即触发检测</span>';
+    btn.style.pointerEvents = "";
   });
 
   document.querySelectorAll('input[name="settings-browser-target"]').forEach((radio) => {

@@ -10,6 +10,7 @@ import {
 } from "./operations.js";
 import { openSetTagsModal } from "./tags.js";
 import { openLoadOrderModal } from "../modals/load-order.js";
+import { openWorkshopModal, checkWorkshopUrl } from "../downloads/workshop-modal.js";
 
 export function setupFileListEventDelegation() {
   console.log("正在设置文件列表按钮事件委托...");
@@ -59,6 +60,26 @@ export function setupFileListEventDelegation() {
         const container = d.closest(".file-item") || d.closest(".file-card");
         if (container) container.classList.remove("active-dropdown");
       });
+    }
+
+    // 待更新标签/按钮点击 - 打开下载界面并自动解析
+    const updateTag = e.target.closest(".update-available-tag") || e.target.closest(".update-btn");
+    if (updateTag) {
+      const workshopId = updateTag.getAttribute("data-workshop-id");
+      if (workshopId) {
+        e.preventDefault();
+        e.stopPropagation();
+        const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`;
+        openWorkshopModal();
+        // 等待模态框打开后填入URL并自动解析
+        setTimeout(() => {
+          const urlInput = document.getElementById("workshop-url");
+          if (urlInput) {
+            urlInput.value = workshopUrl;
+            checkWorkshopUrl();
+          }
+        }, 300);
+      }
     }
 
     const detailBtn = e.target.closest(".detail-btn");

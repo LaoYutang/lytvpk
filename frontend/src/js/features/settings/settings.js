@@ -9,20 +9,23 @@ let renderSettingsPage;
 let GetWorkshopPreferredIP;
 let GetWorkshopFixedIP;
 let GetWorkshopMetaEnabled;
+let GetWorkshopUpdateCheckEnabled;
 let GetWorkshopBrowserTarget;
 let IsSelectingIP;
 let GetCurrentBestIP;
 let SetWorkshopPreferredIP;
 let SetWorkshopFixedIP;
 let SetWorkshopMetaEnabled;
+let SetWorkshopUpdateCheckEnabled;
 let SetWorkshopBrowserTarget;
+let CheckModUpdates;
 let refreshActiveIndicator;
 let switchAppPage;
 let showConfirmModal;
 let showError;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopBrowserTarget, refreshActiveIndicator, switchAppPage, showConfirmModal, showError } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, refreshActiveIndicator, switchAppPage, showConfirmModal, showError } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -43,13 +46,16 @@ export async function renderSettingsPageWithDeps() {
       GetWorkshopPreferredIP,
       GetWorkshopFixedIP,
       GetWorkshopMetaEnabled,
+      GetWorkshopUpdateCheckEnabled,
       GetWorkshopBrowserTarget,
       IsSelectingIP,
       GetCurrentBestIP,
       SetWorkshopPreferredIP,
       SetWorkshopFixedIP,
       SetWorkshopMetaEnabled,
+      SetWorkshopUpdateCheckEnabled,
       SetWorkshopBrowserTarget,
+      CheckModUpdates,
     });
   } catch (error) {
     console.error("设置页面渲染失败:", error);

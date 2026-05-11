@@ -119,6 +119,7 @@ import {
   GetWorkshopPreferredIP,
   GetWorkshopFixedIP,
   GetWorkshopMetaEnabled,
+  GetWorkshopUpdateCheckEnabled,
   GetWorkshopBrowserTarget,
   IsSelectingIP,
   GetCurrentBestIP,
@@ -126,12 +127,14 @@ import {
   SetWorkshopPreferredIP,
   SetWorkshopFixedIP,
   SetWorkshopMetaEnabled,
+  SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
   DoUpdate,
   RestartApplication,
   FetchWorkshopList,
   FetchWorkshopDetail,
   GetAppVersion,
+  CheckModUpdates,
 } from "../../../wailsjs/go/app/App";
 
 import {
@@ -196,13 +199,16 @@ configureSettings({
   GetWorkshopPreferredIP,
   GetWorkshopFixedIP,
   GetWorkshopMetaEnabled,
+  GetWorkshopUpdateCheckEnabled,
   GetWorkshopBrowserTarget,
   IsSelectingIP,
   GetCurrentBestIP,
   SetWorkshopPreferredIP,
   SetWorkshopFixedIP,
   SetWorkshopMetaEnabled,
+  SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
+  CheckModUpdates,
 });
 
 configureWorkshopBrowser({
@@ -224,6 +230,50 @@ document.addEventListener("DOMContentLoaded", function () {
   initializeApp();
 });
 
+// Mod更新检测初始化
+const UPDATE_CHECK_KEY = "lastUpdateCheckTime";
+const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时
+
+let _updateCheckTimer = null;
+
+async function initUpdateCheck() {
+  try {
+    const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
+    appState.workshopUpdateCheckEnabled = updateCheckEnabled;
+    if (!updateCheckEnabled) return;
+
+    const lastCheck = localStorage.getItem(UPDATE_CHECK_KEY);
+    const now = Date.now();
+    if (!lastCheck || now - Number(lastCheck) >= UPDATE_CHECK_INTERVAL) {
+      // 延迟30秒后首次检测，避免和IP优选等其他启动任务冲突
+      setTimeout(async () => {
+        try {
+          await CheckModUpdates();
+          localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now()));
+        } catch (err) {
+          console.warn("更新检测失败:", err);
+        }
+      }, 30000);
+    }
+
+    // 每小时检查一次是否超过24小时
+    if (_updateCheckTimer) clearInterval(_updateCheckTimer);
+    _updateCheckTimer = setInterval(async () => {
+      const last = localStorage.getItem(UPDATE_CHECK_KEY);
+      if (!last || Date.now() - Number(last) >= UPDATE_CHECK_INTERVAL) {
+        try {
+          await CheckModUpdates();
+          localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now()));
+        } catch (err) {
+          console.warn("定时更新检测失败:", err);
+        }
+      }
+    }, 60 * 60 * 1000);
+  } catch (err) {
+    console.warn("更新检测初始化失败:", err);
+  }
+}
+
 function initializeApp() {
   initAppShell();
   setupPageChangeListeners();
@@ -237,6 +287,7 @@ function initializeApp() {
   initModRotationState();
   initWorkshopState();
   initBoxSelection();
+  initUpdateCheck();
 
   if (!window._ipEventsRegistered) {
     EventsOn("ip_selection_start", () => {
@@ -734,6 +785,11 @@ function setupWailsEvents() {
     if (data && data.message) {
       showError(`协议处理失败: ${data.message}`);
     }
+  });
+
+  // 监听Mod更新检测事件
+  EventsOn("mod_update_check_complete", () => {
+    refreshFilesKeepFilter();
   });
 }
 

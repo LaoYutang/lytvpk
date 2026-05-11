@@ -289,6 +289,46 @@ html.dark-mode .setting-indent {
   width: 100%;
 }
 
+.trigger-check-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--duration-150) var(--ease-out), background var(--duration-150) var(--ease-out);
+}
+
+.trigger-check-btn:hover:not([disabled]) {
+  border-color: var(--primary);
+  background: rgba(79, 70, 229, 0.06);
+}
+
+.trigger-check-btn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.trigger-check-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.trigger-check-btn .btn-spinner {
+  width: 14px;
+  height: 14px;
+}
+
+html.dark-mode .trigger-check-btn:hover:not([disabled]) {
+  background: rgba(79, 70, 229, 0.12);
+}
+
 .setting-radio-group {
   display: flex;
   flex-direction: column;
@@ -313,6 +353,19 @@ html.dark-mode .setting-indent {
 
 .setting-radio-label span {
   line-height: 1.5;
+}
+
+.setting-row-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.toggle-switch-disabled {
+  opacity: 0.45;
+}
+
+.toggle-switch-disabled .toggle-slider {
+  cursor: not-allowed;
 }
 
 /* 移动端适配 */

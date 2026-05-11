@@ -188,6 +188,20 @@ export namespace app {
 	        this.mode = source["mode"];
 	    }
 	}
+	export class UpdateCheckResult {
+	    total_updates: number;
+	    new_detected: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateCheckResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total_updates = source["total_updates"];
+	        this.new_detected = source["new_detected"];
+	    }
+	}
 	export class UpdateInfo {
 	    has_update: boolean;
 	    latest_ver: string;
@@ -504,6 +518,7 @@ export namespace parser {
 	    desc: string;
 	    addonURL0: string;
 	    workshopId: string;
+	    hasUpdate: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new VPKFile(source);
@@ -529,6 +544,7 @@ export namespace parser {
 	        this.desc = source["desc"];
 	        this.addonURL0 = source["addonURL0"];
 	        this.workshopId = source["workshopId"];
+	        this.hasUpdate = source["hasUpdate"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
