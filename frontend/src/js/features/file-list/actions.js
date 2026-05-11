@@ -130,6 +130,61 @@ export async function disableSelected() {
   }
 }
 
+export async function disableAllMods(primaryTag = "") {
+  const scopeLabel = primaryTag ? `${primaryTag}mod` : "mod";
+  const filesToToggle = appState.allVpkFiles
+    .filter((file) => {
+      if (!file || !file.enabled || file.location !== "root") return false;
+      return primaryTag ? file.primaryTag === primaryTag : true;
+    })
+    .map((file) => file.path);
+
+  if (filesToToggle.length === 0) {
+    showNotification(`没有需要禁用的${scopeLabel}（只会禁用root目录中已启用的文件）`, "info");
+    return;
+  }
+
+  showConfirmModal(
+    `确认禁用${scopeLabel}`,
+    `确定要禁用 ${filesToToggle.length} 个${scopeLabel}吗？文件将被移动到 disabled 目录。`,
+    async () => {
+      updateLoadingMessage(`正在禁用${scopeLabel}...`);
+      showLoadingScreen();
+
+      const successFiles = [];
+      let failedCount = 0;
+
+      try {
+        for (const filePath of filesToToggle) {
+          try {
+            await ToggleVPKFile(filePath);
+            successFiles.push(filePath);
+          } catch (error) {
+            failedCount++;
+            console.error("禁用文件失败:", filePath, error);
+          }
+        }
+
+        await batchUpdateFileStatus(successFiles);
+        await refreshFilesKeepFilter();
+
+        if (successFiles.length > 0) {
+          showNotification(`成功禁用 ${successFiles.length} 个${scopeLabel}`, "success");
+        }
+
+        if (failedCount > 0) {
+          showNotification(`${failedCount} 个${scopeLabel}禁用失败`, "error");
+        }
+      } catch (error) {
+        console.error(`批量禁用${scopeLabel}失败:`, error);
+        showError(`批量禁用${scopeLabel}失败: ` + error);
+      } finally {
+        showMainScreen();
+      }
+    }
+  );
+}
+
 export async function exportZipSelected() {
   const selectedFiles = Array.from(appState.selectedFiles);
   if (selectedFiles.length === 0) {

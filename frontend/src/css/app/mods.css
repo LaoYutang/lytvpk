@@ -2134,8 +2134,91 @@ html.dark-mode .update-btn {
 
 .status-actions {
   display: flex;
+  align-items: center;
   gap: var(--spacing-2);
   z-index: 1;
+}
+
+.batch-disable-split-container {
+  position: relative;
+  display: inline-flex;
+}
+
+.split-button-group {
+  display: inline-flex;
+  align-items: stretch;
+  transition:
+    transform var(--duration-150) var(--ease-out),
+    box-shadow var(--duration-150) var(--ease-out);
+}
+
+.split-button-group:hover {
+  transform: translateY(-1px);
+}
+
+.split-button-group .btn-danger:hover {
+  transform: none;
+}
+
+.split-button-group .split-main-btn {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.split-button-group .split-arrow-btn {
+  min-width: 2.25rem;
+  width: 2.25rem;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.split-button-group .split-arrow-btn .icon {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.batch-disable-dropdown-content {
+  right: 0;
+  min-width: 12.75rem;
+  padding: 0.45rem;
+  border-radius: 0.85rem;
+  border-color: var(--border-light);
+  box-shadow:
+    0 18px 50px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.batch-disable-dropdown-content .dropdown-item {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.65rem !important;
+  gap: 0.65rem;
+  border-radius: 0.55rem;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.batch-disable-dropdown-content .dropdown-item .btn-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--danger);
+  font-size: 0.85rem;
+  opacity: 0.72;
+}
+
+.batch-disable-dropdown-content .dropdown-item:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger);
+}
+
+html.dark-mode .batch-disable-dropdown-content .dropdown-item:hover {
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--danger-light);
 }
 
 /* 框选模式样式 */

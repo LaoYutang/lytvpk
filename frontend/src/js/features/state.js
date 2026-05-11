@@ -82,6 +82,7 @@ function disableActionButtons() {
     "deselect-all-btn",
     "enable-selected-btn",
     "disable-selected-btn",
+    "batch-disable-menu-btn",
   ];
   buttons.forEach((id) => {
     const btn = document.getElementById(id);
@@ -102,6 +103,7 @@ export function enableActionButtons() {
     "deselect-all-btn",
     "enable-selected-btn",
     "disable-selected-btn",
+    "batch-disable-menu-btn",
   ];
   buttons.forEach((id) => {
     const btn = document.getElementById(id);

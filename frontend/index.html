@@ -477,11 +477,65 @@
               <span class="icon">☐</span> 取消全选
             </button>
             <button id="enable-selected-btn" class="btn btn-small btn-success">
-              <span class="icon">✓</span> 启用选中
+              <span class="icon">✓</span> 批量启用
             </button>
-            <button id="disable-selected-btn" class="btn btn-small btn-danger">
-              <span class="icon">✗</span> 禁用选中
-            </button>
+            <div class="batch-disable-split-container">
+              <div class="split-button-group">
+                <button id="disable-selected-btn" class="btn btn-small btn-danger split-main-btn">
+                  <span class="icon">✗</span> 批量禁用
+                </button>
+                <button
+                  id="batch-disable-menu-btn"
+                  class="btn btn-small btn-danger split-arrow-btn"
+                  type="button"
+                  title="更多批量禁用选项"
+                  aria-label="更多批量禁用选项"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <span class="icon">▾</span>
+                </button>
+              </div>
+              <div
+                id="batch-disable-dropdown-content"
+                class="dropdown-content hidden batch-dropdown-content batch-disable-dropdown-content"
+              >
+                <button id="disable-all-mods-btn" class="dropdown-item">
+                  <span class="btn-icon">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 3v8"></path>
+                      <path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"></path>
+                      <path d="m4 4 16 16"></path>
+                    </svg>
+                  </span>
+                  禁用所有mod
+                </button>
+                <button id="disable-all-character-mods-btn" class="dropdown-item">
+                  <span class="btn-icon">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="9" cy="7" r="4"></circle>
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                  </span>
+                  禁用所有人物mod
+                </button>
+                <button id="disable-all-weapon-mods-btn" class="dropdown-item">
+                  <span class="btn-icon">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="7"></circle>
+                      <path d="M12 3v4"></path>
+                      <path d="M12 17v4"></path>
+                      <path d="M3 12h4"></path>
+                      <path d="M17 12h4"></path>
+                      <circle cx="12" cy="12" r="1"></circle>
+                    </svg>
+                  </span>
+                  禁用所有武器mod
+                </button>
+              </div>
+            </div>
 
             <div class="batch-actions-dropdown-container">
               <button id="batch-more-btn" class="btn btn-small btn-outline">

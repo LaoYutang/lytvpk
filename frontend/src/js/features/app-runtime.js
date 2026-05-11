@@ -57,6 +57,7 @@ import {
   deleteSelected,
   moveSelected,
   batchToggleVisibility,
+  disableAllMods,
 } from "./file-list/actions.js";
 import { setupFileListEventDelegation } from "./file-list/events.js";
 import { initBoxSelection } from "./file-list/box-selection.js";
@@ -419,11 +420,47 @@ function setupBatchActionEvents() {
     .getElementById("disable-selected-btn")
     ?.addEventListener("click", disableSelected);
 
+  const closeBatchDisableDropdown = () => {
+    const dropdown = document.getElementById("batch-disable-dropdown-content");
+    const button = document.getElementById("batch-disable-menu-btn");
+    if (dropdown) dropdown.classList.add("hidden");
+    button?.setAttribute("aria-expanded", "false");
+  };
+
+  const batchDisableMenuBtn = document.getElementById("batch-disable-menu-btn");
+  if (batchDisableMenuBtn) {
+    batchDisableMenuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      document.querySelectorAll(".dropdown-content").forEach((d) => {
+        if (d.id !== "batch-disable-dropdown-content") {
+          d.classList.add("hidden");
+          const fileItem = d.closest(".file-item");
+          if (fileItem) fileItem.classList.remove("active-dropdown");
+        }
+      });
+
+      const dropdown = document.getElementById("batch-disable-dropdown-content");
+      if (dropdown) {
+        const willOpen = dropdown.classList.contains("hidden");
+        dropdown.classList.toggle("hidden");
+        batchDisableMenuBtn.setAttribute("aria-expanded", String(willOpen));
+      }
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".batch-disable-split-container")) {
+      closeBatchDisableDropdown();
+    }
+  });
+
   // 批量操作下拉菜单
   const batchMoreBtn = document.getElementById("batch-more-btn");
   if (batchMoreBtn) {
     batchMoreBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      closeBatchDisableDropdown();
 
       document.querySelectorAll(".dropdown-content").forEach((d) => {
         if (d.id !== "batch-dropdown-content") {
@@ -442,6 +479,20 @@ function setupBatchActionEvents() {
     const dropdown = document.getElementById("batch-dropdown-content");
     if (dropdown) dropdown.classList.add("hidden");
   };
+
+  const bindBatchDisableAction = (buttonId, primaryTag = "") => {
+    const button = document.getElementById(buttonId);
+    if (!button) return;
+
+    button.addEventListener("click", () => {
+      closeBatchDisableDropdown();
+      disableAllMods(primaryTag);
+    });
+  };
+
+  bindBatchDisableAction("disable-all-mods-btn");
+  bindBatchDisableAction("disable-all-character-mods-btn", "人物");
+  bindBatchDisableAction("disable-all-weapon-mods-btn", "武器");
 
   document
     .getElementById("delete-selected-btn")
