@@ -44,6 +44,7 @@ import {
   handleSearch,
   performSearch,
   resetFilters,
+  renderTagFilters,
   refreshFilesKeepFilter,
 } from "./file-list/filters.js";
 import { setupSortEvents } from "./file-list/sorting.js";
@@ -188,6 +189,7 @@ configureSettings({
   getConfig,
   saveConfig,
   renderFileList,
+  renderTagFilters,
   refreshFilesKeepFilter,
   showNotification,
   renderSettingsPage,

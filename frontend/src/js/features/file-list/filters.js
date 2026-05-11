@@ -6,16 +6,37 @@ import { applySort, updateSortButtonUI } from "./sorting.js";
 import { resetBoxSelection } from "./box-selection.js";
 import { GetPrimaryTags, GetSecondaryTags, SearchVPKFiles, ScanVPKFiles, GetVPKFiles } from "../../../../wailsjs/go/app/App";
 
+const LOCATION_FILTERS = ["root", "workshop", "disabled"];
+
+document.addEventListener("app:page-change", (event) => {
+  if (event.detail?.page === "mods") {
+    requestAnimationFrame(updateClassicSecondaryTagsCollapse);
+  }
+});
+
+window.addEventListener("resize", () => {
+  requestAnimationFrame(updateClassicSecondaryTagsCollapse);
+});
+
 export async function renderTagFilters() {
   const tagContainer = document.getElementById("tag-filters");
   const locationContainer = document.getElementById("location-filter-section");
+  const filterRow = tagContainer?.closest(".filter-row-filters");
 
+  if (!tagContainer || !locationContainer) return;
   tagContainer.innerHTML = "";
   locationContainer.innerHTML = "";
+  filterRow?.classList.toggle("filter-layout-classic", appState.filterLayoutMode === "classic");
+  tagContainer.classList.toggle("classic-tag-filters", appState.filterLayoutMode === "classic");
+  locationContainer.classList.toggle("classic-location-placeholder", appState.filterLayoutMode === "classic");
 
   try {
     const primaryTags = await GetPrimaryTags();
-    renderSelectBasedFilters(tagContainer, locationContainer, primaryTags);
+    if (appState.filterLayoutMode === "classic") {
+      renderClassicFilters(tagContainer, locationContainer, primaryTags);
+    } else {
+      renderSelectBasedFilters(tagContainer, locationContainer, primaryTags);
+    }
     await renderSecondaryTags(appState.selectedPrimaryTag);
   } catch (error) {
     console.error("渲染标签筛选器失败:", error);
@@ -73,6 +94,45 @@ function renderSelectBasedFilters(tagContainer, locationContainer, primaryTags) 
   renderLocationFilterDropdown(locationContainer);
 }
 
+function renderClassicFilters(tagContainer, locationContainer, primaryTags) {
+  const primaryLine = document.createElement("div");
+  primaryLine.className = "classic-filter-line classic-primary-line";
+
+  const locationGroup = document.createElement("div");
+  locationGroup.className = "classic-filter-group classic-location-group";
+  locationGroup.innerHTML = '<span class="filter-label">位置</span>';
+  const locationList = document.createElement("div");
+  locationList.className = "classic-filter-chip-list";
+  LOCATION_FILTERS.forEach((location) => {
+    locationList.appendChild(createLocationTagButton(location));
+  });
+  locationGroup.appendChild(locationList);
+
+  const primaryGroup = document.createElement("div");
+  primaryGroup.className = "classic-filter-group classic-primary-group";
+  primaryGroup.innerHTML = '<span class="filter-label">标签</span>';
+  const primaryList = document.createElement("div");
+  primaryList.className = "classic-filter-chip-list";
+  [{ value: "", text: "全部" }, ...primaryTags.map((tag) => ({ value: tag, text: tag }))].forEach((option) => {
+    primaryList.appendChild(createPrimaryTagButton(option.value, option.text));
+  });
+  primaryGroup.appendChild(primaryList);
+
+  primaryLine.appendChild(locationGroup);
+  primaryLine.appendChild(primaryGroup);
+  tagContainer.appendChild(primaryLine);
+
+  const secondaryGroup = document.createElement("div");
+  secondaryGroup.id = "secondary-tag-group";
+  secondaryGroup.className = "classic-filter-line classic-secondary-row";
+  secondaryGroup.innerHTML = `
+    <span class="filter-label">子标签</span>
+    <div class="classic-secondary-tags-slot"></div>
+    <div class="classic-secondary-action-slot"></div>
+  `;
+  tagContainer.appendChild(secondaryGroup);
+}
+
 export function updatePrimaryTagDropdownUI() {
   const trigger = document.getElementById("primary-tag-filter-trigger");
   const menu = document.getElementById("primary-tag-filter-menu");
@@ -110,24 +170,27 @@ export function createPrimaryTagButton(value, text) {
 
 export async function renderSecondaryTags(primaryTag) {
   const secondaryGroup = document.getElementById("secondary-tag-group");
+  if (!secondaryGroup) return;
+
   if (secondaryGroup?.classList.contains("filter-select-group")) {
     await renderSecondaryTagDropdown(secondaryGroup, primaryTag);
     return;
   }
 
+  await renderSecondaryTagButtons(secondaryGroup, primaryTag);
+}
+
+async function renderSecondaryTagButtons(secondaryGroup, primaryTag) {
+  const tagsSlot = secondaryGroup.querySelector(".classic-secondary-tags-slot") || secondaryGroup;
+  const actionSlot = secondaryGroup.querySelector(".classic-secondary-action-slot") || secondaryGroup;
   const existingContainer = secondaryGroup.querySelector(".secondary-tags-container");
   if (existingContainer) existingContainer.remove();
 
   const existingExpandBtn = secondaryGroup.querySelector(".expand-tags-btn");
   if (existingExpandBtn) existingExpandBtn.remove();
 
-  if (!primaryTag) {
-    secondaryGroup.style.display = "none";
-    return;
-  }
-
   try {
-    const secondaryTags = await GetSecondaryTags(primaryTag);
+    const secondaryTags = await GetSecondaryTags(primaryTag || "");
 
     if (secondaryTags.length > 0) {
       secondaryTags.sort((a, b) => a.localeCompare(b, "zh-CN"));
@@ -141,22 +204,9 @@ export async function renderSecondaryTags(primaryTag) {
         container.appendChild(tagBtn);
       });
 
-      secondaryGroup.appendChild(container);
+      tagsSlot.appendChild(container);
 
-      if (container.scrollHeight > 30) {
-        container.classList.add("collapsed");
-        const expandBtn = document.createElement("button");
-        expandBtn.className = "expand-tags-btn";
-        expandBtn.innerHTML = '<span class="icon">▼</span> 展开';
-        expandBtn.onclick = () => {
-          container.classList.toggle("collapsed");
-          const isCollapsed = container.classList.contains("collapsed");
-          expandBtn.innerHTML = isCollapsed
-            ? '<span class="icon">▼</span> 展开'
-            : '<span class="icon">▲</span> 收起';
-        };
-        secondaryGroup.appendChild(expandBtn);
-      }
+      scheduleSecondaryTagsCollapse(container, actionSlot);
     } else {
       secondaryGroup.style.display = "none";
     }
@@ -164,6 +214,68 @@ export async function renderSecondaryTags(primaryTag) {
     console.error("获取二级标签失败:", error);
     secondaryGroup.style.display = "none";
   }
+}
+
+function scheduleSecondaryTagsCollapse(container, actionSlot) {
+  const run = () => updateSecondaryTagsCollapse(container, actionSlot);
+  requestAnimationFrame(() => {
+    if (!run()) {
+      setTimeout(run, 80);
+    }
+  });
+}
+
+function updateClassicSecondaryTagsCollapse() {
+  const container = document.querySelector(".filter-row-filters.filter-layout-classic .secondary-tags-container");
+  const actionSlot = document.querySelector(".filter-row-filters.filter-layout-classic .classic-secondary-action-slot");
+  if (container && actionSlot) {
+    updateSecondaryTagsCollapse(container, actionSlot);
+  }
+}
+
+function updateSecondaryTagsCollapse(container, actionSlot) {
+  if (!document.body.contains(container)) return true;
+
+  const rect = container.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+
+  const tagButtons = Array.from(container.children);
+  const firstRowTop = tagButtons[0]?.offsetTop ?? 0;
+  const hasMultipleRows = tagButtons.some((button) => button.offsetTop > firstRowTop);
+  let expandBtn = actionSlot.querySelector(".expand-tags-btn");
+
+  if (!hasMultipleRows) {
+    container.classList.remove("collapsed");
+    container.dataset.expanded = "";
+    expandBtn?.remove();
+    return true;
+  }
+
+  if (!expandBtn) {
+    container.classList.add("collapsed");
+    container.dataset.expanded = "false";
+
+    expandBtn = document.createElement("button");
+    expandBtn.className = "expand-tags-btn";
+    expandBtn.onclick = () => {
+      const willExpand = container.classList.contains("collapsed");
+      container.classList.toggle("collapsed", !willExpand);
+      container.dataset.expanded = willExpand ? "true" : "false";
+      syncExpandButton(expandBtn, willExpand);
+    };
+    actionSlot.appendChild(expandBtn);
+  } else if (container.dataset.expanded !== "true") {
+    container.classList.add("collapsed");
+  }
+
+  syncExpandButton(expandBtn, container.dataset.expanded === "true");
+  return true;
+}
+
+function syncExpandButton(button, isExpanded) {
+  button.innerHTML = isExpanded
+    ? '<span class="icon">▲</span> 收起'
+    : '<span class="icon">▼</span> 展开';
 }
 
 async function renderSecondaryTagDropdown(secondaryGroup, primaryTag) {
@@ -288,6 +400,23 @@ function createSecondaryTagButton(tag) {
   return button;
 }
 
+function createLocationTagButton(location) {
+  const button = document.createElement("button");
+  button.className = "location-tag-btn";
+  button.textContent = getLocationDisplayName(location);
+  button.dataset.location = location;
+
+  if (appState.selectedLocations.includes(location)) {
+    button.classList.add("active");
+  }
+
+  button.addEventListener("click", function () {
+    toggleLocationFilter(location, button);
+  });
+
+  return button;
+}
+
 function toggleSecondaryTag(tag, button) {
   const index = appState.selectedSecondaryTags.indexOf(tag);
   if (index > -1) {
@@ -315,7 +444,7 @@ export function renderLocationFilterDropdown(locationContainer) {
   const trigger = dropdown.querySelector("#location-filter-trigger");
   const menu = dropdown.querySelector("#location-filter-menu");
 
-  ["root", "workshop", "disabled"].forEach((tag) => {
+  LOCATION_FILTERS.forEach((tag) => {
     const label = document.createElement("label");
     label.className = "multi-select-option";
     label.innerHTML = `

@@ -2,6 +2,7 @@ let appState;
 let getConfig;
 let saveConfig;
 let renderFileList;
+let renderTagFilters;
 let refreshFilesKeepFilter;
 let showNotification;
 let renderSettingsPage;
@@ -21,7 +22,7 @@ let showConfirmModal;
 let showError;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopBrowserTarget, refreshActiveIndicator, switchAppPage, showConfirmModal, showError } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopBrowserTarget, refreshActiveIndicator, switchAppPage, showConfirmModal, showError } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -36,6 +37,7 @@ export async function renderSettingsPageWithDeps() {
       getConfig,
       saveConfig,
       renderFileList,
+      renderTagFilters,
       refreshFilesKeepFilter,
       showNotification,
       GetWorkshopPreferredIP,

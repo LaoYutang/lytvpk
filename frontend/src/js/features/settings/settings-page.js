@@ -9,6 +9,7 @@ export async function renderSettingsPage({
   getConfig,
   saveConfig,
   renderFileList,
+  renderTagFilters,
   refreshFilesKeepFilter,
   showNotification,
   GetWorkshopPreferredIP,
@@ -107,6 +108,22 @@ export async function renderSettingsPage({
                 <span class="toggle-slider"></span>
               </label>
             </div>
+            <div class="setting-row">
+              <div class="setting-row-info">
+                <div class="setting-row-label">筛选布局</div>
+                <div class="setting-row-desc">简洁模式使用下拉筛选节省空间；经典模式展开选项，方便快速点击筛选 Mod</div>
+              </div>
+              <div class="mode-toggle-group filter-layout-toggle">
+                <label class="mode-option ${appState.filterLayoutMode !== "classic" ? "active" : ""}">
+                  <input type="radio" name="settings-filter-layout" value="compact" ${appState.filterLayoutMode !== "classic" ? "checked" : ""}>
+                  <span class="mode-text">简洁</span>
+                </label>
+                <label class="mode-option ${appState.filterLayoutMode === "classic" ? "active" : ""}">
+                  <input type="radio" name="settings-filter-layout" value="classic" ${appState.filterLayoutMode === "classic" ? "checked" : ""}>
+                  <span class="mode-text">经典</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -152,6 +169,7 @@ export async function renderSettingsPage({
     getConfig,
     saveConfig,
     renderFileList,
+    renderTagFilters,
     refreshFilesKeepFilter,
     showNotification,
     SetWorkshopPreferredIP,
@@ -209,9 +227,23 @@ function bindSettingsPage(deps) {
       const config = deps.getConfig();
       config.displayMode = radio.value;
       deps.saveConfig(config);
-      document.querySelectorAll("#settings-page-content .mode-option").forEach((option) => option.classList.remove("active"));
+      radio.closest(".mode-toggle-group")?.querySelectorAll(".mode-option").forEach((option) => option.classList.remove("active"));
       radio.closest(".mode-option")?.classList.add("active");
       deps.renderFileList();
+    });
+  });
+
+  document.querySelectorAll('input[name="settings-filter-layout"]').forEach((radio) => {
+    radio.addEventListener("change", async () => {
+      if (!radio.checked) return;
+      deps.appState.filterLayoutMode = radio.value;
+      const config = deps.getConfig();
+      config.filterLayoutMode = radio.value;
+      deps.saveConfig(config);
+      radio.closest(".mode-toggle-group")?.querySelectorAll(".mode-option").forEach((option) => option.classList.remove("active"));
+      radio.closest(".mode-option")?.classList.add("active");
+      await deps.renderTagFilters?.();
+      deps.showNotification(radio.value === "classic" ? "已切换到经典筛选布局" : "已切换到简洁筛选布局", "success");
     });
   });
 
