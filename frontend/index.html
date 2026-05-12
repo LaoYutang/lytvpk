@@ -1570,17 +1570,41 @@
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label for="primary-tag-select" class="input-label">一级标签</label>
-            <select
-              id="primary-tag-select"
-              class="form-select form-select-styled"
+            <label for="primary-tag-trigger" class="input-label">一级标签</label>
+            <div
+              id="primary-tag-dropdown"
+              class="single-select-dropdown set-tags-primary-dropdown"
             >
-              <option value="">无</option>
-              <option value="地图">地图</option>
-              <option value="人物">人物</option>
-              <option value="武器">武器</option>
-              <option value="其他">其他</option>
-            </select>
+              <input type="hidden" id="primary-tag-select" value="" />
+              <button
+                type="button"
+                id="primary-tag-trigger"
+                class="select-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+              ></button>
+              <div
+                id="primary-tag-menu"
+                class="select-menu hidden"
+                role="listbox"
+              >
+                <button type="button" class="select-option" data-value="" role="option">
+                  无
+                </button>
+                <button type="button" class="select-option" data-value="地图" role="option">
+                  地图
+                </button>
+                <button type="button" class="select-option" data-value="人物" role="option">
+                  人物
+                </button>
+                <button type="button" class="select-option" data-value="武器" role="option">
+                  武器
+                </button>
+                <button type="button" class="select-option" data-value="其他" role="option">
+                  其他
+                </button>
+              </div>
+            </div>
           </div>
           <div class="form-group mt-16">
             <label class="input-label">二级标签</label>

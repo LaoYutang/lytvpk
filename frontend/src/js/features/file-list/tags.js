@@ -6,6 +6,90 @@ import { refreshFilesKeepFilter } from "./filters.js";
 let currentEditingTagsFile = null;
 let currentSecondaryTags = [];
 
+const PRIMARY_TAG_FALLBACK_LABEL = "无";
+
+function getPrimaryTagDropdownElements() {
+  return {
+    valueInput: document.getElementById("primary-tag-select"),
+    trigger: document.getElementById("primary-tag-trigger"),
+    menu: document.getElementById("primary-tag-menu"),
+    dropdown: document.getElementById("primary-tag-dropdown"),
+  };
+}
+
+function closePrimaryTagDropdown() {
+  const { trigger, menu } = getPrimaryTagDropdownElements();
+  if (!trigger || !menu) return;
+
+  menu.classList.add("hidden");
+  trigger.setAttribute("aria-expanded", "false");
+}
+
+function updatePrimaryTagDropdownUI() {
+  const { valueInput, trigger, menu } = getPrimaryTagDropdownElements();
+  if (!valueInput || !trigger || !menu) return;
+
+  const selectedValue = valueInput.value || "";
+  const selectedOption = Array.from(menu.querySelectorAll(".select-option")).find(
+    (option) => option.dataset.value === selectedValue,
+  );
+
+  trigger.textContent = selectedOption?.textContent.trim() || PRIMARY_TAG_FALLBACK_LABEL;
+  menu.querySelectorAll(".select-option").forEach((option) => {
+    const isActive = option.dataset.value === selectedValue;
+    option.classList.toggle("active", isActive);
+    option.setAttribute("aria-selected", String(isActive));
+  });
+}
+
+function setPrimaryTagValue(value) {
+  const { valueInput } = getPrimaryTagDropdownElements();
+  if (!valueInput) return;
+
+  valueInput.value = value || "";
+  updatePrimaryTagDropdownUI();
+}
+
+function setupPrimaryTagDropdown() {
+  const { trigger, menu, dropdown } = getPrimaryTagDropdownElements();
+  if (!trigger || !menu || !dropdown) return;
+  if (dropdown.dataset.initialized === "true") {
+    updatePrimaryTagDropdownUI();
+    return;
+  }
+
+  dropdown.dataset.initialized = "true";
+
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpening = menu.classList.contains("hidden");
+    menu.classList.toggle("hidden", !isOpening);
+    trigger.setAttribute("aria-expanded", String(isOpening));
+  });
+
+  menu.querySelectorAll(".select-option").forEach((option) => {
+    option.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setPrimaryTagValue(option.dataset.value || "");
+      closePrimaryTagDropdown();
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!dropdown.contains(event.target)) {
+      closePrimaryTagDropdown();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closePrimaryTagDropdown();
+    }
+  });
+
+  updatePrimaryTagDropdownUI();
+}
+
 export function openSetTagsModal(filePath) {
   const file =
     (appState.vpkFiles || []).find((f) => f.path === filePath) ||
@@ -20,10 +104,9 @@ export function openSetTagsModal(filePath) {
   currentSecondaryTags = [...(file.secondaryTags || [])];
 
   const modal = document.getElementById("set-tags-modal");
-  const primarySelect = document.getElementById("primary-tag-select");
   const input = document.getElementById("new-secondary-tag-input");
 
-  if (primarySelect) primarySelect.value = file.primaryTag || "";
+  setPrimaryTagValue(file.primaryTag || "");
   renderEditTagsList();
   if (input) input.value = "";
 
@@ -54,12 +137,13 @@ export function setupTagModalListeners() {
   const clearTagsBtn = document.getElementById("clear-tags-btn");
   if (clearTagsBtn) {
     clearTagsBtn.addEventListener("click", () => {
-      const primarySelect = document.getElementById("primary-tag-select");
-      if (primarySelect) primarySelect.value = "";
+      setPrimaryTagValue("");
       currentSecondaryTags = [];
       renderEditTagsList();
     });
   }
+
+  setupPrimaryTagDropdown();
 
   const addTagBtn = document.getElementById("add-secondary-tag-btn");
   if (addTagBtn) {
@@ -94,7 +178,7 @@ export function setupTagModalListeners() {
       const modal = document.getElementById("set-tags-modal");
       const primarySelect = document.getElementById("primary-tag-select");
 
-      const pTag = primarySelect.value;
+      const pTag = primarySelect?.value || "";
       const sTags = currentSecondaryTags;
 
       try {
