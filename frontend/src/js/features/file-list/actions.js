@@ -8,7 +8,7 @@ import {
 } from "../state.js";
 import { showError, showNotification, showSuccess } from "../../core/toast.js";
 import { showConfirmModal } from "../modals/confirm.js";
-import { renderFileList } from "./render.js";
+import { renderFileList, iconSvg, getLocationSvg } from "./render.js";
 import { refreshFilesKeepFilter } from "./filters.js";
 import {
   ToggleVPKFile,
@@ -378,14 +378,19 @@ function updateSingleFileDisplay(file) {
 
   const statusEl = item.querySelector(".file-status");
   if (statusEl) {
-    statusEl.textContent = `${file.enabled ? "✅" : "❌"} ${file.enabled ? "启用" : "禁用"}`;
+    const statusIcon = file.enabled ? iconSvg("check") : iconSvg("x");
+    statusEl.innerHTML = `${statusIcon} ${file.enabled ? "启用" : "禁用"}`;
   }
 
   const locationEl = item.querySelector(".file-location");
   if (locationEl) {
-    const locationMap = { root: "📁", workshop: "🔧", disabled: "🚫" };
     const locationNames = { root: "根目录", workshop: "创意工坊", disabled: "已禁用" };
-    locationEl.textContent = `${locationMap[file.location] || "📄"} ${locationNames[file.location] || file.location}`;
+    locationEl.innerHTML = `
+      <span class="location-state-tag location-${file.location}">
+        ${getLocationSvg(file.location)}
+        <span>${locationNames[file.location] || file.location}</span>
+      </span>
+    `;
   }
 
   const actionBtn = item.querySelector(".toggle-btn, .move-btn");
@@ -393,7 +398,7 @@ function updateSingleFileDisplay(file) {
     if (file.location === "workshop") {
       actionBtn.outerHTML = `
         <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move">
-          <span class="btn-icon">📦</span>
+          <span class="btn-icon">${iconSvg("package")}</span>
           <span class="btn-text">转移</span>
         </button>
       `;
@@ -401,7 +406,7 @@ function updateSingleFileDisplay(file) {
       actionBtn.outerHTML = `
         <button class="btn-small action-btn toggle-btn ${file.enabled ? "toggle-disable" : "toggle-enable"}"
                 data-file-path="${file.path}" data-action="toggle">
-          <span class="btn-icon">${file.enabled ? "⛔" : "✅"}</span>
+          <span class="btn-icon">${file.enabled ? iconSvg("x") : iconSvg("check")}</span>
           <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
         </button>
       `;
