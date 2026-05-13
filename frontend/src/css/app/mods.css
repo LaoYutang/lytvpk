@@ -2240,10 +2240,21 @@ html.dark-mode .batch-disable-dropdown-content .dropdown-item:hover {
   display: none;
 }
 
-.file-item.box-selected,
+.file-item.box-selected {
+  background: rgba(79, 70, 229, 0.12) !important;
+}
+
+.file-item.box-selected::before {
+  background: linear-gradient(180deg, var(--primary) 0%, var(--accent) 100%);
+}
+
 .file-card.box-selected {
-  background: rgba(79, 70, 229, 0.15) !important;
-  border-left: 3px solid var(--primary) !important;
+  background: rgba(79, 70, 229, 0.12) !important;
+  border-color: var(--primary) !important;
+  box-shadow:
+    0 0 0 1px var(--primary),
+    0 0 12px rgba(79, 70, 229, 0.45),
+    0 0 24px rgba(79, 70, 229, 0.2) !important;
 }
 
 /* 右键菜单 */
