@@ -138,7 +138,7 @@ func getWorkshopCache(key string) (interface{}, bool) {
 func setWorkshopCache(key string, data interface{}) {
 	workshopCache.Store(key, WorkshopCacheItem{
 		Data:      data,
-		ExpiresAt: time.Now().Add(30 * time.Minute),
+		ExpiresAt: time.Now().Add(1 * time.Hour),
 	})
 }
 
