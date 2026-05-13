@@ -246,6 +246,14 @@ export function setupPageChangeListeners() {
 
 export function disableGlobalContextMenu() {
   document.addEventListener("contextmenu", (e) => {
+    if (
+      e.target.closest(".file-list") ||
+      e.target.closest(".file-list-grid") ||
+      e.target.closest(".file-item") ||
+      e.target.closest(".file-card")
+    ) {
+      return;
+    }
     e.preventDefault();
     return false;
   });

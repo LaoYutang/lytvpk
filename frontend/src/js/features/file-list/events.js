@@ -11,6 +11,7 @@ import {
 import { openSetTagsModal } from "./tags.js";
 import { openLoadOrderModal } from "../modals/load-order.js";
 import { openWorkshopModal, checkWorkshopUrl } from "../downloads/workshop-modal.js";
+import { showContextMenu, hideContextMenu } from "./context-menu.js";
 
 export function setupFileListEventDelegation() {
   console.log("正在设置文件列表按钮事件委托...");
@@ -216,6 +217,37 @@ export function setupFileListEventDelegation() {
         openLoadOrderModal(filePath);
       }
     }
+  });
+
+  document.addEventListener("contextmenu", function (e) {
+    const fileItem = e.target.closest(".file-item") || e.target.closest(".file-card");
+    if (!fileItem) return;
+
+    if (
+      e.target.closest(".file-checkbox-container") ||
+      e.target.closest(".card-checkbox-container") ||
+      e.target.closest("button") ||
+      e.target.closest(".more-actions-dropdown") ||
+      e.target.closest(".dropdown-content") ||
+      e.target.type === "checkbox"
+    ) {
+      return;
+    }
+
+    const filePath = fileItem.dataset.path;
+    if (!filePath) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    document.querySelectorAll(".dropdown-content").forEach((d) => {
+      d.classList.add("hidden");
+      const container = d.closest(".file-item") || d.closest(".file-card");
+      if (container) container.classList.remove("active-dropdown");
+    });
+
+    hideContextMenu();
+    showContextMenu(e, filePath);
   });
 
   console.log("文件列表按钮事件委托设置完成");

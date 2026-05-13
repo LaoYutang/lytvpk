@@ -2246,3 +2246,96 @@ html.dark-mode .batch-disable-dropdown-content .dropdown-item:hover {
   border-left: 3px solid var(--primary) !important;
 }
 
+/* 右键菜单 */
+.context-menu {
+  position: fixed;
+  z-index: 6500;
+  min-width: 11rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background: var(--bg-app);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.14), 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-150) var(--ease-out), color var(--duration-150) var(--ease-out);
+}
+
+.context-menu-item:hover {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.context-menu-item .btn-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.72;
+}
+
+.context-menu-item:hover .btn-icon {
+  opacity: 1;
+}
+
+.context-menu-item-danger {
+  color: var(--danger);
+}
+
+.context-menu-item-danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger);
+}
+
+.context-menu-item-danger .btn-icon {
+  color: var(--danger);
+  opacity: 0.72;
+}
+
+.context-menu-item-danger:hover .btn-icon {
+  opacity: 1;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 0.3rem 0.45rem;
+}
+
+html.dark-mode .context-menu {
+  background: var(--bg-surface);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+html.dark-mode .context-menu-item:hover {
+  background: rgba(99, 102, 241, 0.16);
+}
+
+html.dark-mode .context-menu-item-danger:hover {
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--danger-light);
+}
+
+html.dark-mode .context-menu-divider {
+  background: rgba(148, 163, 184, 0.18);
+}
+
