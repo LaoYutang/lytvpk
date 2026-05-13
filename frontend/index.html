@@ -601,6 +601,14 @@
                     </svg>
                   </span> 导出ZIP
                 </button>
+                <button id="batch-set-tags-btn" class="dropdown-item">
+                  <span class="btn-icon">
+                    <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"></path>
+                      <circle cx="7.5" cy="7.5" r=".8"></circle>
+                    </svg>
+                  </span> 设置标签
+                </button>
                 <button id="move-selected-btn" class="dropdown-item">
                   <span class="btn-icon">
                     <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1637,6 +1645,162 @@
             </button>
             <button id="save-tags-btn" class="btn btn-primary">保存</button>
           </div>
+        </div>
+      </div>
+    </div>
+    <!-- 批量编辑标签对话框 -->
+    <div id="batch-set-tags-modal" class="modal hidden">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h2>
+            批量编辑标签
+            <span class="batch-tags-count">
+              已选中 <span id="batch-tags-file-count">0</span> 个文件
+            </span>
+          </h2>
+          <button id="close-batch-set-tags-modal-btn" class="close-btn">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <!-- 一级标签区块 -->
+          <section class="batch-tags-section">
+            <div class="batch-tags-section-header">
+              <h3>一级标签</h3>
+            </div>
+            <div
+              class="mode-toggle-group batch-mode-group"
+              data-target="primary"
+            >
+              <span class="mode-toggle-slider" aria-hidden="true"></span>
+              <button class="mode-option active" data-mode="keep">
+                不修改
+              </button>
+              <button class="mode-option" data-mode="set">设置</button>
+              <button class="mode-option" data-mode="reset">清空</button>
+            </div>
+            <div
+              class="batch-tags-action-area hidden"
+              id="batch-primary-action-area"
+            >
+              <div
+                id="batch-primary-dropdown"
+                class="single-select-dropdown set-tags-primary-dropdown"
+              >
+                <input type="hidden" id="batch-primary-select" value="" />
+                <button
+                  type="button"
+                  id="batch-primary-trigger"
+                  class="select-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  无
+                </button>
+                <div
+                  id="batch-primary-menu"
+                  class="select-menu hidden"
+                  role="listbox"
+                >
+                  <button
+                    type="button"
+                    class="select-option active"
+                    data-value=""
+                    role="option"
+                  >
+                    无
+                  </button>
+                  <button
+                    type="button"
+                    class="select-option"
+                    data-value="地图"
+                    role="option"
+                  >
+                    地图
+                  </button>
+                  <button
+                    type="button"
+                    class="select-option"
+                    data-value="人物"
+                    role="option"
+                  >
+                    人物
+                  </button>
+                  <button
+                    type="button"
+                    class="select-option"
+                    data-value="武器"
+                    role="option"
+                  >
+                    武器
+                  </button>
+                  <button
+                    type="button"
+                    class="select-option"
+                    data-value="其他"
+                    role="option"
+                  >
+                    其他
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 二级标签区块 -->
+          <section class="batch-tags-section mt-16">
+            <div class="batch-tags-section-header">
+              <h3>二级标签</h3>
+            </div>
+            <div
+              class="mode-toggle-group batch-mode-group"
+              data-target="secondary"
+            >
+              <span class="mode-toggle-slider" aria-hidden="true"></span>
+              <button class="mode-option active" data-mode="keep">
+                不修改
+              </button>
+              <button class="mode-option" data-mode="append">追加</button>
+              <button class="mode-option" data-mode="set">设置</button>
+              <button class="mode-option" data-mode="reset">清空</button>
+            </div>
+            <div
+              class="batch-tags-action-area hidden"
+              id="batch-secondary-action-area"
+            >
+              <div
+                id="batch-secondary-tags-list"
+                class="tags-container"
+              ></div>
+              <div class="input-group input-group-flex">
+                <input
+                  type="text"
+                  id="batch-new-secondary-tag-input"
+                  class="form-input flex-1"
+                  placeholder="输入标签按回车添加"
+                />
+                <button
+                  id="batch-add-secondary-tag-btn"
+                  class="btn btn-small btn-primary ml-8"
+                >
+                  添加
+                </button>
+              </div>
+              <p class="batch-tags-hint" id="batch-secondary-hint"></p>
+            </div>
+          </section>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-batch-set-tags-btn" class="btn btn-secondary">
+            取消
+          </button>
+          <button
+            id="save-batch-set-tags-btn"
+            class="btn btn-primary"
+            disabled
+          >
+            保存
+          </button>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   renameFile,
 } from "./operations.js";
 import { openSetTagsModal } from "./tags.js";
+import { openBatchSetTagsModal } from "./batch-tags.js";
 import { openLoadOrderModal } from "../modals/load-order.js";
 import {
   enableSelected,
@@ -109,6 +110,7 @@ function buildBatchMenu(menu) {
   }
 
   menu.appendChild(createDivider());
+  menu.appendChild(createMenuItem("设置标签", iconSvg("tag"), () => openBatchSetTagsModal()));
   menu.appendChild(createMenuItem("导出ZIP", iconSvg("package"), () => exportZipSelected()));
   menu.appendChild(createMenuItem("移动文件", iconSvg("folderOpen"), () => moveSelected()));
   menu.appendChild(createMenuItem("批量删除", iconSvg("trash"), () => deleteSelected(), { danger: true }));

@@ -87,6 +87,10 @@ import {
   setupClearCompletedTasks,
 } from "./downloads/task-list.js";
 import { openSetTagsModal, setupTagModalListeners } from "./file-list/tags.js";
+import {
+  openBatchSetTagsModal,
+  setupBatchTagsModalListeners,
+} from "./file-list/batch-tags.js";
 import { showConfirmModal } from "./modals/confirm.js";
 import { showExitModal, closeExitModal, confirmExit } from "./modals/exit.js";
 import { showInfoModal, closeInfoModal } from "./modals/info.js";
@@ -387,6 +391,7 @@ function setupEventListeners() {
 
   // 标签模态框事件
   setupTagModalListeners();
+  setupBatchTagsModalListeners();
 
   // 清除已完成任务
   setupClearCompletedTasks();
@@ -508,6 +513,14 @@ function setupBatchActionEvents() {
     exportZipSelectedBtn.addEventListener("click", () => {
       closeBatchDropdown();
       exportZipSelected();
+    });
+  }
+
+  const batchSetTagsBtn = document.getElementById("batch-set-tags-btn");
+  if (batchSetTagsBtn) {
+    batchSetTagsBtn.addEventListener("click", () => {
+      closeBatchDropdown();
+      openBatchSetTagsModal();
     });
   }
 
