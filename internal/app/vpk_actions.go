@@ -183,16 +183,22 @@ func (a *App) SetVPKTags(filePath string, primaryTag string, secondaryTags []str
 		baseName = strings.TrimPrefix(realName, "_")
 	}
 
+	// 清理特殊字符，避免破坏文件名或标签解析
+	primaryTag = parser.SanitizeTag(primaryTag)
+	sanitizedSecondary := make([]string, 0, len(secondaryTags))
+	for _, t := range secondaryTags {
+		if cleaned := parser.SanitizeTag(t); cleaned != "" {
+			sanitizedSecondary = append(sanitizedSecondary, cleaned)
+		}
+	}
+	secondaryTags = sanitizedSecondary
+
 	// 组合新标签
 	allTags := make([]string, 0)
 	if primaryTag != "" {
 		allTags = append(allTags, primaryTag)
 	}
-	for _, t := range secondaryTags {
-		if t != "" {
-			allTags = append(allTags, t)
-		}
-	}
+	allTags = append(allTags, secondaryTags...)
 
 	var newFilename string
 	if len(allTags) == 0 {

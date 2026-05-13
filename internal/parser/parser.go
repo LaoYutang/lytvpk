@@ -85,6 +85,17 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 
 var tagRegex = regexp.MustCompile(`^(_)?\[(.*?)\](.*)$`)
 
+// tagSanitizeRegex 匹配会导致文件名非法或破坏标签解析的字符：
+// Windows 文件名禁止字符 (< > : " / \ | ? *) 以及标签解析相关字符 ([ ] , +)
+var tagSanitizeRegex = regexp.MustCompile(`[<>:"/\\|?*\[\],+]`)
+
+// SanitizeTag 清理标签中的特殊字符，使其能安全地写入文件名
+// 将禁止字符替换为下划线并修剪两端空白
+func SanitizeTag(tag string) string {
+	cleaned := tagSanitizeRegex.ReplaceAllString(tag, "_")
+	return strings.TrimSpace(cleaned)
+}
+
 // ParseFilenameTags 解析文件名中的标签
 // 返回: primaryTag, secondaryTags, realNameWithoutTags, hasTags
 func ParseFilenameTags(filename string) (string, []string, string, bool) {
