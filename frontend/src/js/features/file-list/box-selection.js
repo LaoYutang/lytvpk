@@ -21,6 +21,9 @@ const boxState = {
 let selectionBoxEl = null;
 let fileListContainer = null;
 
+// 框选完成后短暂阻止 click 事件，防止卡片详情弹窗误触发
+let suppressClick = false;
+
 /**
  * 初始化框选功能 - 在应用加载时调用
  */
@@ -42,7 +45,17 @@ export function initBoxSelection() {
   // 滚动时取消选择
   fileListContainer.addEventListener("scroll", handleScroll);
 
+  // 阻止框选后的误触发 click
+  fileListContainer.addEventListener("click", handleClickCapture, { capture: true });
+
   console.log("框选功能已初始化");
+}
+
+function handleClickCapture(e) {
+  if (suppressClick) {
+    e.stopPropagation();
+    suppressClick = false;
+  }
 }
 
 /**
@@ -129,7 +142,8 @@ function handleMouseUp(e) {
   boxState.hasStarted = false;
 
   if (wasStarted) {
-    // 有框选行为，应用选择
+    // 有框选行为，应用选择，并阻止后续误触发的 click 事件
+    suppressClick = true;
     selectionBoxEl.classList.add("hidden");
 
     // 将框选中的文件添加到 selectedFiles（保留原有选择）
