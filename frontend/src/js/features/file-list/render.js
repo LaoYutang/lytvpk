@@ -136,6 +136,25 @@ export function createFileItem(file) {
 
   item.querySelector(".file-checkbox-container").appendChild(checkbox);
 
+  item.addEventListener("click", function (e) {
+    if (
+      e.target.closest(".file-checkbox-container") ||
+      e.target.closest(".file-actions") ||
+      e.target.type === "checkbox" ||
+      e.target.closest("button")
+    ) {
+      return;
+    }
+
+    if (e.ctrlKey && appState.ctrlClickSelectionEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      const newChecked = !checkbox.checked;
+      checkbox.checked = newChecked;
+      toggleFileSelection(file.path, newChecked);
+    }
+  });
+
   item.addEventListener("dblclick", function (e) {
     if (
       e.target.closest(".file-checkbox-container") ||
@@ -345,6 +364,16 @@ export function createFileCard(file) {
     ) {
       return;
     }
+
+    if (e.ctrlKey && appState.ctrlClickSelectionEnabled) {
+      e.preventDefault();
+      e.stopPropagation();
+      const newChecked = !checkbox.checked;
+      checkbox.checked = newChecked;
+      toggleFileSelection(file.path, newChecked);
+      return;
+    }
+
     showFileDetail(file.path);
   });
 

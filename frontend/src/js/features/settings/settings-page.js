@@ -114,6 +114,16 @@ export async function renderSettingsPage({
             </div>
             <div class="setting-row">
               <div class="setting-row-info">
+                <div class="setting-row-label">Ctrl+单击选择</div>
+                <div class="setting-row-desc">按住 Ctrl 键并单击 Mod，可快速选中或取消选中</div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="settings-ctrl-click-selection" ${appState.ctrlClickSelectionEnabled ? "checked" : ""}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div class="setting-row-info">
                 <div class="setting-row-label">筛选布局</div>
                 <div class="setting-row-desc">简洁模式使用下拉筛选节省空间；经典模式展开选项，方便快速点击筛选 Mod</div>
               </div>
@@ -276,6 +286,14 @@ function bindSettingsPage(deps) {
     config.boxSelectionEnabled = e.target.checked;
     deps.saveConfig(config);
     deps.showNotification(e.target.checked ? "已开启框选模式" : "已关闭框选模式", "info");
+  });
+
+  document.getElementById("settings-ctrl-click-selection")?.addEventListener("change", (e) => {
+    deps.appState.ctrlClickSelectionEnabled = e.target.checked;
+    const config = deps.getConfig();
+    config.ctrlClickSelectionEnabled = e.target.checked;
+    deps.saveConfig(config);
+    deps.showNotification(e.target.checked ? "已开启 Ctrl+单击选择" : "已关闭 Ctrl+单击选择", "info");
   });
 
   document.getElementById("settings-meta-enabled")?.addEventListener("change", async (event) => {
