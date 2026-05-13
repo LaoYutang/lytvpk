@@ -22,7 +22,7 @@ const HINTS = {
       : `将这 ${count} 个标签追加到 ${fileCount} 个文件的现有标签`,
   set: (count, fileCount) =>
     count === 0
-      ? `将清空 ${fileCount} 个文件的二级标签（等同于"清空"）`
+      ? `将清空 ${fileCount} 个文件的二级标签`
       : `用这 ${count} 个标签覆盖 ${fileCount} 个文件的现有标签`,
 };
 
@@ -212,14 +212,12 @@ function updateSaveButtonState() {
 }
 
 function computePrimary(file) {
-  if (primaryMode === "keep") return file.primaryTag || "";
   if (primaryMode === "set") return batchPrimaryTag;
-  return "";
+  return file.primaryTag || "";
 }
 
 function computeSecondary(file) {
   const current = file.secondaryTags || [];
-  if (secondaryMode === "keep") return current;
   if (secondaryMode === "append") {
     const merged = [...current];
     batchSecondaryTags.forEach((t) => {
@@ -228,7 +226,7 @@ function computeSecondary(file) {
     return merged;
   }
   if (secondaryMode === "set") return [...batchSecondaryTags];
-  return [];
+  return current;
 }
 
 async function saveBatchTags() {
@@ -326,6 +324,19 @@ function addSecondaryTagFromInput() {
   }
 }
 
+function resetBatchTags() {
+  primaryMode = "set";
+  secondaryMode = "set";
+  batchPrimaryTag = "";
+  batchSecondaryTags = [];
+  setPrimaryValue("");
+  updateModeButtonStates();
+  updateActionAreasVisibility();
+  renderSecondaryList();
+  updateSecondaryHint();
+  updateSaveButtonState();
+}
+
 export function setupBatchTagsModalListeners() {
   setupPrimaryDropdown();
 
@@ -371,6 +382,13 @@ export function setupBatchTagsModalListeners() {
       } catch (err) {
         showError("批量编辑标签失败: " + err);
       }
+    });
+  }
+
+  const clearBtn = document.getElementById("clear-batch-tags-btn");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      resetBatchTags();
     });
   }
 

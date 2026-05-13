@@ -1677,7 +1677,6 @@
                 不修改
               </button>
               <button class="mode-option" data-mode="set">设置</button>
-              <button class="mode-option" data-mode="reset">清空</button>
             </div>
             <div
               class="batch-tags-action-area hidden"
@@ -1762,7 +1761,6 @@
               </button>
               <button class="mode-option" data-mode="append">追加</button>
               <button class="mode-option" data-mode="set">设置</button>
-              <button class="mode-option" data-mode="reset">清空</button>
             </div>
             <div
               class="batch-tags-action-area hidden"
@@ -1790,17 +1788,22 @@
             </div>
           </section>
         </div>
-        <div class="modal-footer">
-          <button id="cancel-batch-set-tags-btn" class="btn btn-secondary">
-            取消
+        <div class="modal-footer" style="justify-content: space-between">
+          <button id="clear-batch-tags-btn" class="btn btn-danger-outline">
+            重置
           </button>
-          <button
-            id="save-batch-set-tags-btn"
-            class="btn btn-primary"
-            disabled
-          >
-            保存
-          </button>
+          <div style="display: flex; gap: 8px">
+            <button id="cancel-batch-set-tags-btn" class="btn btn-secondary">
+              取消
+            </button>
+            <button
+              id="save-batch-set-tags-btn"
+              class="btn btn-primary"
+              disabled
+            >
+              保存
+            </button>
+          </div>
         </div>
       </div>
     </div>
