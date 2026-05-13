@@ -322,6 +322,49 @@ html.dark-mode .browser-category-indicator {
   flex-shrink: 0;
 }
 
+.watch-later-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.watch-later-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition:
+    background var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.watch-later-clear-btn .icon-svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+}
+
+.watch-later-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.watch-later-clear-btn:disabled,
+.watch-later-clear-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .watch-later-list {
   flex: 1;
   overflow-y: auto;

@@ -1,3 +1,5 @@
+import { showConfirmModal } from "../modals/confirm.js";
+
 let switchAppPage;
 let showNotification;
 let showError;
@@ -263,10 +265,29 @@ function setupWatchLaterDrawerListeners() {
   document
     .getElementById("browser-watch-later-backdrop")
     ?.addEventListener("click", closeWatchLaterDrawer);
+  document
+    .getElementById("browser-watch-later-clear")
+    ?.addEventListener("click", clearWatchLater);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeWatchLaterDrawer();
   });
   renderWatchLaterDrawer();
+}
+
+function clearWatchLater() {
+  const items = getWatchLaterItems();
+  if (items.length === 0) return;
+
+  showConfirmModal(
+    "确认清空",
+    `确定要清空稍后再看列表吗？列表中有 ${items.length} 个物品，此操作不可撤销。`,
+    () => {
+      localStorage.removeItem(WATCH_LATER_STORAGE_KEY);
+      updateWatchLaterBadge();
+      renderWatchLaterDrawer();
+      showNotification?.("已清空稍后再看列表", "info");
+    }
+  );
 }
 
 function resetWorkshopPaging() {
