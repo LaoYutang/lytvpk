@@ -7,6 +7,7 @@ import {
 import { showError, showNotification } from "../../core/toast.js";
 import { SetVPKTags } from "../../../../wailsjs/go/app/App";
 import { refreshFilesKeepFilter } from "./filters.js";
+import { deselectAll } from "./actions.js";
 
 let primaryMode = "keep";
 let secondaryMode = "keep";
@@ -268,6 +269,7 @@ async function saveBatchTags() {
   if (modal) modal.classList.add("hidden");
   await refreshFilesKeepFilter();
   showMainScreen();
+  deselectAll();
 
   if (fail > 0) {
     showNotification(
@@ -288,6 +290,7 @@ export function openBatchSetTagsModal() {
 
   primaryMode = "keep";
   secondaryMode = "keep";
+  batchSecondaryTags = [];
   setPrimaryValue("");
 
   const countEl = document.getElementById("batch-tags-file-count");
