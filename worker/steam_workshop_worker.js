@@ -78,7 +78,7 @@ export default {
 // ----------------------------------------------------
 // Handler 1: 列表查询 (IPublishedFileService/QueryFiles)
 // ----------------------------------------------------
-async function handleList(url, env, headers) {
+function buildListUrl(url, env, filetype) {
   const steamApiUrl = new URL(
     "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/"
   );
@@ -89,6 +89,9 @@ async function handleList(url, env, headers) {
   params.set("return_details", "true"); // 返回详情
   params.set("numperpage", "20");
   params.set("cache_max_age_seconds", "300"); // 其实 Steam 忽略这个，但我们可以加
+  if (filetype !== null && filetype !== undefined && filetype !== "") {
+    params.set("filetype", filetype);
+  }
 
   // 转发参数
   const q = url.searchParams.get("q");
@@ -132,7 +135,15 @@ async function handleList(url, env, headers) {
     params.set("match_all_tags", "true");
   }
 
+  return steamApiUrl;
+}
+
+async function fetchListData(url, env, filetype) {
+  const steamApiUrl = buildListUrl(url, env, filetype);
   const resp = await fetch(steamApiUrl.toString());
+  if (!resp.ok) {
+    throw new Error(`QueryFiles failed: ${resp.status}`);
+  }
   const data = await resp.json();
   const items = data?.response?.publishedfiledetails;
   if (Array.isArray(items)) {
@@ -140,6 +151,73 @@ async function handleList(url, env, headers) {
       delete item.children;
     });
   }
+  return data;
+}
+
+function mergeListData(itemData, collectionData, limit = 20) {
+  const itemResponse = itemData?.response || {};
+  const collectionResponse = collectionData?.response || {};
+  const items = Array.isArray(itemResponse.publishedfiledetails)
+    ? itemResponse.publishedfiledetails
+    : [];
+  const collections = Array.isArray(collectionResponse.publishedfiledetails)
+    ? collectionResponse.publishedfiledetails
+    : [];
+  const merged = [];
+  const seen = new Set();
+
+  const addItem = (item) => {
+    if (!item?.publishedfileid || seen.has(String(item.publishedfileid))) {
+      return;
+    }
+    seen.add(String(item.publishedfileid));
+    merged.push(item);
+  };
+
+  const maxLength = Math.max(items.length, collections.length);
+  for (let index = 0; index < maxLength && merged.length < limit; index++) {
+    if (index < items.length) addItem(items[index]);
+    if (merged.length >= limit) break;
+    if (index < collections.length) addItem(collections[index]);
+  }
+
+  return {
+    response: {
+      ...itemResponse,
+      publishedfiledetails: merged,
+      total: Number(itemResponse.total || 0) + Number(collectionResponse.total || 0),
+    },
+  };
+}
+
+// ----------------------------------------------------
+// Handler 1: 列表查询 (IPublishedFileService/QueryFiles)
+// ----------------------------------------------------
+async function handleList(url, env, headers) {
+  const requestedFileType = url.searchParams.get("filetype");
+  if (requestedFileType !== null) {
+    const data = await fetchListData(url, env, requestedFileType);
+    return new Response(JSON.stringify(data), { headers });
+  }
+
+  const [itemsResult, collectionsResult] = await Promise.allSettled([
+    fetchListData(url, env, "0"),
+    fetchListData(url, env, "1"),
+  ]);
+
+  if (itemsResult.status === "rejected" && collectionsResult.status === "rejected") {
+    throw itemsResult.reason;
+  }
+
+  const itemData =
+    itemsResult.status === "fulfilled"
+      ? itemsResult.value
+      : { response: { publishedfiledetails: [], total: 0 } };
+  const collectionData =
+    collectionsResult.status === "fulfilled"
+      ? collectionsResult.value
+      : { response: { publishedfiledetails: [], total: 0 } };
+  const data = mergeListData(itemData, collectionData);
 
   return new Response(JSON.stringify(data), { headers });
 }
