@@ -28,6 +28,7 @@ export const browserState = {
 };
 
 const WATCH_LATER_STORAGE_KEY = "workshop-watch-later-items";
+const WORKSHOP_COLLECTION_FILE_TYPE = 2;
 const WATCH_LATER_PLACEHOLDER_SVG = `
   <svg viewBox="0 0 160 90" aria-hidden="true">
     <rect x="1" y="1" width="158" height="88" rx="8"></rect>
@@ -41,6 +42,28 @@ const WATCH_LATER_PLACEHOLDER_SVG = `
 
 function getWorkshopItemId(item) {
   return String(item?.publishedfileid || "");
+}
+
+function isWorkshopCollection(item) {
+  return Number(item?.file_type) === WORKSHOP_COLLECTION_FILE_TYPE;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatWorkshopDate(value) {
+  if (!value) return "N/A";
+  const rawValue = Number(value);
+  const date = Number.isFinite(rawValue)
+    ? new Date(rawValue * 1000)
+    : new Date(value);
+  return Number.isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
 }
 
 function getWatchLaterItems() {
@@ -58,6 +81,7 @@ function getWatchLaterItems() {
         views: item.views || 0,
         subscriptions: item.subscriptions || 0,
         favorited: item.favorited || 0,
+        file_type: item.file_type || 0,
         addedAt: item.addedAt || new Date().toISOString(),
       }))
       .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
@@ -87,6 +111,7 @@ function createWatchLaterItem(detail) {
     views: detail.views || 0,
     subscriptions: detail.subscriptions || 0,
     favorited: detail.favorited || 0,
+    file_type: detail.file_type || 0,
     addedAt: new Date().toISOString(),
   };
 }
@@ -561,8 +586,9 @@ function renderWorkshopGrid(items) {
   const grid = document.getElementById("browser-grid");
 
   items.forEach((item) => {
+    const isCollection = isWorkshopCollection(item);
     const card = document.createElement("div");
-    card.className = "workshop-card";
+    card.className = `workshop-card${isCollection ? " collection" : ""}`;
     card.innerHTML = `
             <div class="card-preview skeleton-anim">
                  <div class="skeleton-image-placeholder">
@@ -573,13 +599,14 @@ function renderWorkshopGrid(items) {
                      </svg>
                  </div>
                 <img src="${
-                  item.preview_url || "assets/images/no-preview.png"
-                }" loading="lazy" alt="${item.title}"
+                  escapeHtml(item.preview_url || "assets/images/no-preview.png")
+                }" loading="lazy" alt="${escapeHtml(item.title)}"
                 style="opacity: 0; transition: opacity 0.3s; position: relative; z-index: 2;"
                 onload="this.style.opacity='1'; this.parentElement.classList.remove('skeleton-anim'); this.previousElementSibling.style.display='none';">
+                ${isCollection ? '<span class="collection-card-tag">合集</span>' : ""}
             </div>
             <div class="card-info">
-                <div class="card-title">${item.title}</div>
+                <div class="card-title">${escapeHtml(item.title)}</div>
                 <div class="card-meta">
                     <div class="card-stats">
                         <span>🔥 ${formatNumber(item.views)}</span>
@@ -802,204 +829,379 @@ function resetWorkshopDetailView(detailView) {
   detailView.closest(".browser-body")?.classList.remove("detail-open");
 }
 
-async function openWorkshopDetail(item) {
+function getDetailPreviewUrl(detail) {
+  const images = getWorkshopPreviewImages(detail);
+  return images[0] || detail.preview_url || "assets/images/no-preview.png";
+}
+
+function renderDetailBackButton(parentDetail) {
+  return `
+    <button class="btn btn-outline detail-back-btn" id="back-to-list-btn">
+        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5"></path>
+            <path d="m12 19-7-7 7-7"></path>
+        </svg>
+        <span>${parentDetail ? "返回合集" : "返回列表"}</span>
+    </button>
+  `;
+}
+
+function renderDetailHeader(parentDetail) {
+  return `
+    <div class="detail-header-action">
+        ${renderDetailBackButton(parentDetail)}
+        <div class="detail-header-actions-right">
+            <button class="btn btn-outline watch-later-detail-btn" id="add-to-watch-later-btn" type="button">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 6v6l4 2"></path>
+                    <circle cx="12" cy="12" r="9"></circle>
+                </svg>
+                <span class="watch-later-label">添加到稍后再看</span>
+            </button>
+            <a href="javascript:void(0)" id="open-in-steam-browser" class="btn btn-outline">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M15 3h6v6"></path>
+                    <path d="M10 14 21 3"></path>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                </svg>
+                <span>在浏览器打开</span>
+            </a>
+        </div>
+    </div>
+  `;
+}
+
+function renderDetailPreview(detail) {
+  const previewUrl = getDetailPreviewUrl(detail);
+  return `
+    <div class="detail-preview-wrapper">
+        <div class="main-preview-container skeleton-anim">
+             <div class="skeleton-image-placeholder">
+                 <svg class="icon-svg" style="width: 48px; height: 48px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                     <polyline points="21 15 16 10 5 21"></polyline>
+                 </svg>
+             </div>
+             <img src="${escapeHtml(previewUrl)}" class="detail-preview-img-large" id="main-preview-img"
+             style="opacity: 0; transition: opacity 0.3s; position: relative; z-index: 2;"
+             onclick="window.openFullImage(this.src)"
+             onload="this.style.opacity='1'; this.parentElement.classList.remove('skeleton-anim'); this.previousElementSibling.style.display='none';">
+        </div>
+        ${renderThumbnails(detail)}
+    </div>
+  `;
+}
+
+function renderDetailTags(detail, extraHtml = "") {
+  const tagsHtml = (detail.tags || [])
+    .map((t) => `<span class="tag-badge">${escapeHtml(t.tag)}</span>`)
+    .join("");
+  return `<div class="detail-tags-row">${extraHtml}${tagsHtml}</div>`;
+}
+
+function renderDetailDownloadButton(label) {
+  return `
+    <div class="action-bar-large">
+        <button class="btn btn-success btn-large" id="browser-download-btn">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>${label}</span>
+        </button>
+    </div>
+  `;
+}
+
+function renderItemStats(detail) {
+  return `
+    <div class="detail-stats-bar">
+        <div class="stat-item">
+            <span class="stat-value">${formatNumber(detail.views)}</span>
+            <span class="stat-label">点击</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatNumber(detail.subscriptions)}</span>
+            <span class="stat-label">订阅</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatNumber(detail.favorited)}</span>
+            <span class="stat-label">收藏</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatSize(detail.file_size)}</span>
+            <span class="stat-label">大小</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatWorkshopDate(detail.time_updated)}</span>
+            <span class="stat-label">更新</span>
+        </div>
+    </div>
+  `;
+}
+
+function renderCollectionStats(detail) {
+  const childCount = Array.isArray(detail.child_items) ? detail.child_items.length : 0;
+  return `
+    <div class="detail-stats-bar">
+        <div class="stat-item">
+            <span class="stat-value">${formatNumber(detail.views)}</span>
+            <span class="stat-label">点击</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatNumber(detail.subscriptions)}</span>
+            <span class="stat-label">订阅</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatNumber(detail.favorited)}</span>
+            <span class="stat-label">收藏</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${childCount}</span>
+            <span class="stat-label">物品</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value">${formatWorkshopDate(detail.time_updated)}</span>
+            <span class="stat-label">更新</span>
+        </div>
+    </div>
+  `;
+}
+
+function renderCollectionItems(detail) {
+  const childItems = Array.isArray(detail.child_items) ? detail.child_items : [];
+
+  if (childItems.length === 0) {
+    return `
+      <div class="collection-items-section">
+        <div class="collection-items-header">
+          <h3>合集物品</h3>
+          <span>0 个物品</span>
+        </div>
+        <div class="collection-empty-state">暂时无法获取合集中的物品列表</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="collection-items-section">
+      <div class="collection-items-header">
+        <h3>合集物品</h3>
+        <span>${childItems.length} 个物品</span>
+      </div>
+      <div class="collection-items-list">
+        ${childItems
+          .map((child) => {
+            const childId = getWorkshopItemId(child);
+            const title = child.title || `工坊 #${childId}`;
+            const previewUrl = child.preview_url || "assets/images/no-preview.png";
+            return `
+              <div class="collection-child-card" role="button" tabindex="0" data-workshop-id="${escapeHtml(childId)}">
+                <div class="collection-child-thumb">
+                  <img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(title)}" loading="lazy">
+                </div>
+                <div class="collection-child-info">
+                  <div class="collection-child-title">${escapeHtml(title)}</div>
+                  <div class="collection-child-meta">
+                    <span>ID ${escapeHtml(childId)}</span>
+                    <span>点击 ${formatNumber(child.views)}</span>
+                    <span>订阅 ${formatNumber(child.subscriptions)}</span>
+                  </div>
+                </div>
+                <button class="btn btn-secondary btn-small collection-child-download-btn" type="button" data-workshop-id="${escapeHtml(childId)}" aria-label="下载 ${escapeHtml(title)}">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>下载</span>
+                </button>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderItemDetail(detail, parentDetail) {
+  return `
+    <div class="detail-container">
+        ${renderDetailHeader(parentDetail)}
+        <div class="detail-scroll-content">
+          <div class="detail-top-section">
+              ${renderDetailPreview(detail)}
+              <div class="detail-info-wrapper">
+                  <h1 class="detail-title-large">${escapeHtml(detail.title)}</h1>
+                  ${renderItemStats(detail)}
+                  ${renderDetailTags(detail)}
+                  ${renderDetailDownloadButton("下载并安装")}
+              </div>
+          </div>
+          <div class="detail-description-box">
+              <h3>MOD 介绍</h3>
+              <div class="detail-description-text">${
+                detail.description ? formatDescription(detail.description) : "暂无描述"
+              }</div>
+          </div>
+        </div>
+    </div>
+  `;
+}
+
+function renderCollectionDetail(detail, parentDetail) {
+  return `
+    <div class="detail-container">
+        ${renderDetailHeader(parentDetail)}
+        <div class="detail-scroll-content">
+          <div class="detail-top-section">
+              ${renderDetailPreview(detail)}
+              <div class="detail-info-wrapper">
+                  <div class="detail-title-row">
+                    <span class="detail-type-badge">合集</span>
+                    <h1 class="detail-title-large">${escapeHtml(detail.title)}</h1>
+                  </div>
+                  ${renderCollectionStats(detail)}
+                  ${renderDetailTags(detail, '<span class="tag-badge collection-detail-tag">合集</span>')}
+                  ${renderDetailDownloadButton("下载合集")}
+              </div>
+          </div>
+          ${renderCollectionItems(detail)}
+          <div class="detail-description-box">
+              <h3>合集介绍</h3>
+              <div class="detail-description-text">${
+                detail.description ? formatDescription(detail.description) : "暂无描述"
+              }</div>
+          </div>
+        </div>
+    </div>
+  `;
+}
+
+function renderWorkshopDetail(detail, options = {}) {
+  const detailView = document.getElementById("browser-detail-view");
+  const browserBody = detailView.closest(".browser-body");
+  const parentDetail = options.parentDetail || null;
+
+  workshopPreviewImages = getWorkshopPreviewImages(detail);
+  workshopPreviewIndex = 0;
+  if (isInWatchLater(detail.publishedfileid)) {
+    const nextItems = getWatchLaterItems().map((savedItem) =>
+      savedItem.publishedfileid === detail.publishedfileid
+        ? { ...savedItem, ...createWatchLaterItem(detail), addedAt: savedItem.addedAt }
+        : savedItem
+    );
+    saveWatchLaterItems(nextItems);
+  }
+
+  detailView.innerHTML = isWorkshopCollection(detail)
+    ? renderCollectionDetail(detail, parentDetail)
+    : renderItemDetail(detail, parentDetail);
+
+  document
+    .getElementById("back-to-list-btn")
+    .addEventListener("click", () => {
+      if (parentDetail) {
+        renderWorkshopDetail(parentDetail);
+        return;
+      }
+      hideWorkshopDetailView(detailView, browserBody);
+    });
+
+  document
+    .getElementById("browser-download-btn")
+    .addEventListener("click", () => {
+      startDownloadFromBrowser(detail.publishedfileid);
+    });
+
+  const watchLaterBtn = document.getElementById("add-to-watch-later-btn");
+  if (watchLaterBtn) {
+    watchLaterBtn.dataset.workshopId = detail.publishedfileid;
+    updateWatchLaterDetailButton(watchLaterBtn, detail);
+    watchLaterBtn.addEventListener("click", () => {
+      toggleWatchLaterItem(detail);
+      updateWatchLaterDetailButton(watchLaterBtn, detail);
+    });
+  }
+
+  document
+    .getElementById("open-in-steam-browser")
+    .addEventListener("click", async () => {
+      const target = await GetWorkshopBrowserTarget();
+      let url;
+      if (target === "mirror") {
+        url = `https://l4d2ws.com?workshop-id=${detail.publishedfileid}`;
+      } else {
+        url = `https://steamcommunity.com/sharedfiles/filedetails/?id=${detail.publishedfileid}`;
+      }
+      BrowserOpenURL(url);
+    });
+
+  const thumbContainer = detailView.querySelector(".detail-thumbnails");
+  if (thumbContainer) {
+    thumbContainer.addEventListener("wheel", (evt) => {
+      if (evt.deltaY !== 0) {
+        evt.preventDefault();
+        thumbContainer.scrollLeft += evt.deltaY;
+      }
+    });
+  }
+
+  detailView.querySelectorAll(".collection-child-card").forEach((card) => {
+    const openChild = () => {
+      const childId = card.dataset.workshopId;
+      const child = (detail.child_items || []).find(
+        (item) => getWorkshopItemId(item) === childId
+      );
+      openWorkshopDetail(child || { publishedfileid: childId }, {
+        parentDetail: detail,
+      });
+    };
+
+    card.addEventListener("click", openChild);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openChild();
+      }
+    });
+  });
+
+  detailView
+    .querySelectorAll(".collection-child-download-btn")
+    .forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        startDownloadFromBrowser(button.dataset.workshopId);
+      });
+    });
+}
+
+async function openWorkshopDetail(item, options = {}) {
   const detailView = document.getElementById("browser-detail-view");
   const browserBody = detailView.closest(".browser-body");
   showWorkshopDetailView(detailView, browserBody);
   detailView.innerHTML = `<div class="workshop-detail-loading">${renderWorkshopLoading("正在加载物品详情...")}</div>`;
 
   try {
-    // 请求详情
-    const detail = await FetchWorkshopDetail(item.publishedfileid);
-    workshopPreviewImages = getWorkshopPreviewImages(detail);
-    workshopPreviewIndex = 0;
-    if (isInWatchLater(detail.publishedfileid)) {
-      const nextItems = getWatchLaterItems().map((savedItem) =>
-        savedItem.publishedfileid === detail.publishedfileid
-          ? { ...savedItem, ...createWatchLaterItem(detail), addedAt: savedItem.addedAt }
-          : savedItem
-      );
-      saveWatchLaterItems(nextItems);
-    }
-
-    detailView.innerHTML = `
-            <div class="detail-container">
-                <div class="detail-header-action">
-                    <button class="btn btn-outline detail-back-btn" id="back-to-list-btn">
-                        <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M19 12H5"></path>
-                            <path d="m12 19-7-7 7-7"></path>
-                        </svg>
-                        <span>返回列表</span>
-                    </button>
-                    <div class="detail-header-actions-right">
-                        <button class="btn btn-outline watch-later-detail-btn" id="add-to-watch-later-btn" type="button">
-                            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M12 6v6l4 2"></path>
-                                <circle cx="12" cy="12" r="9"></circle>
-                            </svg>
-                            <span class="watch-later-label">添加到稍后再看</span>
-                        </button>
-                        <a href="javascript:void(0)" id="open-in-steam-browser" class="btn btn-outline">
-                            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M15 3h6v6"></path>
-                                <path d="M10 14 21 3"></path>
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            </svg>
-                            <span>在浏览器打开</span>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="detail-scroll-content">
-                <div class="detail-top-section">
-                    <div class="detail-preview-wrapper">
-                        <div class="main-preview-container skeleton-anim">
-                             <div class="skeleton-image-placeholder">
-                                 <svg class="icon-svg" style="width: 48px; height: 48px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                     <polyline points="21 15 16 10 5 21"></polyline>
-                                 </svg>
-                             </div>
-                             <img src="${
-                               detail.previews && detail.previews.length > 0
-                                 ? detail.previews[0].preview_url ||
-                                   detail.previews[0]
-                                 : detail.preview_url
-                             }" class="detail-preview-img-large" id="main-preview-img" 
-                             style="opacity: 0; transition: opacity 0.3s; position: relative; z-index: 2;"
-                             onclick="window.openFullImage(this.src)"
-                             onload="this.style.opacity='1'; this.parentElement.classList.remove('skeleton-anim'); this.previousElementSibling.style.display='none';">
-                        </div>
-                        ${renderThumbnails(detail)}
-                    </div>
-                    
-                    <div class="detail-info-wrapper">
-                         <h1 class="detail-title-large">${detail.title}</h1>
-                         
-                         <div class="detail-stats-bar">
-                             <div class="stat-item">
-                                <span class="stat-value">${formatNumber(
-                                  detail.views
-                                )}</span>
-                                <span class="stat-label">点击</span>
-                            </div>
-                             <div class="stat-item">
-                                <span class="stat-value">${formatNumber(
-                                  detail.subscriptions
-                                )}</span>
-                                <span class="stat-label">订阅</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-value">${formatNumber(
-                                  detail.favorited
-                                )}</span>
-                                <span class="stat-label">收藏</span>
-                            </div>
-                             <div class="stat-item">
-                                <span class="stat-value">${formatSize(
-                                  detail.file_size
-                                )}</span>
-                                <span class="stat-label">大小</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-value">${new Date(
-                                  detail.time_updated * 1000
-                                ).toLocaleDateString()}</span>
-                                <span class="stat-label">更新</span>
-                            </div>
-                        </div>
-
-                         <div class="detail-tags-row">
-                            ${(detail.tags || [])
-                              .map(
-                                (t) => `<span class="tag-badge">${t.tag}</span>`
-                              )
-                              .join("")}
-                        </div>
-
-                         <div class="action-bar-large">
-                            <button class="btn btn-success btn-large" id="browser-download-btn">
-                                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="7 10 12 15 17 10"></polyline>
-                                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                <span>下载并安装</span>
-                            </button>
-                         </div>
-                    </div>
-                </div>
-
-                <div class="detail-description-box">
-                    <h3>MOD 介绍</h3>
-                    <div class="detail-description-text">${
-                      detail.description
-                        ? formatDescription(detail.description)
-                        : "暂无描述"
-                    }</div>
-                </div>
-                </div>
-            </div>
-        `;
-
-    // 绑定事件
-    document
-      .getElementById("back-to-list-btn")
-      .addEventListener("click", () => {
-        // 隐藏详情，因为我们现在是单页覆盖
-        hideWorkshopDetailView(detailView, browserBody);
-      });
-
-    document
-      .getElementById("browser-download-btn")
-      .addEventListener("click", () => {
-        startDownloadFromBrowser(detail.publishedfileid);
-      });
-
-    const watchLaterBtn = document.getElementById("add-to-watch-later-btn");
-    if (watchLaterBtn) {
-      watchLaterBtn.dataset.workshopId = detail.publishedfileid;
-      updateWatchLaterDetailButton(watchLaterBtn, detail);
-      watchLaterBtn.addEventListener("click", () => {
-        toggleWatchLaterItem(detail);
-        updateWatchLaterDetailButton(watchLaterBtn, detail);
-      });
-    }
-
-    document
-      .getElementById("open-in-steam-browser")
-      .addEventListener("click", async () => {
-        const target = await GetWorkshopBrowserTarget();
-        let url;
-        if (target === "mirror") {
-          url = `https://l4d2ws.com?workshop-id=${detail.publishedfileid}`;
-        } else {
-          url = `https://steamcommunity.com/sharedfiles/filedetails/?id=${detail.publishedfileid}`;
-        }
-        BrowserOpenURL(url);
-      });
-
-    // 绑定缩略图滚轮事件
-    const thumbContainer = detailView.querySelector(".detail-thumbnails");
-    if (thumbContainer) {
-      thumbContainer.addEventListener("wheel", (evt) => {
-        if (evt.deltaY !== 0) {
-          evt.preventDefault();
-          thumbContainer.scrollLeft += evt.deltaY;
-        }
-      });
-    }
+    const detail = await FetchWorkshopDetail(getWorkshopItemId(item));
+    renderWorkshopDetail(detail, options);
   } catch (err) {
     detailView.innerHTML = `
             <div class="loading-placeholder">
                 <p>加载详情失败: ${err}</p>
-                <button class="btn btn-primary" id="detail-error-back-btn">返回</button>
+                <button class="btn btn-primary" id="detail-error-back-btn">${options.parentDetail ? "返回合集" : "返回"}</button>
             </div>`;
     document
       .getElementById("detail-error-back-btn")
       ?.addEventListener("click", () => {
+        if (options.parentDetail) {
+          renderWorkshopDetail(options.parentDetail);
+          return;
+        }
         hideWorkshopDetailView(detailView, browserBody);
       });
   }

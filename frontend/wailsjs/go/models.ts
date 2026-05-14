@@ -304,6 +304,52 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class WorkshopPreviewItem {
+	    publishedfileid: string;
+	    title: string;
+	    preview_url: string;
+	    creator: string;
+	    file_type: number;
+	    views: number;
+	    subscriptions: number;
+	    favorited: number;
+	    tags: [];
+
+	    static createFrom(source: any = {}) {
+	        return new WorkshopPreviewItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.publishedfileid = source["publishedfileid"];
+	        this.title = source["title"];
+	        this.preview_url = source["preview_url"];
+	        this.creator = source["creator"];
+	        this.file_type = source["file_type"];
+	        this.views = source["views"];
+	        this.subscriptions = source["subscriptions"];
+	        this.favorited = source["favorited"];
+	        this.tags = this.convertValues(source["tags"], );
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class  {
 	    tag: string;
 	
@@ -337,6 +383,7 @@ export namespace app {
 	    file_url: string;
 	    preview_url: string;
 	    previews: WorkshopPreviewImage[];
+	    file_type: number;
 	    file_size: any;
 	    time_created: any;
 	    time_updated: any;
@@ -344,6 +391,7 @@ export namespace app {
 	    favorited: any;
 	    views: any;
 	    tags: [];
+	    child_items: WorkshopPreviewItem[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkshopItemDetail(source);
@@ -357,6 +405,7 @@ export namespace app {
 	        this.file_url = source["file_url"];
 	        this.preview_url = source["preview_url"];
 	        this.previews = this.convertValues(source["previews"], WorkshopPreviewImage);
+	        this.file_type = source["file_type"];
 	        this.file_size = source["file_size"];
 	        this.time_created = source["time_created"];
 	        this.time_updated = source["time_updated"];
@@ -364,50 +413,7 @@ export namespace app {
 	        this.favorited = source["favorited"];
 	        this.views = source["views"];
 	        this.tags = this.convertValues(source["tags"], );
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class WorkshopPreviewItem {
-	    publishedfileid: string;
-	    title: string;
-	    preview_url: string;
-	    creator: string;
-	    views: number;
-	    subscriptions: number;
-	    favorited: number;
-	    tags: [];
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkshopPreviewItem(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.publishedfileid = source["publishedfileid"];
-	        this.title = source["title"];
-	        this.preview_url = source["preview_url"];
-	        this.creator = source["creator"];
-	        this.views = source["views"];
-	        this.subscriptions = source["subscriptions"];
-	        this.favorited = source["favorited"];
-	        this.tags = this.convertValues(source["tags"], );
+	        this.child_items = this.convertValues(source["child_items"], WorkshopPreviewItem);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -567,4 +573,3 @@ export namespace parser {
 	}
 
 }
-

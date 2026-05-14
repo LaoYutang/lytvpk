@@ -134,6 +134,12 @@ async function handleList(url, env, headers) {
 
   const resp = await fetch(steamApiUrl.toString());
   const data = await resp.json();
+  const items = data?.response?.publishedfiledetails;
+  if (Array.isArray(items)) {
+    items.forEach((item) => {
+      delete item.children;
+    });
+  }
 
   return new Response(JSON.stringify(data), { headers });
 }
@@ -141,6 +147,102 @@ async function handleList(url, env, headers) {
 // ----------------------------------------------------
 // Handler 2: 单个详情 (合并 ISteamRemoteStorage 和 IPublishedFileService)
 // ----------------------------------------------------
+const PUBLISHED_FILE_DETAILS_URL =
+  "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/";
+const COLLECTION_DETAILS_URL =
+  "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/";
+
+async function fetchPublishedFileDetails(ids, env) {
+  const formData = new FormData();
+  if (env?.STEAM_API_KEY) {
+    formData.append("key", env.STEAM_API_KEY);
+  }
+  formData.append("itemcount", String(ids.length));
+  ids.forEach((id, index) => {
+    formData.append(`publishedfileids[${index}]`, id);
+  });
+
+  const response = await fetch(PUBLISHED_FILE_DETAILS_URL, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`GetPublishedFileDetails failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data?.response?.publishedfiledetails || [];
+}
+
+async function fetchCollectionDetails(id) {
+  const formData = new FormData();
+  formData.append("collectioncount", "1");
+  formData.append("publishedfileids[0]", id);
+
+  const response = await fetch(COLLECTION_DETAILS_URL, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`GetCollectionDetails failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const collection = data?.response?.collectiondetails?.[0];
+  if (
+    !collection ||
+    Number(collection.result) !== 1 ||
+    String(collection.publishedfileid || id) !== String(id)
+  ) {
+    return null;
+  }
+
+  return collection;
+}
+
+async function fetchCollectionChildItems(collection, env) {
+  const childIds = (collection?.children || [])
+    .map((child) => String(child.publishedfileid || ""))
+    .filter(Boolean);
+
+  if (childIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const childDetails = [];
+    const chunkSize = 100;
+    for (let i = 0; i < childIds.length; i += chunkSize) {
+      const chunk = childIds.slice(i, i + chunkSize);
+      childDetails.push(...(await fetchPublishedFileDetails(chunk, env)));
+    }
+
+    const detailsById = new Map(
+      childDetails.map((item) => [String(item.publishedfileid), item])
+    );
+
+    return childIds
+      .map((id) => detailsById.get(id))
+      .filter(Boolean)
+      .map((item) => ({
+        publishedfileid: item.publishedfileid,
+        title: item.title,
+        preview_url: item.preview_url,
+        creator: item.creator,
+        file_type: item.file_type,
+        views: item.views,
+        subscriptions: item.subscriptions,
+        favorited: item.favorited,
+        tags: item.tags || [],
+      }));
+  } catch (err) {
+    console.warn(`Failed to fetch collection child items: ${err.message}`);
+    return [];
+  }
+}
+
 async function handleDetail(url, env, headers) {
   const id = url.searchParams.get("id");
   if (!id) throw new Error("Missing id parameter");
@@ -148,18 +250,7 @@ async function handleDetail(url, env, headers) {
   // 1. 调用旧接口 (ISteamRemoteStorage/GetPublishedFileDetails)
   // 作用: 获取 title, description, 统计数据(订阅/收藏)等
   // 注意: 虽然此接口返回 file_url，但在详情页场景下前端并不使用它(下载走单独流程)
-  const oldApiUrl =
-    "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/";
-
-  const formData = new FormData();
-  formData.append("key", env.STEAM_API_KEY);
-  formData.append("itemcount", "1");
-  formData.append("publishedfileids[0]", id);
-
-  const p1 = fetch(oldApiUrl, {
-    method: "POST",
-    body: formData,
-  }).then((r) => r.json());
+  const p1 = fetchPublishedFileDetails([id], env);
 
   // 2. 爬取 HTML 页面获取更多预览图 (Steam API 通常不返回多图)
   // 目标: 从 HTML 中提取 ShowEnlargedImagePreview 调用中的高清大图链接
@@ -176,9 +267,9 @@ async function handleDetail(url, env, headers) {
 
   try {
     // 并行请求
-    const [dataOld, pageHtml] = await Promise.all([p1, p2]);
+    const [publishedFileDetails, pageHtml] = await Promise.all([p1, p2]);
 
-    const resultOld = dataOld?.response?.publishedfiledetails?.[0];
+    const resultOld = publishedFileDetails?.[0];
 
     // 基础校验
     if (!resultOld) {
@@ -254,6 +345,31 @@ async function handleDetail(url, env, headers) {
           },
         ];
       }
+    }
+
+    const fileTypeMissing =
+      resultOld.file_type === undefined ||
+      resultOld.file_type === null ||
+      resultOld.file_type === "";
+    let collectionDetails = null;
+    let isCollection = Number(resultOld.file_type) === 2;
+
+    if (isCollection || fileTypeMissing) {
+      try {
+        collectionDetails = await fetchCollectionDetails(id);
+        if (collectionDetails) {
+          resultOld.file_type = 2;
+          isCollection = true;
+        }
+      } catch (err) {
+        console.warn(`Failed to confirm collection details: ${err.message}`);
+      }
+    }
+
+    if (isCollection) {
+      resultOld.child_items = collectionDetails
+        ? await fetchCollectionChildItems(collectionDetails, env)
+        : [];
     }
 
     // 构造最终响应 (保持原有结构)

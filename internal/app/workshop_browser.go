@@ -35,6 +35,7 @@ type WorkshopPreviewItem struct {
 	Title           string `json:"title"`
 	PreviewUrl      string `json:"preview_url"`
 	Author          string `json:"creator"` // 注意：Steam 有时返回的是 ID，可能需要二次查询用户名
+	FileType        int    `json:"file_type"`
 	Views           int    `json:"views"`
 	Subscriptions   int    `json:"subscriptions"`
 	Favorited       int    `json:"favorited"`
@@ -71,6 +72,7 @@ type WorkshopItemDetail struct {
 	FileUrl         string                 `json:"file_url"`
 	PreviewUrl      string                 `json:"preview_url"`
 	Previews        []WorkshopPreviewImage `json:"previews"`
+	FileType        int                    `json:"file_type"`
 	FileSize        interface{}            `json:"file_size"`
 	TimeCreated     interface{}            `json:"time_created"`
 	TimeUpdated     interface{}            `json:"time_updated"`
@@ -80,6 +82,7 @@ type WorkshopItemDetail struct {
 	Tags            []struct {
 		Tag string `json:"tag"`
 	} `json:"tags"`
+	ChildItems []WorkshopPreviewItem `json:"child_items"`
 }
 
 type SteamDetailResponse struct {
@@ -246,6 +249,9 @@ func (a *App) FetchWorkshopDetail(id string) (WorkshopItemDetail, error) {
 		item.PreviewUrl = a.processWorkshopImage(item.PreviewUrl)
 		for i := range item.Previews {
 			item.Previews[i].PreviewUrl = a.processWorkshopImage(item.Previews[i].PreviewUrl)
+		}
+		for i := range item.ChildItems {
+			item.ChildItems[i].PreviewUrl = a.processWorkshopImage(item.ChildItems[i].PreviewUrl)
 		}
 	}
 
