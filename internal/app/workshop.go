@@ -143,8 +143,13 @@ func parseFileSize(sizeStr string) int64 {
 	return 0
 }
 
-// ParseWorkshopID extracts the ID from a Steam Workshop URL
+// ParseWorkshopID extracts the ID from a Steam Workshop URL or a direct ID.
 func (a *App) ParseWorkshopID(workshopUrl string) (string, error) {
+	workshopUrl = strings.TrimSpace(workshopUrl)
+	if protocol.IsValidWorkshopID(workshopUrl) {
+		return workshopUrl, nil
+	}
+
 	u, err := url.Parse(workshopUrl)
 	if err != nil {
 		return "", fmt.Errorf("invalid URL")
