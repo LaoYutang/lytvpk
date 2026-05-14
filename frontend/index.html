@@ -1830,19 +1830,42 @@
           </aside>
           <div class="browser-content" style="position: relative">
             <div class="browser-toolbar">
-              <div class="search-input-wrapper" style="flex: 1">
-                <span class="search-icon-inside" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <circle cx="11" cy="11" r="7"></circle>
-                    <path d="m16 16 4 4"></path>
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  id="browser-search-input"
-                  class="form-input"
-                  placeholder="搜索 Mod..."
-                />
+              <div class="workshop-search-combo">
+                <div
+                  id="browser-type-toggle"
+                  class="workshop-type-toggle"
+                  data-active="item"
+                  role="tablist"
+                  aria-label="工坊类型"
+                >
+                  <span class="workshop-type-toggle-indicator" aria-hidden="true"></span>
+                  <button
+                    type="button"
+                    class="workshop-type-toggle-btn active"
+                    data-filetype="0"
+                    role="tab"
+                    aria-selected="true"
+                  >
+                    物品
+                  </button>
+                  <button
+                    type="button"
+                    class="workshop-type-toggle-btn"
+                    data-filetype="1"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    合集
+                  </button>
+                </div>
+                <div class="search-input-wrapper">
+                  <input
+                    type="text"
+                    id="browser-search-input"
+                    class="form-input"
+                    placeholder="搜索 Mod..."
+                  />
+                </div>
               </div>
               <button id="browser-search-btn" class="btn btn-primary">
                 <span class="icon" aria-hidden="true">

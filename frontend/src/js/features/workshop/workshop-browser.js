@@ -21,6 +21,7 @@ export const browserState = {
   query: "",
   sort: "trend",
   tags: [],
+  filetype: "0",
   loading: false,
   hasMore: true,
   loadFailed: false,
@@ -322,6 +323,39 @@ function resetWorkshopPaging() {
   browserState.loadFailed = false;
 }
 
+function updateWorkshopTypeToggle() {
+  const toggle = document.getElementById("browser-type-toggle");
+  if (!toggle) return;
+
+  const activeFileType = String(browserState.filetype ?? "0");
+  toggle.dataset.active = activeFileType === "1" ? "collection" : "item";
+
+  toggle.querySelectorAll(".workshop-type-toggle-btn").forEach((button) => {
+    const isActive = button.dataset.filetype === activeFileType;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+}
+
+function setupWorkshopTypeToggle() {
+  const toggle = document.getElementById("browser-type-toggle");
+  if (!toggle) return;
+
+  updateWorkshopTypeToggle();
+
+  toggle.querySelectorAll(".workshop-type-toggle-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextFileType = button.dataset.filetype || "0";
+      if (browserState.filetype === nextFileType) return;
+
+      browserState.filetype = nextFileType;
+      updateWorkshopTypeToggle();
+      resetWorkshopPaging();
+      loadWorkshopList();
+    });
+  });
+}
+
 function updateWorkshopLoadMoreButton() {
   const loadMoreBtn = document.getElementById("browser-load-more");
   if (!loadMoreBtn) return;
@@ -414,6 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 初始化动态指示器
   initBrowserIndicators();
+  setupWorkshopTypeToggle();
 
   // 加载更多
   const loadMoreBtn = document.getElementById("browser-load-more");
@@ -454,6 +489,7 @@ export function openBrowser(options = {}) {
   setTimeout(() => {
     addFilterIcons();
     initBrowserIndicators();
+    updateWorkshopTypeToggle();
     renderWatchLaterDrawer();
   }, 100);
 
@@ -544,7 +580,7 @@ export async function loadWorkshopList() {
 
   try {
     console.log(
-      `[Frontend] Fetching Workshop List: Page=${browserState.page}, Query=${browserState.query}, Sort=${browserState.sort}`
+      `[Frontend] Fetching Workshop List: Page=${browserState.page}, Query=${browserState.query}, Sort=${browserState.sort}, FileType=${browserState.filetype}`
     );
 
     // 调用 Go 后端
@@ -553,6 +589,7 @@ export async function loadWorkshopList() {
       search_text: browserState.query,
       sort: browserState.sort,
       tags: browserState.tags,
+      filetype: browserState.filetype,
     };
 
     const result = await FetchWorkshopList(opts);
@@ -1652,8 +1689,7 @@ function renderFilterItem(
       if (input) input.value = "";
     }
 
-    browserState.page = 1;
-    browserState.data = [];
+    resetWorkshopPaging();
 
     loadWorkshopList();
   });
@@ -1678,8 +1714,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (browserSearch) {
       browserState.query = browserSearch.value.trim();
     }
-    browserState.page = 1;
-    browserState.data = [];
+    resetWorkshopPaging();
     loadWorkshopList();
   };
 
@@ -1720,8 +1755,8 @@ document.addEventListener("DOMContentLoaded", () => {
       browserState.query = "";
       browserState.tags = [];
       browserState.sort = "trend";
-      browserState.page = 1;
-      browserState.data = [];
+      browserState.filetype = "0";
+      resetWorkshopPaging();
 
       // 重置排序组选中
       document.querySelectorAll("#browser-sort-list .filter-item").forEach(i => i.classList.remove("active"));
@@ -1736,6 +1771,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // 更新指示器（排序组需要更新，分类组会自动隐藏）
       updateBrowserSortIndicator(true);
       updateBrowserCategoryIndicator(true);
+      updateWorkshopTypeToggle();
 
       loadWorkshopList();
     });

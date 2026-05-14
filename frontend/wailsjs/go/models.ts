@@ -314,11 +314,11 @@ export namespace app {
 	    subscriptions: number;
 	    favorited: number;
 	    tags: [];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new WorkshopPreviewItem(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.publishedfileid = source["publishedfileid"];
@@ -331,7 +331,7 @@ export namespace app {
 	        this.favorited = source["favorited"];
 	        this.tags = this.convertValues(source["tags"], );
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -473,6 +473,7 @@ export namespace app {
 	    search_text: string;
 	    sort: string;
 	    tags: string[];
+	    filetype: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkshopQueryOptions(source);
@@ -484,6 +485,7 @@ export namespace app {
 	        this.search_text = source["search_text"];
 	        this.sort = source["sort"];
 	        this.tags = source["tags"];
+	        this.filetype = source["filetype"];
 	    }
 	}
 
@@ -573,3 +575,4 @@ export namespace parser {
 	}
 
 }
+

@@ -27,6 +27,7 @@ type WorkshopQueryOptions struct {
 	SearchText string   `json:"search_text"`
 	Sort       string   `json:"sort"` // trend, recent, top
 	Tags       []string `json:"tags"`
+	FileType   string   `json:"filetype"`
 }
 
 // WorkshopPreviewItem 列表页专用的精简结构
@@ -170,9 +171,12 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 	if len(opts.Tags) > 0 {
 		req.SetQueryParam("tags", strings.Join(opts.Tags, ","))
 	}
+	if opts.FileType != "" {
+		req.SetQueryParam("filetype", opts.FileType)
+	}
 
 	// Log request for debugging
-	fmt.Printf("[Workshop] Fetching List: Page=%d, Q=%s, Sort=%s\n", opts.Page, opts.SearchText, opts.Sort)
+	fmt.Printf("[Workshop] Fetching List: Page=%d, Q=%s, Sort=%s, FileType=%s\n", opts.Page, opts.SearchText, opts.Sort, opts.FileType)
 
 	// 发起请求到 Cloudflare Worker (Path: /list)
 	resp, err := req.Get(WorkshopWorkerURL + "/list")
