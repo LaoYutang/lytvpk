@@ -2,11 +2,13 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"vpk-manager/internal/parser"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -21,6 +23,13 @@ type ConflictGroup struct {
 type ConflictResult struct {
 	TotalConflicts int             `json:"total_conflicts"`
 	ConflictGroups []ConflictGroup `json:"conflict_groups"`
+}
+
+const conflictVPKReadTimeout = 45 * time.Second
+
+type conflictVPKFileListResult struct {
+	files []string
+	err   error
 }
 
 // getConflictSeverity 判断文件冲突严重程度
@@ -82,14 +91,50 @@ func getConflictSeverity(filePath string) string {
 	return "info"
 }
 
+func getVPKFileListWithTimeout(filePath string) ([]string, error) {
+	resultCh := make(chan conflictVPKFileListResult, 1)
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				resultCh <- conflictVPKFileListResult{
+					err: fmt.Errorf("解析VPK文件时发生异常: %v", r),
+				}
+			}
+		}()
+
+		files, err := parser.GetVPKFileList(filePath)
+		resultCh <- conflictVPKFileListResult{files: files, err: err}
+	}()
+
+	timer := time.NewTimer(conflictVPKReadTimeout)
+	defer timer.Stop()
+
+	select {
+	case result := <-resultCh:
+		return result.files, result.err
+	case <-timer.C:
+		return nil, fmt.Errorf("解析VPK文件超时")
+	}
+}
+
 // CheckConflicts 检测VPK文件冲突
 func (a *App) CheckConflicts() (*ConflictResult, error) {
-	if a.rootDir == "" {
+	a.mu.RLock()
+	rootDir := a.rootDir
+	a.mu.RUnlock()
+
+	if rootDir == "" {
 		return nil, fmt.Errorf("未选择L4D2目录")
 	}
 
-	// a.rootDir 已经是 addons 目录
-	addonsDir := a.rootDir
+	if !a.conflictCheckMu.TryLock() {
+		return nil, fmt.Errorf("冲突检测正在进行中，请稍候")
+	}
+	defer a.conflictCheckMu.Unlock()
+
+	// rootDir 已经是 addons 目录
+	addonsDir := rootDir
 	workshopDir := filepath.Join(addonsDir, "workshop")
 
 	var vpkPaths []string
@@ -143,7 +188,7 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 		err := a.goroutinePool.Submit(func() {
 			defer wg.Done()
 
-			files, err := parser.GetVPKFileList(p)
+			files, err := getVPKFileListWithTimeout(p)
 
 			countMu.Lock()
 			processedCount++
@@ -160,6 +205,7 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 			}
 
 			if err != nil {
+				log.Printf("冲突检测跳过VPK: %s, 错误: %v", p, err)
 				return
 			}
 

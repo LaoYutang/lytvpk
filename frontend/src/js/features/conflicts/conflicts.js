@@ -4,6 +4,8 @@ let CheckConflicts;
 let toggleFile;
 let moveFileToAddons;
 let conflictProgressRegistered = false;
+let isConflictChecking = false;
+let conflictCheckRunId = 0;
 
 export function configureConflicts(deps) {
   ({ EventsOn, showError, CheckConflicts, toggleFile, moveFileToAddons } = deps);
@@ -15,6 +17,12 @@ let currentSeverityFilter = "critical"; // 默认只显示严重
 
 export function showConflictModal() {
   document.getElementById("conflict-modal").classList.remove("hidden");
+  if (isConflictChecking) {
+    document
+      .getElementById("conflict-progress-container")
+      .classList.remove("hidden");
+    return;
+  }
   resetConflictModal();
   // 自动开始检测
   startConflictCheck();
@@ -39,6 +47,16 @@ function resetConflictModal() {
   // 重置筛选状态
   currentSeverityFilter = "critical";
   updateFilterButtons();
+}
+
+function setConflictChecking(checking) {
+  isConflictChecking = checking;
+
+  const startButton = document.getElementById("start-conflict-check-btn");
+  if (startButton) {
+    startButton.disabled = checking;
+    startButton.textContent = checking ? "检测中..." : "开始检测";
+  }
 }
 
 // 筛选说明文本
@@ -79,6 +97,11 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 export async function startConflictCheck() {
+  if (isConflictChecking) return;
+
+  const runId = ++conflictCheckRunId;
+  setConflictChecking(true);
+
   document
     .getElementById("conflict-progress-container")
     .classList.remove("hidden");
@@ -87,11 +110,22 @@ export async function startConflictCheck() {
 
   try {
     const result = await CheckConflicts();
+    if (runId !== conflictCheckRunId) return;
+
     currentConflictResult = result;
     renderConflictResults(result);
   } catch (err) {
-    showError("冲突检测失败: " + err);
-    // 出错时显示关闭按钮即可
+    if (runId === conflictCheckRunId) {
+      showError("冲突检测失败: " + err);
+      document
+        .getElementById("conflict-progress-container")
+        .classList.add("hidden");
+      document.getElementById("start-conflict-check-btn").style.display = "";
+    }
+  } finally {
+    if (runId === conflictCheckRunId) {
+      setConflictChecking(false);
+    }
   }
 }
 

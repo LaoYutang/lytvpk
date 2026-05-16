@@ -57,36 +57,36 @@ type VPKFileCache struct {
 
 // App struct
 type App struct {
-	ctx           context.Context
-	vpkCache      sync.Map // map[string]*VPKFileCache, key是文件路径
-	mu            sync.RWMutex
-	rootDir       string
-	goroutinePool *ants.Pool
-	forceClose    bool
-	restyClient   *resty.Client
-	proxyServer   *network.ImageProxyServer
-	singletonMgr  *SingletonManager // 单例管理器
+	ctx             context.Context
+	vpkCache        sync.Map // map[string]*VPKFileCache, key是文件路径
+	mu              sync.RWMutex
+	rootDir         string
+	goroutinePool   *ants.Pool
+	conflictCheckMu sync.Mutex
+	forceClose      bool
+	restyClient     *resty.Client
+	proxyServer     *network.ImageProxyServer
+	singletonMgr    *SingletonManager // 单例管理器
 
 	// 配置项
-	modRotationConfig        RotationConfig
-	workshopPreferredIP      bool
-	workshopFixedIP          string
-	workshopMetaEnabled      bool
+	modRotationConfig          RotationConfig
+	workshopPreferredIP        bool
+	workshopFixedIP            string
+	workshopMetaEnabled        bool
 	workshopUpdateCheckEnabled bool
-	workshopBrowserTarget    string
-	migrationVersion         int
-	configPath               string
-
+	workshopBrowserTarget      string
+	migrationVersion           int
+	configPath                 string
 }
 
 // ConfigFile 定义配置文件结构
 type ConfigFile struct {
-	ModRotationConfig        RotationConfig `json:"modRotationConfig"`
-	WorkshopPreferredIP      *bool          `json:"workshopPreferredIP,omitempty"`
-	WorkshopFixedIP          *string        `json:"workshopFixedIP,omitempty"`
-	WorkshopMetaEnabled      *bool          `json:"workshopMetaEnabled,omitempty"`
-	WorkshopUpdateCheckEnabled *bool        `json:"workshopUpdateCheckEnabled,omitempty"`
-	WorkshopBrowserTarget    *string        `json:"workshopBrowserTarget,omitempty"`
+	ModRotationConfig          RotationConfig `json:"modRotationConfig"`
+	WorkshopPreferredIP        *bool          `json:"workshopPreferredIP,omitempty"`
+	WorkshopFixedIP            *string        `json:"workshopFixedIP,omitempty"`
+	WorkshopMetaEnabled        *bool          `json:"workshopMetaEnabled,omitempty"`
+	WorkshopUpdateCheckEnabled *bool          `json:"workshopUpdateCheckEnabled,omitempty"`
+	WorkshopBrowserTarget      *string        `json:"workshopBrowserTarget,omitempty"`
 	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
 	MigrationVersion int `json:"migrationVersion"`
 }
