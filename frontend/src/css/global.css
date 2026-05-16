@@ -186,6 +186,7 @@
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .conflict-header {
@@ -320,24 +321,28 @@
 }
 
 .conflict-details {
-  max-height: 0;
+  display: grid;
+  grid-template-rows: 0fr;
   overflow: hidden;
   background: var(--bg-app);
   padding-left: var(--spacing-4);
   padding-right: var(--spacing-4);
   border-top-color: var(--border-light);
   opacity: 0;
-  transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
+  transition: grid-template-rows 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
 }
 
 .conflict-details.expanded {
-  max-height: 320px;
+  grid-template-rows: 1fr;
   padding-top: var(--spacing-3);
   padding-bottom: var(--spacing-4);
   opacity: 1;
 }
 
 .file-tree {
+  min-height: 0;
+  max-height: min(46vh, 520px);
+  overflow: auto;
   padding: var(--spacing-2);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
