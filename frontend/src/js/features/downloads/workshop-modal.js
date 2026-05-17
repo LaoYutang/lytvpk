@@ -1,6 +1,7 @@
 import { switchAppPage } from "../../core/ui-shell.js";
 import { showError, showNotification, showInfo } from "../../core/toast.js";
 import { getConfig } from "../../core/config.js";
+import { escapeHtml } from "../../core/utils.js";
 import { refreshTaskList } from "./task-list.js";
 import {
   GetWorkshopDetails,
@@ -12,6 +13,11 @@ const DOWNLOAD_ICON_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" fill="none"
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
     <polyline points="7 10 12 15 17 10"></polyline>
     <line x1="12" y1="15" x2="12" y2="3"></line>
+</svg>`;
+const IMAGE_PLACEHOLDER_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+    <polyline points="21 15 16 10 5 21"></polyline>
 </svg>`;
 
 let currentWorkshopDetails = null;
@@ -179,25 +185,56 @@ export async function checkWorkshopUrl() {
     detailsList.forEach((details, index) => {
       const itemDiv = document.createElement("div");
       itemDiv.className = "workshop-info";
-      itemDiv.style.cssText = "display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px;";
 
       const creatorHtml = details.creator && details.creator.trim() !== ""
-        ? `<p><strong>作者:</strong> <span>${details.creator}</span></p>`
+        ? `<p><strong>作者:</strong> <span>${escapeHtml(details.creator)}</span></p>`
         : "";
+      const previewUrl = details.preview_url || "";
+      const title = details.title || "Preview";
+      const filename = details.filename || "";
+      const fileUrl = details.file_url || "";
+      const fileSize = Number.parseInt(details.file_size, 10) || 0;
 
       itemDiv.innerHTML = `
-        <img src="${details.preview_url}" alt="Preview" class="workshop-preview" style="max-width: 200px; max-height: 200px; object-fit: cover; border-radius: 4px;" />
+        <div class="workshop-result-preview skeleton-anim">
+          <div class="skeleton-image-placeholder">
+            ${IMAGE_PLACEHOLDER_SVG}
+          </div>
+          <img ${previewUrl ? `src="${escapeHtml(previewUrl)}"` : ""} alt="${escapeHtml(title)}" class="workshop-preview" loading="lazy" />
+        </div>
         <div class="workshop-details" style="flex: 1;">
-          <h3 style="margin-top: 0;">${details.title}</h3>
-          <p><strong>文件名:</strong> <span>${details.filename}</span></p>
-          <p><strong>大小:</strong> <span>${formatBytes(parseInt(details.file_size))}</span></p>
+          <h3 style="margin-top: 0;">${escapeHtml(title)}</h3>
+          <p><strong>文件名:</strong> <span>${escapeHtml(filename)}</span></p>
+          <p><strong>大小:</strong> <span>${formatBytes(fileSize)}</span></p>
           ${creatorHtml}
           <div style="margin-top: 10px;">
             <button class="btn btn-success download-item-btn" data-index="${index}">下载此文件</button>
-            <button class="btn btn-secondary copy-url-item-btn" data-url="${details.file_url}">复制链接</button>
+            <button class="btn btn-secondary copy-url-item-btn" data-url="${escapeHtml(fileUrl)}">复制链接</button>
           </div>
         </div>
       `;
+
+      const preview = itemDiv.querySelector(".workshop-preview");
+      const previewWrapper = itemDiv.querySelector(".workshop-result-preview");
+      const placeholder = itemDiv.querySelector(".skeleton-image-placeholder");
+      const showPreview = () => {
+        preview.classList.add("loaded");
+        previewWrapper.classList.remove("skeleton-anim");
+        placeholder.classList.add("hidden");
+      };
+      const stopPreviewLoading = () => {
+        previewWrapper.classList.remove("skeleton-anim");
+      };
+
+      if (!previewUrl) {
+        stopPreviewLoading();
+      } else if (preview.complete && preview.naturalWidth > 0) {
+        showPreview();
+      } else {
+        preview.addEventListener("load", showPreview, { once: true });
+        preview.addEventListener("error", stopPreviewLoading, { once: true });
+      }
+
       result.appendChild(itemDiv);
     });
 

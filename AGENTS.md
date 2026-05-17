@@ -74,6 +74,7 @@ wails dev
 wails build
 ```
 该命令会执行完整构建流程，验证前后端集成和产物正确性。
+不需要分别再执行`npm run build`和`gp build .`。
 
 ### 发布构建
 
@@ -125,7 +126,7 @@ wails build -platform windows/amd64 -ldflags "-X main.AppVersion=<version>" -o "
 
 ## 常见注意事项
 
-- Go 会嵌入 `frontend/dist`。如果前端产物缺失或过期，请运行 `npm run build` 或 `wails build`。
+- Go 会嵌入 `frontend/dist`。如果前端产物缺失或过期，请运行 `npm run build`。
 - 修改导出的后端方法或模型后，Wails 绑定可能需要重新生成。
 - 创意工坊、图片代理和服务器查询依赖外部网络，在受限环境中可能无法完整验证。
 - 文件移动、删除、重命名会影响用户真实 addon 目录，新增相关逻辑时要谨慎。

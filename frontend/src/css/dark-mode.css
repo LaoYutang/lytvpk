@@ -200,7 +200,8 @@ html.dark-mode .file-item:nth-child(even) {
 /* 创意工坊骨架屏暗黑模式适配 */
 html.dark-mode .card-preview.skeleton-anim,
 html.dark-mode .main-preview-container.skeleton-anim,
-html.dark-mode .thumbnail-item.skeleton-anim {
+html.dark-mode .thumbnail-item.skeleton-anim,
+html.dark-mode .workshop-result-preview.skeleton-anim {
   background-color: var(--bg-card) !important;
   background-image: linear-gradient(
     90deg,
