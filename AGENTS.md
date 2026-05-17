@@ -73,6 +73,7 @@ wails dev
 ```powershell
 wails build
 ```
+在 Codex 受限沙箱中，`wails build` 会访问 `%LOCALAPPDATA%\go-build`，通常会因沙箱权限报 `Access is denied`。需要验证构建时，直接以提权方式运行 `wails build`，不要先在普通沙箱里试跑一次。
 该命令会执行完整构建流程，验证前后端集成和产物正确性。
 不需要分别再执行`npm run build`和`gp build .`。
 
