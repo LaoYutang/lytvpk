@@ -6,11 +6,21 @@ export function showConfirmModal(title, message, onConfirm, useHtml = false, ext
   const okBtn = document.getElementById("confirm-ok-btn");
   const cancelBtn = document.getElementById("confirm-cancel-btn");
   const closeBtn = document.getElementById("close-confirm-modal-btn");
+  let isConfirming = false;
+
+  const setPending = (pending) => {
+    isConfirming = pending;
+    okBtn.disabled = pending;
+    cancelBtn.disabled = pending;
+    closeBtn.disabled = pending;
+    modal.dataset.confirming = pending ? "true" : "false";
+  };
 
   if (extraClass) {
     extraClass.split(" ").filter(Boolean).forEach((c) => modalContent.classList.add(c));
   }
 
+  setPending(false);
   titleEl.textContent = title;
   if (useHtml) {
     messageEl.innerHTML = message;
@@ -20,6 +30,7 @@ export function showConfirmModal(title, message, onConfirm, useHtml = false, ext
   modal.classList.remove("hidden");
 
   const cleanup = () => {
+    setPending(false);
     modal.classList.add("hidden");
     okBtn.onclick = null;
     cancelBtn.onclick = null;
@@ -30,12 +41,26 @@ export function showConfirmModal(title, message, onConfirm, useHtml = false, ext
   };
 
   okBtn.onclick = async () => {
-    const result = await onConfirm();
-    if (result !== false) {
-      cleanup();
+    if (isConfirming) return;
+
+    setPending(true);
+    try {
+      const result = await onConfirm();
+      if (result !== false) {
+        cleanup();
+      } else {
+        setPending(false);
+      }
+    } catch (error) {
+      setPending(false);
+      console.error("Confirm action failed:", error);
     }
   };
 
-  cancelBtn.onclick = cleanup;
-  closeBtn.onclick = cleanup;
+  cancelBtn.onclick = () => {
+    if (!isConfirming) cleanup();
+  };
+  closeBtn.onclick = () => {
+    if (!isConfirming) cleanup();
+  };
 }
