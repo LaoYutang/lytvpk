@@ -18,6 +18,71 @@ let currentWorkshopDetails = null;
 const workshopCache = new Map();
 const CACHE_DURATION = 3600 * 1000;
 
+function getCurrentDownloadUrls() {
+  const parsedUrls = Array.isArray(currentWorkshopDetails)
+    ? currentWorkshopDetails
+        .map((details) => details?.file_url?.trim())
+        .filter(Boolean)
+    : [];
+
+  if (parsedUrls.length > 1) {
+    return parsedUrls;
+  }
+
+  const manualUrl = document.getElementById("download-url")?.value.trim();
+  if (manualUrl) {
+    return [manualUrl];
+  }
+
+  return parsedUrls;
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (err) {
+      console.error("Clipboard API copy failed:", err);
+    }
+  }
+
+  const el = document.createElement("textarea");
+  el.value = text;
+  el.setAttribute("readonly", "");
+  el.style.position = "fixed";
+  el.style.left = "-9999px";
+  document.body.appendChild(el);
+  el.select();
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("execCommand copy failed");
+    }
+  } finally {
+    document.body.removeChild(el);
+  }
+}
+
+export async function copyCurrentDownloadUrls() {
+  const urls = getCurrentDownloadUrls();
+  if (urls.length === 0) {
+    showError("没有可复制的下载链接");
+    return;
+  }
+
+  try {
+    await copyTextToClipboard(urls.join("\n"));
+    showNotification(
+      urls.length > 1 ? `已复制 ${urls.length} 个下载链接` : "链接已复制",
+      "success"
+    );
+  } catch (err) {
+    console.error("复制失败:", err);
+    showError("复制失败");
+  }
+}
+
 export function openWorkshopModal() {
   switchAppPage("downloads");
   document.getElementById("workshop-url")?.focus();
@@ -152,17 +217,19 @@ export async function checkWorkshopUrl() {
     });
 
     result.querySelectorAll(".copy-url-item-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(btn.dataset.url).then(() => showInfo("链接已复制"));
-        } else {
-          const el = document.createElement("textarea");
-          el.value = btn.dataset.url;
-          document.body.appendChild(el);
-          el.select();
-          document.execCommand("copy");
-          document.body.removeChild(el);
+      btn.addEventListener("click", async () => {
+        const url = btn.dataset.url;
+        if (!url) {
+          showError("无效的下载链接");
+          return;
+        }
+
+        try {
+          await copyTextToClipboard(url);
           showInfo("链接已复制");
+        } catch (err) {
+          console.error("复制失败:", err);
+          showError("复制失败");
         }
       });
     });

@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"vpk-manager/internal/network"
@@ -27,8 +28,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+var downloadTaskSequence atomic.Uint64
+
 func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool) string {
-	taskID := fmt.Sprintf("%d", time.Now().UnixNano())
+	taskID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), downloadTaskSequence.Add(1))
 
 	totalSize := parseFileSize(details.FileSize)
 
@@ -518,7 +521,6 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 
 	updateStatus("completed", "")
 }
-
 
 // replaceExistingMod 下载完成后，查找同workshopId的旧mod并替换
 // 将新文件移动到旧mod所在目录，删才旧文件及其关联文件

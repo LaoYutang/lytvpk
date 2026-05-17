@@ -79,6 +79,7 @@ import {
   closeWorkshopModal,
   checkWorkshopUrl,
   downloadWorkshopFile,
+  copyCurrentDownloadUrls,
 } from "./downloads/workshop-modal.js";
 import {
   refreshTaskList,
@@ -717,19 +718,7 @@ function setupBatchActionEvents() {
   // 复制下载链接按钮
   document
     .getElementById("copy-url-btn")
-    ?.addEventListener("click", function () {
-      const input = document.getElementById("download-url");
-      if (input?.value) {
-        input.select();
-        navigator.clipboard
-          .writeText(input.value)
-          .then(() => showNotification("链接已复制", "success"))
-          .catch((err) => {
-            console.error("复制失败:", err);
-            showError("复制失败");
-          });
-      }
-    });
+    ?.addEventListener("click", copyCurrentDownloadUrls);
 
   // 点击模态框外部关闭
   document
