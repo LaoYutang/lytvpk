@@ -720,6 +720,46 @@ function changeFullImage(step) {
   setFullImageAt(workshopPreviewIndex + step);
 }
 
+function scrollThumbnailsAfterEdgeClick(element) {
+  const container = element?.closest(".detail-thumbnails");
+  if (!container) return;
+
+  const thumbnails = Array.from(container.querySelectorAll(".thumbnail-item"));
+  const clickedIndex = thumbnails.indexOf(element);
+  if (clickedIndex < 0) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const visibleIndexes = thumbnails.reduce((indexes, thumbnail, index) => {
+    const rect = thumbnail.getBoundingClientRect();
+    const isVisible =
+      rect.left < containerRect.right - 1 &&
+      rect.right > containerRect.left + 1;
+    if (isVisible) indexes.push(index);
+    return indexes;
+  }, []);
+
+  if (visibleIndexes.length === 0) return;
+
+  const firstVisibleIndex = visibleIndexes[0];
+  const lastVisibleIndex = visibleIndexes[visibleIndexes.length - 1];
+  let targetIndex = clickedIndex;
+
+  if (clickedIndex === lastVisibleIndex && clickedIndex < thumbnails.length - 1) {
+    targetIndex = Math.min(clickedIndex + 2, thumbnails.length - 1);
+  } else if (clickedIndex === firstVisibleIndex && clickedIndex > 0) {
+    targetIndex = Math.max(clickedIndex - 2, 0);
+  } else {
+    return;
+  }
+
+  const scrollDistance =
+    thumbnails[targetIndex].offsetLeft - thumbnails[clickedIndex].offsetLeft;
+
+  if (scrollDistance !== 0) {
+    container.scrollBy({ left: scrollDistance, behavior: "smooth" });
+  }
+}
+
 window.switchPreview = function (url, element) {
   const mainImg = document.getElementById("main-preview-img");
   if (mainImg) {
@@ -736,6 +776,8 @@ window.switchPreview = function (url, element) {
   if (index >= 0) {
     workshopPreviewIndex = index;
   }
+
+  scrollThumbnailsAfterEdgeClick(element);
 };
 
 // 全屏图片预览
