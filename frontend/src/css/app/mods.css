@@ -1467,6 +1467,7 @@
 }
 
 .card-badge {
+  box-sizing: border-box;
   min-height: 1.5rem;
   padding: 0 var(--spacing-2);
   border-radius: var(--radius-full);
@@ -1478,6 +1479,7 @@
   align-items: center;
   line-height: 1;
   border: 1px solid transparent;
+  min-width: 0;
   max-width: 8.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1504,6 +1506,18 @@
   background: rgba(30, 41, 59, 0.82);
   color: rgba(248, 250, 252, 0.92);
   border-color: rgba(226, 232, 240, 0.22);
+}
+
+.card-badge.secondary-tag-badge.is-long {
+  flex: 0 1 auto;
+  max-width: 8rem;
+  display: inline-block;
+  height: 1.5rem;
+  line-height: 1.38rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-badge.more-tag-badge {

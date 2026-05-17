@@ -214,10 +214,10 @@ export function createFileCard(file) {
     const hasMore = file.secondaryTags.length > 2;
 
     secondaryTagsHtml = displayTags
-      .map(
-        (tag) =>
-          `<span class="card-badge secondary-tag-badge" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`
-      )
+      .map((tag) => {
+        const longTagClass = tag.length > 16 ? " is-long" : "";
+        return `<span class="card-badge secondary-tag-badge${longTagClass}" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
+      })
       .join("");
 
     if (hasMore) {
