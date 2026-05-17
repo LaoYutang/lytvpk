@@ -14,6 +14,9 @@ export function configureConflicts(deps) {
 
 let currentConflictResult = null;
 let currentSeverityFilter = "critical"; // 默认只显示严重
+let currentConflictPage = 1;
+
+const CONFLICT_PAGE_SIZE = 20;
 
 export function showConflictModal() {
   document.getElementById("conflict-modal").classList.remove("hidden");
@@ -46,6 +49,7 @@ function resetConflictModal() {
 
   // 重置筛选状态
   currentSeverityFilter = "critical";
+  currentConflictPage = 1;
   updateFilterButtons();
 }
 
@@ -88,6 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".filter-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       currentSeverityFilter = e.target.dataset.filter;
+      currentConflictPage = 1;
       updateFilterButtons();
       if (currentConflictResult) {
         renderConflictResults(currentConflictResult);
@@ -113,6 +118,7 @@ export async function startConflictCheck() {
     if (runId !== conflictCheckRunId) return;
 
     currentConflictResult = result;
+    currentConflictPage = 1;
     renderConflictResults(result);
   } catch (err) {
     if (runId === conflictCheckRunId) {
@@ -140,62 +146,72 @@ function renderConflictResults(result) {
   }
 
   document.getElementById("conflict-results").classList.remove("hidden");
-  document.getElementById("conflict-count").textContent =
-    result.total_conflicts;
 
   const list = document.getElementById("conflict-list");
   list.innerHTML = "";
 
-  // 过滤并渲染
-  let displayedCount = 0;
-  result.conflict_groups.forEach((group) => {
+  const groups = getFilteredConflictGroups(result);
+  document.getElementById("conflict-count").textContent = groups.length;
+  renderConflictPagination(groups.length);
+
+  if (groups.length === 0) {
+    list.innerHTML =
+      '<div class="empty-state"><p>当前筛选条件下无冲突</p></div>';
+    return;
+  }
+
+  const pageCount = Math.ceil(groups.length / CONFLICT_PAGE_SIZE);
+  currentConflictPage = Math.min(Math.max(currentConflictPage, 1), pageCount);
+
+  const start = (currentConflictPage - 1) * CONFLICT_PAGE_SIZE;
+  const pageGroups = groups.slice(start, start + CONFLICT_PAGE_SIZE);
+
+  pageGroups.forEach((group) => {
+    const groupEl = createConflictGroupElement(group);
+    list.appendChild(groupEl);
+  });
+}
+
+function getFilteredConflictGroups(result) {
+  return (result.conflict_groups || []).filter((group) => {
     const severity = group.severity || "info";
+    return currentSeverityFilter === "all" || severity === currentSeverityFilter;
+  });
+}
 
-    // 筛选逻辑
-    if (currentSeverityFilter !== "all" && severity !== currentSeverityFilter) {
-      return;
-    }
+function createConflictGroupElement(group) {
+  const severity = group.severity || "info";
+  const files = group.files || [];
+  const groupEl = document.createElement("div");
+  groupEl.className = `conflict-group ${severity}`;
 
-    displayedCount++;
-    const groupEl = document.createElement("div");
-    // 添加严重程度 class
-    groupEl.className = `conflict-group ${severity}`;
+  const vpkListHtml = (group.vpk_files || [])
+    .map((vpk) => {
+      const displayName = truncateText(vpk.title || vpk.name);
+      const fileName = truncateText(vpk.name);
+      const isWorkshop = vpk.location === "workshop";
+      const btnText = isWorkshop ? "转移" : "禁用";
+      const btnClass = isWorkshop ? "btn-transfer" : "btn-disable";
+      const title = isWorkshop ? "转移到插件目录后可禁用" : "禁用此Mod";
 
-    // 截断文本函数
-    const truncateText = (text, maxLen = 25) => {
-      if (!text || text.length <= maxLen) return text || "";
-      return text.substring(0, maxLen - 2) + "..";
-    };
-
-    // 生成VPK项列表（带标题、文件名和禁用按钮）
-    const vpkListHtml = group.vpk_files
-      .map((vpk) => {
-        const displayName = truncateText(vpk.title || vpk.name);
-        const fileName = truncateText(vpk.name);
-        const isWorkshop = vpk.location === "workshop";
-
-        // workshop显示转移按钮，其他显示禁用按钮
-        const btnText = isWorkshop ? "转移" : "禁用";
-        const btnClass = isWorkshop ? "btn-transfer" : "btn-disable";
-
-        return `
-          <div class="conflict-vpk-item">
-            <div class="conflict-vpk-info">
-              <span class="conflict-vpk-title" title="${vpk.title || vpk.name}">${displayName}</span>
-              <span class="conflict-vpk-filename" title="${vpk.name}">${fileName}</span>
-            </div>
-            <button
-              class="btn btn-small btn-conflict-action ${btnClass}"
-              data-path="${vpk.path}"
-              data-location="${vpk.location}"
-              title="${isWorkshop ? "转移到插件目录后可禁用" : "禁用此Mod"}"
-            >
-              <span>${btnText}</span>
-            </button>
+      return `
+        <div class="conflict-vpk-item">
+          <div class="conflict-vpk-info">
+            <span class="conflict-vpk-title" title="${escapeHtml(vpk.title || vpk.name)}">${escapeHtml(displayName)}</span>
+            <span class="conflict-vpk-filename" title="${escapeHtml(vpk.name)}">${escapeHtml(fileName)}</span>
           </div>
-        `;
-      })
-      .join("");
+          <button
+            class="btn btn-small btn-conflict-action ${btnClass}"
+            data-path="${escapeHtml(vpk.path)}"
+            data-location="${escapeHtml(vpk.location)}"
+            title="${title}"
+          >
+            <span>${btnText}</span>
+          </button>
+        </div>
+      `;
+    })
+    .join("");
 
     // 严重程度标签文本
     let severityText = "普通";
@@ -207,7 +223,7 @@ function renderConflictResults(result) {
                 <div class="conflict-title-section">
                     <div class="conflict-severity-row">
                         <span class="severity-badge ${severity}">${severityText}</span>
-                        <span class="conflict-file-count">${group.files.length} 个冲突文件</span>
+                        <span class="conflict-file-count">${files.length} 个冲突文件</span>
                     </div>
                     <div class="conflict-vpk-names">
                         ${vpkListHtml}
@@ -215,70 +231,7 @@ function renderConflictResults(result) {
                 </div>
             </div>
             <div class="conflict-details">
-                ${(() => {
-                  // 构建文件树
-                  const buildTree = (paths) => {
-                    const root = [];
-                    paths.forEach((path) => {
-                      const parts = path.replace(/\\/g, "/").split("/");
-                      let currentLevel = root;
-                      parts.forEach((part, index) => {
-                        const isFile = index === parts.length - 1;
-                        let node = currentLevel.find((n) => n.name === part);
-                        if (!node) {
-                          node = {
-                            name: part,
-                            type: isFile ? "file" : "folder",
-                            children: [],
-                            path: isFile ? path : null,
-                          };
-                          currentLevel.push(node);
-                        }
-                        if (!isFile) currentLevel = node.children;
-                      });
-                    });
-                    return root;
-                  };
-
-                  // 递归渲染树
-                  const renderTree = (nodes) => {
-                    // 排序：文件夹在前，文件在后，按名称排序
-                    nodes.sort((a, b) => {
-                      if (a.type !== b.type)
-                        return a.type === "folder" ? -1 : 1;
-                      return a.name.localeCompare(b.name);
-                    });
-
-                    return nodes
-                      .map((node) => {
-                        if (node.type === "folder") {
-                          return `
-                                    <div class="tree-folder">
-                                        <div class="tree-folder-name">
-                                            <span class="folder-icon">${folderIconSvg()}</span>
-                                            <span class="tree-node-name">${node.name}</span>
-                                        </div>
-                                        <div class="tree-children">
-                                            ${renderTree(node.children)}
-                                        </div>
-                                    </div>
-                                `;
-                        } else {
-                          const category = getFileCategory(node.path);
-                          return `
-                                    <div class="tree-file">
-                                        <span class="file-tag ${category.className}">${category.label}</span>
-                                        <span class="tree-node-name">${node.name}</span>
-                                    </div>
-                                `;
-                        }
-                      })
-                      .join("");
-                  };
-
-                  const tree = buildTree(group.files);
-                  return `<div class="file-tree">${renderTree(tree)}</div>`;
-                })()}
+                <div class="conflict-details-inner"></div>
             </div>
         `;
 
@@ -287,6 +240,9 @@ function renderConflictResults(result) {
     const details = groupEl.querySelector(".conflict-details");
 
     header.addEventListener("click", () => {
+      if (!details.classList.contains("expanded")) {
+        loadConflictDetails(details, group);
+      }
       details.classList.toggle("expanded");
     });
 
@@ -322,14 +278,172 @@ function renderConflictResults(result) {
       });
     });
 
-    list.appendChild(groupEl);
+  return groupEl;
+}
+
+function loadConflictDetails(details, group) {
+  if (details.dataset.loaded === "true" || details.dataset.loading === "true") {
+    return;
+  }
+
+  details.dataset.loading = "true";
+  const inner = details.querySelector(".conflict-details-inner");
+  inner.innerHTML = '<div class="file-tree-loading">正在加载文件树...</div>';
+
+  requestAnimationFrame(() => {
+    const tree = buildTree(group.files || []);
+    inner.innerHTML = `<div class="file-tree">${renderTree(tree)}</div>`;
+    details.dataset.loaded = "true";
+    delete details.dataset.loading;
+  });
+}
+
+function buildTree(paths) {
+  const root = [];
+
+  paths.forEach((path) => {
+    const normalizedPath = String(path || "");
+    const parts = normalizedPath.replace(/\\/g, "/").split("/").filter(Boolean);
+    let currentLevel = root;
+
+    parts.forEach((part, index) => {
+      const isFile = index === parts.length - 1;
+      let node = currentLevel.find((n) => n.name === part);
+
+      if (!node) {
+        node = {
+          name: part,
+          type: isFile ? "file" : "folder",
+          children: [],
+          path: isFile ? normalizedPath : null,
+        };
+        currentLevel.push(node);
+      }
+
+      if (!isFile) currentLevel = node.children;
+    });
   });
 
-  // 如果筛选后没有结果
-  if (displayedCount === 0) {
-    list.innerHTML =
-      '<div class="empty-state"><p>当前筛选条件下无冲突</p></div>';
+  return root;
+}
+
+function renderTree(nodes) {
+  nodes.sort((a, b) => {
+    if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return nodes
+    .map((node) => {
+      if (node.type === "folder") {
+        return `
+          <div class="tree-folder">
+            <div class="tree-folder-name">
+              <span class="folder-icon">${folderIconSvg()}</span>
+              <span class="tree-node-name">${escapeHtml(node.name)}</span>
+            </div>
+            <div class="tree-children">
+              ${renderTree(node.children)}
+            </div>
+          </div>
+        `;
+      }
+
+      const category = getFileCategory(node.path);
+      return `
+        <div class="tree-file">
+          <span class="file-tag ${category.className}">${category.label}</span>
+          <span class="tree-node-name">${escapeHtml(node.name)}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderConflictPagination(totalCount) {
+  const list = document.getElementById("conflict-list");
+  let pagination = document.getElementById("conflict-pagination");
+
+  if (!pagination) {
+    pagination = document.createElement("div");
+    pagination.id = "conflict-pagination";
+    pagination.className = "conflict-pagination";
+    list.insertAdjacentElement("afterend", pagination);
   }
+
+  const pageCount = Math.ceil(totalCount / CONFLICT_PAGE_SIZE);
+  if (pageCount <= 1) {
+    pagination.classList.add("hidden");
+    pagination.innerHTML = "";
+    return;
+  }
+
+  currentConflictPage = Math.min(Math.max(currentConflictPage, 1), pageCount);
+
+  const visiblePages = getVisiblePageNumbers(currentConflictPage, pageCount);
+  const start = (currentConflictPage - 1) * CONFLICT_PAGE_SIZE + 1;
+  const end = Math.min(currentConflictPage * CONFLICT_PAGE_SIZE, totalCount);
+
+  pagination.classList.remove("hidden");
+  pagination.innerHTML = `
+    <div class="conflict-pagination-info">${start}-${end} / ${totalCount}</div>
+    <div class="conflict-pagination-controls">
+      <button class="conflict-page-btn" data-page="${currentConflictPage - 1}" ${currentConflictPage === 1 ? "disabled" : ""}>上一页</button>
+      ${visiblePages
+        .map((page) =>
+          page === "..."
+            ? '<span class="conflict-page-ellipsis">...</span>'
+            : `<button class="conflict-page-btn ${page === currentConflictPage ? "active" : ""}" data-page="${page}">${page}</button>`,
+        )
+        .join("")}
+      <button class="conflict-page-btn" data-page="${currentConflictPage + 1}" ${currentConflictPage === pageCount ? "disabled" : ""}>下一页</button>
+    </div>
+  `;
+
+  pagination.querySelectorAll(".conflict-page-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const page = Number(btn.dataset.page);
+      if (!page || page === currentConflictPage) return;
+
+      currentConflictPage = Math.min(Math.max(page, 1), pageCount);
+      renderConflictResults(currentConflictResult);
+    });
+  });
+}
+
+function getVisiblePageNumbers(currentPage, pageCount) {
+  if (pageCount <= 7) {
+    return Array.from({ length: pageCount }, (_, index) => index + 1);
+  }
+
+  const pages = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(pageCount - 1, currentPage + 1);
+
+  if (start > 2) pages.push("...");
+  for (let page = start; page <= end; page++) pages.push(page);
+  if (end < pageCount - 1) pages.push("...");
+
+  pages.push(pageCount);
+  return pages;
+}
+
+function truncateText(text, maxLen = 25) {
+  if (!text || text.length <= maxLen) return text || "";
+  return text.substring(0, maxLen - 2) + "..";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char];
+  });
 }
 
 function registerConflictProgressEvents() {

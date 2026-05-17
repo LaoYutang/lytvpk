@@ -396,9 +396,21 @@ html.dark-mode .conflict-group.info .conflict-header {
 }
 
 html.dark-mode .conflict-details,
-html.dark-mode .file-tree {
+html.dark-mode .file-tree,
+html.dark-mode .file-tree-loading {
   background: var(--bg-surface);
   border-color: var(--border-default);
+}
+
+html.dark-mode .conflict-page-btn {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+}
+
+html.dark-mode .conflict-page-btn:hover:not(:disabled),
+html.dark-mode .conflict-page-btn.active {
+  border-color: rgba(129, 140, 248, 0.3);
+  color: var(--accent-light);
 }
 
 html.dark-mode .tree-children {
