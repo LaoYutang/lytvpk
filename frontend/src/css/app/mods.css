@@ -1459,11 +1459,12 @@
 }
 
 .file-checkbox.card-checkbox:checked {
-  background: linear-gradient(
-    135deg,
-    var(--primary) 0%,
-    var(--primary-light) 100%
-  );
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.72),
+    0 0 0 5px rgba(124, 58, 237, 0.42),
+    0 6px 18px rgba(15, 23, 42, 0.38);
 }
 
 .card-badge {
