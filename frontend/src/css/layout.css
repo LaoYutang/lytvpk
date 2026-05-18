@@ -427,6 +427,10 @@ html.dark-mode .sidebar-quick-action.theme-action:hover {
   justify-content: center;
 }
 
+#launch-l4d2-btn.sidebar-quick-action .icon-svg {
+  transform: translateX(0.08rem);
+}
+
 #launch-l4d2-btn.sidebar-quick-action:hover {
   gap: 0.25rem;
   padding: 0;
