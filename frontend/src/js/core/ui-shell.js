@@ -125,14 +125,31 @@ function buildSidebar(sidebar) {
   const themeBtn = document.getElementById("theme-toggle-btn");
 
   if (launchBtn) {
+    const launchWrapper = document.createElement("div");
+    launchWrapper.className = "sidebar-launch-wrapper";
+
     launchBtn.className = "sidebar-quick-action launch-action";
+    launchBtn.removeAttribute("title");
+    launchBtn.setAttribute("aria-label", "启动L4D2");
+    launchBtn.setAttribute("aria-haspopup", "menu");
+    launchBtn.setAttribute("aria-controls", "launch-server-popover");
     const span = launchBtn.querySelector("span");
     if (span) span.textContent = "启动L4D2";
-    footer.appendChild(launchBtn);
+
+    const launchPopover = document.createElement("div");
+    launchPopover.id = "launch-server-popover";
+    launchPopover.className = "launch-server-popover";
+    launchPopover.setAttribute("role", "menu");
+    launchPopover.setAttribute("aria-label", "最近服务器");
+
+    launchWrapper.append(launchBtn, launchPopover);
+    footer.appendChild(launchWrapper);
   }
 
   if (themeBtn) {
     themeBtn.className = "sidebar-quick-action theme-action";
+    themeBtn.removeAttribute("title");
+    themeBtn.setAttribute("aria-label", "切换主题");
     if (!themeBtn.querySelector(".quick-label")) {
       const label = document.createElement("span");
       label.className = "quick-label";

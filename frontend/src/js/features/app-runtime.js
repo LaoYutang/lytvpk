@@ -14,6 +14,7 @@ import {
   closeServerModal,
   renderServers,
   refreshAllServers,
+  setupLaunchServerMenu,
 } from "./servers/servers.js";
 import {
   configureUpdates,
@@ -585,6 +586,7 @@ function setupBatchActionEvents() {
     ?.addEventListener("click", openServerModal);
 
   setupServerModalListeners();
+  setupLaunchServerMenu();
 
   // 启动L4D2按钮
   document

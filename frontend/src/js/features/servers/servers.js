@@ -13,6 +13,8 @@ export function configureServers(deps) {
 }
 
 const SERVER_CONFIG_KEY = "vpk-manager-servers";
+const RECENT_SERVER_KEY = "vpk-manager-recent-servers";
+const RECENT_SERVER_LIMIT = 2;
 const SERVER_ICONS = {
   play: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
   refresh: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg>`,
@@ -38,6 +40,86 @@ function getServers() {
 
 function saveServers(servers) {
   localStorage.setItem(SERVER_CONFIG_KEY, JSON.stringify(servers));
+}
+
+function normalizeAddress(address) {
+  return String(address || "").trim();
+}
+
+function getRawRecentServers() {
+  try {
+    const raw = localStorage.getItem(RECENT_SERVER_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set();
+    return parsed
+      .map((server) => ({
+        name: String(server?.name || "").trim(),
+        address: normalizeAddress(server?.address),
+        lastConnectedAt: Number(server?.lastConnectedAt) || 0,
+      }))
+      .filter((server) => {
+        if (!server.address || seen.has(server.address)) return false;
+        seen.add(server.address);
+        return true;
+      });
+  } catch (e) {
+    console.error("读取最近服务器失败:", e);
+    return [];
+  }
+}
+
+function saveRawRecentServers(servers) {
+  localStorage.setItem(
+    RECENT_SERVER_KEY,
+    JSON.stringify(servers.slice(0, RECENT_SERVER_LIMIT))
+  );
+}
+
+export function getRecentServers() {
+  const savedServers = getServers();
+  const savedByAddress = new Map(
+    savedServers.map((server) => [normalizeAddress(server.address), server])
+  );
+
+  return getRawRecentServers()
+    .map((recent) => {
+      const saved = savedByAddress.get(recent.address);
+      if (!saved) return null;
+
+      return {
+        name: saved.name || recent.name || recent.address,
+        address: saved.address,
+        lastConnectedAt: recent.lastConnectedAt,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.lastConnectedAt - a.lastConnectedAt)
+    .slice(0, RECENT_SERVER_LIMIT);
+}
+
+function recordRecentServer(address) {
+  const normalizedAddress = normalizeAddress(address);
+  if (!normalizedAddress) return;
+
+  const saved = getServers().find(
+    (server) => normalizeAddress(server.address) === normalizedAddress
+  );
+  const nextServer = {
+    name: saved?.name || normalizedAddress,
+    address: saved?.address || normalizedAddress,
+    lastConnectedAt: Date.now(),
+  };
+  const nextRecent = [
+    nextServer,
+    ...getRawRecentServers().filter(
+      (server) => normalizeAddress(server.address) !== normalizedAddress
+    ),
+  ];
+
+  saveRawRecentServers(nextRecent);
+  renderLaunchServerMenu();
 }
 
 // --- 编辑/添加服务器功能 ---
@@ -119,6 +201,7 @@ function saveServerForm() {
   }
 
   renderServers();
+  renderLaunchServerMenu();
   closeServerFormModal();
 
   // 尝试刷新该服务器信息
@@ -255,6 +338,58 @@ export function setupServerModalListeners() {
     },
     true
   );
+}
+
+export function setupLaunchServerMenu() {
+  const popover = document.getElementById("launch-server-popover");
+  const wrapper = document.querySelector(".sidebar-launch-wrapper");
+  if (!popover || popover.dataset.bound === "true") return;
+
+  popover.dataset.bound = "true";
+  renderLaunchServerMenu();
+
+  wrapper?.addEventListener("pointerenter", renderLaunchServerMenu);
+  popover.addEventListener("click", (event) => {
+    const option = event.target.closest(".launch-server-option");
+    if (!option) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    connectServer(option.dataset.address, { notify: true });
+  });
+}
+
+function renderLaunchServerMenu() {
+  const popover = document.getElementById("launch-server-popover");
+  if (!popover) return;
+
+  const recentServers = getRecentServers().slice().reverse();
+  const content =
+    recentServers.length > 0
+      ? recentServers
+          .map(
+            (server) => `
+              <button
+                class="launch-server-option"
+                type="button"
+                role="menuitem"
+                data-address="${escapeAttr(server.address)}"
+              >
+                <span class="launch-server-icon" aria-hidden="true">${SERVER_ICONS.server}</span>
+                <span class="launch-server-name">${escapeHtml(server.name)}</span>
+              </button>
+            `
+          )
+          .join("")
+      : `
+          <div class="launch-server-empty" role="status">
+            <span>暂无最近</span>
+          </div>
+        `;
+
+  popover.innerHTML = `
+    <div class="launch-server-list">${content}</div>
+  `;
 }
 
 export function openServerModal() {
@@ -535,6 +670,7 @@ function deleteServer(index) {
       if (!isNaN(idx) && idx >= 0 && idx < currentServers.length) {
         currentServers.splice(idx, 1);
         saveServers(currentServers);
+        renderLaunchServerMenu();
 
         // 直接从DOM中移除元素，而不是重新渲染整个列表
         const list = document.getElementById("server-list");
@@ -570,10 +706,17 @@ function deleteServer(index) {
   );
 }
 
-function connectServer(address) {
+function connectServer(address, options = {}) {
+  const server = getServers().find(
+    (item) => normalizeAddress(item.address) === normalizeAddress(address)
+  );
+
   ConnectToServer(address)
     .then(() => {
-      // 可以添加一些提示，比如“正在启动...”
+      recordRecentServer(address);
+      if (options.notify && typeof showNotification === "function") {
+        showNotification(`正在连接 ${server?.name || address}...`, "success");
+      }
     })
     .catch((err) => {
       console.error("连接服务器失败:", err);
@@ -656,6 +799,7 @@ function importServers(jsonStr) {
     if (addedCount > 0) {
       saveServers(currentServers);
       renderServers();
+      renderLaunchServerMenu();
       showNotification(`成功导入 ${addedCount} 个新服务器`, "success");
     } else {
       showNotification("没有发现新的服务器配置", "info");
@@ -745,4 +889,8 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+function escapeAttr(text) {
+  return escapeHtml(text).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
