@@ -248,6 +248,132 @@ export namespace app {
 	        this.errors = source["errors"];
 	    }
 	}
+	export class PanelChapter {
+	    code: string;
+	    title: string;
+	    modes: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PanelChapter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.title = source["title"];
+	        this.modes = source["modes"];
+	    }
+	}
+	export class PanelCampaign {
+	    title: string;
+	    chapters: PanelChapter[];
+	    vpkName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PanelCampaign(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.chapters = this.convertValues(source["chapters"], PanelChapter);
+	        this.vpkName = source["vpkName"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PanelUser {
+	    name: string;
+	    id: number;
+	    steamid: string;
+	    ip: string;
+	    location: string;
+	    status: string;
+	    delay: number;
+	    loss: number;
+	    duration: string;
+	    linkrate: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PanelUser(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.id = source["id"];
+	        this.steamid = source["steamid"];
+	        this.ip = source["ip"];
+	        this.location = source["location"];
+	        this.status = source["status"];
+	        this.delay = source["delay"];
+	        this.loss = source["loss"];
+	        this.duration = source["duration"];
+	        this.linkrate = source["linkrate"];
+	    }
+	}
+	export class PanelServerStatus {
+	    users: PanelUser[];
+	    players: string;
+	    map: string;
+	    hostname: string;
+	    name: string;
+	    serverName: string;
+	    difficulty: string;
+	    gameMode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PanelServerStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.users = this.convertValues(source["users"], PanelUser);
+	        this.players = source["players"];
+	        this.map = source["map"];
+	        this.hostname = source["hostname"];
+	        this.name = source["name"];
+	        this.serverName = source["serverName"];
+	        this.difficulty = source["difficulty"];
+	        this.gameMode = source["gameMode"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PlayerInfo {
 	    name: string;
 	    score: number;
@@ -283,9 +409,15 @@ export namespace app {
 	
 	
 	export class SavedServer {
+	    id?: string;
 	    name: string;
 	    address: string;
 	    weight: number;
+	    panelUrl?: string;
+	    panelPassword?: string;
+	    panelPasswordEncrypted?: string;
+	    panelPasswordSet?: boolean;
+	    clearPanelPassword?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SavedServer(source);
@@ -293,9 +425,15 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.address = source["address"];
 	        this.weight = source["weight"];
+	        this.panelUrl = source["panelUrl"];
+	        this.panelPassword = source["panelPassword"];
+	        this.panelPasswordEncrypted = source["panelPasswordEncrypted"];
+	        this.panelPasswordSet = source["panelPasswordSet"];
+	        this.clearPanelPassword = source["clearPanelPassword"];
 	    }
 	}
 	export class ServerInfo {

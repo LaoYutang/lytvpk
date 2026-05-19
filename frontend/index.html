@@ -1290,6 +1290,128 @@
       </div>
 
       <!-- 编辑/添加服务器模态框 -->
+      <div id="panel-server-details-modal" class="modal hidden z-1070">
+        <div class="modal-content panel-server-details-modal-content">
+          <div class="modal-header">
+            <h2 id="panel-details-server-name">面板详情</h2>
+            <button id="close-panel-server-details-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div
+              id="panel-details-loading"
+              class="loading-text server-details-loading"
+            >
+              正在连接面板...
+            </div>
+            <div id="panel-details-error" class="panel-error-box hidden"></div>
+            <div id="panel-details-content" class="hidden">
+              <div id="panel-status-summary" class="server-info-summary panel-status-summary"></div>
+              <div class="panel-action-bar">
+                <button id="panel-refresh-btn" class="btn btn-secondary btn-small panel-action-btn">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+                  刷新
+                </button>
+                <button id="panel-restart-btn" class="btn btn-danger btn-small panel-action-btn">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15"/><path d="M6.34 18.34A9 9 0 0 1 3.23 10"/><path d="M12 2v4"/><path d="M12 18v4"/><polyline points="4.22 9.73 8.08 11.58 8.08 5.58"/><polyline points="19.78 14.27 15.92 12.42 15.92 18.42"/></svg>
+                  重启
+                </button>
+                <button id="panel-map-btn" class="btn btn-primary btn-small panel-action-btn">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg>
+                  换图
+                </button>
+                <button id="panel-rcon-btn" class="btn btn-secondary btn-small panel-action-btn">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+                  RCON
+                </button>
+                <button id="panel-open-btn" class="btn btn-outline btn-small panel-action-btn">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  打开面板
+                </button>
+              </div>
+              <h3 class="player-list-title">在线玩家</h3>
+              <div class="player-list-container panel-player-list-container">
+                <table class="player-table">
+                  <thead>
+                    <tr>
+                      <th>名称</th>
+                      <th>SteamID</th>
+                      <th>地区/IP</th>
+                      <th class="text-right">延迟</th>
+                      <th class="text-right">丢包</th>
+                      <th class="text-right">时长</th>
+                    </tr>
+                  </thead>
+                  <tbody id="panel-player-list"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="panel-map-modal" class="modal hidden z-1070">
+        <div class="modal-content panel-map-modal-content">
+          <div class="modal-header">
+            <h2 id="panel-map-title">切换地图</h2>
+            <button id="close-panel-map-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="panel-map-toolbar">
+              <input
+                type="text"
+                id="panel-map-search"
+                class="form-input"
+                placeholder="搜索地图名称、代码或 VPK..."
+              />
+              <button
+                id="panel-map-official-toggle-btn"
+                class="btn btn-outline btn-small panel-map-official-toggle"
+                type="button"
+              >
+                隐藏官方
+              </button>
+              <button id="panel-map-refresh-btn" class="btn btn-secondary">
+                刷新
+              </button>
+            </div>
+            <div id="panel-map-loading" class="loading-text server-details-loading hidden">
+              正在读取地图列表...
+            </div>
+            <div id="panel-map-list" class="panel-map-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="panel-rcon-modal" class="modal hidden z-1070">
+        <div class="modal-content panel-rcon-modal-content">
+          <div class="modal-header">
+            <h2 id="panel-rcon-title">RCON</h2>
+            <button id="close-panel-rcon-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="panel-rcon-row">
+              <input
+                type="text"
+                id="panel-rcon-command"
+                class="form-input"
+                placeholder="输入 RCON 指令，例如 status"
+                autocomplete="off"
+              />
+              <button id="panel-rcon-send-btn" class="btn btn-primary">
+                发送
+              </button>
+            </div>
+            <pre id="panel-rcon-output" class="panel-rcon-output">等待发送指令...</pre>
+          </div>
+        </div>
+      </div>
+
       <div id="server-form-modal" class="modal hidden z-1060">
         <div class="modal-content server-form-modal-content">
           <div class="modal-header server-form-header">
@@ -1333,6 +1455,48 @@
                   value="0"
                 />
                 <span class="text-sm-tertiary">数值越大，排序越靠前</span>
+              </div>
+            </div>
+            <div class="server-advanced-section">
+              <button
+                id="server-advanced-toggle"
+                class="server-advanced-toggle"
+                type="button"
+                aria-expanded="false"
+              >
+                <span>高级配置</span>
+                <span id="panel-password-status" class="panel-password-status"
+                  >未保存密码</span
+                >
+              </button>
+              <div id="server-advanced-content" class="server-advanced-content hidden">
+                <div class="form-group mb-20">
+                  <label for="form-server-panel-url" class="form-label"
+                    >面板地址</label
+                  >
+                  <input
+                    type="text"
+                    id="form-server-panel-url"
+                    class="form-input w-100"
+                    placeholder="例如: http://127.0.0.1:27020"
+                  />
+                </div>
+                <div class="form-group mb-20">
+                  <label for="form-server-panel-password" class="form-label"
+                    >面板密码</label
+                  >
+                  <input
+                    type="password"
+                    id="form-server-panel-password"
+                    class="form-input w-100"
+                    placeholder="面板访问密码"
+                    autocomplete="off"
+                  />
+                </div>
+                <label class="server-clear-password">
+                  <input type="checkbox" id="form-clear-panel-password" />
+                  <span>清除已保存的面板密码</span>
+                </label>
               </div>
             </div>
             <div class="modal-footer server-form-footer">

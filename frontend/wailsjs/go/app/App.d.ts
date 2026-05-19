@@ -7,6 +7,8 @@ export function AutoDiscoverAddons():Promise<string>;
 
 export function CancelDownloadTask(arg1:string):Promise<void>;
 
+export function ChangePanelMap(arg1:string,arg2:string):Promise<string>;
+
 export function CheckConflicts():Promise<app.ConflictResult>;
 
 export function CheckModUpdates():Promise<app.UpdateCheckResult>;
@@ -34,6 +36,10 @@ export function ExtractVPKFromArchive(arg1:string,arg2:string):Promise<void>;
 export function ExtractVPKFromRar(arg1:string,arg2:string):Promise<void>;
 
 export function ExtractVPKFromZip(arg1:string,arg2:string):Promise<void>;
+
+export function FetchPanelMapList(arg1:string):Promise<Array<app.PanelCampaign>>;
+
+export function FetchPanelServerStatus(arg1:string):Promise<app.PanelServerStatus>;
 
 export function FetchPlayerList(arg1:string):Promise<Array<app.PlayerInfo>>;
 
@@ -123,6 +129,8 @@ export function RenameVPKFile(arg1:string,arg2:string):Promise<string>;
 
 export function RestartApplication():Promise<void>;
 
+export function RestartPanelServer(arg1:string):Promise<string>;
+
 export function RetryDownloadTask(arg1:string):Promise<void>;
 
 export function RotateMods():Promise<void>;
@@ -140,6 +148,8 @@ export function SearchVPKFiles(arg1:string,arg2:string,arg3:Array<string>):Promi
 export function SelectDirectory():Promise<string>;
 
 export function SelectFiles():Promise<Array<string>>;
+
+export function SendPanelRconCommand(arg1:string,arg2:string):Promise<string>;
 
 export function SetModRotation(arg1:app.RotationConfig):Promise<void>;
 

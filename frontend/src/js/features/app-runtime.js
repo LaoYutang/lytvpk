@@ -151,6 +151,11 @@ import {
   CheckModUpdates,
   GetServerStorage,
   SaveServerStorage,
+  FetchPanelServerStatus,
+  RestartPanelServer,
+  FetchPanelMapList,
+  ChangePanelMap,
+  SendPanelRconCommand,
   GetWorkshopWatchLaterStorage,
   SaveWorkshopWatchLaterStorage,
 } from "../../../wailsjs/go/app/App";
@@ -179,6 +184,12 @@ configureServers({
   GetMapName,
   GetServerStorage,
   SaveServerStorage,
+  BrowserOpenURL,
+  FetchPanelServerStatus,
+  RestartPanelServer,
+  FetchPanelMapList,
+  ChangePanelMap,
+  SendPanelRconCommand,
 });
 
 configureUpdates({

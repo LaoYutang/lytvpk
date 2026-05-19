@@ -10,6 +10,10 @@ export function CancelDownloadTask(arg1) {
   return window['go']['app']['App']['CancelDownloadTask'](arg1);
 }
 
+export function ChangePanelMap(arg1, arg2) {
+  return window['go']['app']['App']['ChangePanelMap'](arg1, arg2);
+}
+
 export function CheckConflicts() {
   return window['go']['app']['App']['CheckConflicts']();
 }
@@ -64,6 +68,14 @@ export function ExtractVPKFromRar(arg1, arg2) {
 
 export function ExtractVPKFromZip(arg1, arg2) {
   return window['go']['app']['App']['ExtractVPKFromZip'](arg1, arg2);
+}
+
+export function FetchPanelMapList(arg1) {
+  return window['go']['app']['App']['FetchPanelMapList'](arg1);
+}
+
+export function FetchPanelServerStatus(arg1) {
+  return window['go']['app']['App']['FetchPanelServerStatus'](arg1);
 }
 
 export function FetchPlayerList(arg1) {
@@ -242,6 +254,10 @@ export function RestartApplication() {
   return window['go']['app']['App']['RestartApplication']();
 }
 
+export function RestartPanelServer(arg1) {
+  return window['go']['app']['App']['RestartPanelServer'](arg1);
+}
+
 export function RetryDownloadTask(arg1) {
   return window['go']['app']['App']['RetryDownloadTask'](arg1);
 }
@@ -276,6 +292,10 @@ export function SelectDirectory() {
 
 export function SelectFiles() {
   return window['go']['app']['App']['SelectFiles']();
+}
+
+export function SendPanelRconCommand(arg1, arg2) {
+  return window['go']['app']['App']['SendPanelRconCommand'](arg1, arg2);
 }
 
 export function SetModRotation(arg1) {

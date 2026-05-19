@@ -131,9 +131,15 @@ type ServerStorage struct {
 }
 
 type SavedServer struct {
-	Name    string `json:"name"`
-	Address string `json:"address"`
-	Weight  int    `json:"weight"`
+	ID                     string `json:"id,omitempty"`
+	Name                   string `json:"name"`
+	Address                string `json:"address"`
+	Weight                 int    `json:"weight"`
+	PanelURL               string `json:"panelUrl,omitempty"`
+	PanelPassword          string `json:"panelPassword,omitempty"`
+	PanelPasswordEncrypted string `json:"panelPasswordEncrypted,omitempty"`
+	PanelPasswordSet       bool   `json:"panelPasswordSet,omitempty"`
+	ClearPanelPassword     bool   `json:"clearPanelPassword,omitempty"`
 }
 
 type RecentServer struct {

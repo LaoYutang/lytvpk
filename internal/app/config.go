@@ -1,11 +1,16 @@
 package app
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"vpk-manager/internal/network"
 
@@ -279,14 +284,22 @@ func (a *App) GetServerStorage() ServerStorage {
 		}
 		return ServerStorage{Servers: []SavedServer{}, RecentServers: []RecentServer{}}
 	}
-	storage.Servers = cloneSavedServers(storage.Servers)
+	storage.Servers = cloneSavedServersForFrontend(storage.Servers)
 	storage.RecentServers = cloneRecentServers(storage.RecentServers)
 	return storage
 }
 
 func (a *App) SaveServerStorage(storage ServerStorage) error {
 	a.ensureConfigPaths()
-	storage.Servers = cloneSavedServers(storage.Servers)
+	var existing ServerStorage
+	if err := readJSONFile(a.serversPath, &existing); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("读取现有服务器配置失败，将覆盖保存: %v", err)
+	}
+	servers, err := prepareSavedServersForStorage(storage.Servers, existing.Servers)
+	if err != nil {
+		return err
+	}
+	storage.Servers = servers
 	storage.RecentServers = cloneRecentServers(storage.RecentServers)
 	return writeJSONFile(a.configDir, a.serversPath, storage)
 }
@@ -499,6 +512,84 @@ func cloneSavedServers(servers []SavedServer) []SavedServer {
 	next := make([]SavedServer, len(servers))
 	copy(next, servers)
 	return next
+}
+
+func cloneSavedServersForFrontend(servers []SavedServer) []SavedServer {
+	next := cloneSavedServers(servers)
+	for i := range next {
+		next[i].ID = strings.TrimSpace(next[i].ID)
+		if next[i].ID == "" {
+			next[i].ID = newServerID()
+		}
+		next[i].Name = strings.TrimSpace(next[i].Name)
+		next[i].Address = strings.TrimSpace(next[i].Address)
+		next[i].PanelURL = strings.TrimSpace(next[i].PanelURL)
+		next[i].PanelPasswordSet = next[i].PanelPasswordEncrypted != ""
+		next[i].PanelPassword = ""
+		next[i].PanelPasswordEncrypted = ""
+		next[i].ClearPanelPassword = false
+	}
+	return next
+}
+
+func prepareSavedServersForStorage(incoming []SavedServer, existing []SavedServer) ([]SavedServer, error) {
+	existingByID := make(map[string]SavedServer)
+	existingByAddress := make(map[string]SavedServer)
+	for _, server := range existing {
+		if server.ID != "" {
+			existingByID[server.ID] = server
+		}
+		if server.Address != "" {
+			existingByAddress[normalizeStoredAddress(server.Address)] = server
+		}
+	}
+
+	next := cloneSavedServers(incoming)
+	for i := range next {
+		server := &next[i]
+		server.ID = strings.TrimSpace(server.ID)
+		if server.ID == "" {
+			server.ID = newServerID()
+		}
+		server.Name = strings.TrimSpace(server.Name)
+		server.Address = strings.TrimSpace(server.Address)
+		server.PanelURL = strings.TrimSpace(server.PanelURL)
+
+		existingServer, ok := existingByID[server.ID]
+		if !ok {
+			existingServer = existingByAddress[normalizeStoredAddress(server.Address)]
+		}
+
+		encryptedPassword := existingServer.PanelPasswordEncrypted
+		if server.ClearPanelPassword || server.PanelURL == "" {
+			encryptedPassword = ""
+		}
+		if strings.TrimSpace(server.PanelPassword) != "" {
+			encrypted, err := protectSecret(strings.TrimSpace(server.PanelPassword))
+			if err != nil {
+				return nil, err
+			}
+			encryptedPassword = encrypted
+		}
+
+		server.PanelPassword = ""
+		server.PanelPasswordEncrypted = encryptedPassword
+		server.PanelPasswordSet = false
+		server.ClearPanelPassword = false
+	}
+	return next, nil
+}
+
+func normalizeStoredAddress(address string) string {
+	return strings.ToLower(strings.TrimSpace(address))
+}
+
+func newServerID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err == nil {
+		return "srv_" + hex.EncodeToString(b[:])
+	}
+	return "srv_" + hex.EncodeToString([]byte(strconv.FormatInt(time.Now().UnixNano(), 10)))
 }
 
 func cloneRecentServers(servers []RecentServer) []RecentServer {
