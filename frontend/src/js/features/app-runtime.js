@@ -3,7 +3,12 @@ import {
   switchAppPage,
   refreshActiveIndicator,
 } from "../core/ui-shell.js";
-import { getConfig, saveConfig } from "../core/config.js";
+import {
+  getConfig,
+  initConfig,
+  migrateLegacyLocalStorageIfNeeded,
+  saveConfig,
+} from "../core/config.js";
 import { initTheme, setupThemeToggle } from "../core/theme.js";
 import { renderAboutPage } from "./about/about.js";
 import { renderSettingsPage } from "./settings/settings-page.js";
@@ -15,6 +20,7 @@ import {
   renderServers,
   refreshAllServers,
   setupLaunchServerMenu,
+  initServerStorage,
 } from "./servers/servers.js";
 import {
   configureUpdates,
@@ -37,9 +43,10 @@ import {
   renderWorkshopSidebar,
   handleProtocolParse,
   handleProtocolWorkshop,
+  initWatchLaterStorage,
 } from "./workshop/workshop-browser.js";
 import { showError, showNotification, handleError } from "../core/toast.js";
-import { appState } from "./state.js";
+import { appState, applyConfigToAppState } from "./state.js";
 import { renderFileList } from "./file-list/render.js";
 import {
   handleSearch,
@@ -142,6 +149,10 @@ import {
   FetchWorkshopDetail,
   GetAppVersion,
   CheckModUpdates,
+  GetServerStorage,
+  SaveServerStorage,
+  GetWorkshopWatchLaterStorage,
+  SaveWorkshopWatchLaterStorage,
 } from "../../../wailsjs/go/app/App";
 
 import {
@@ -156,13 +167,6 @@ import {
 // 暴露给全局使用，以便在 onclick 中调用
 window.BrowserOpenURL = BrowserOpenURL;
 
-// Initialize theme immediately
-initTheme();
-
-document.addEventListener("DOMContentLoaded", () => {
-  setupThemeToggle();
-});
-
 configureServers({
   showError,
   showNotification,
@@ -173,6 +177,8 @@ configureServers({
   ConnectToServer,
   ExportServersToFile,
   GetMapName,
+  GetServerStorage,
+  SaveServerStorage,
 });
 
 configureUpdates({
@@ -230,15 +236,18 @@ configureWorkshopBrowser({
   closeModal,
   openWorkshopModal,
   EventsOn,
+  GetWorkshopWatchLaterStorage,
+  SaveWorkshopWatchLaterStorage,
 });
 
 // 初始化应用
 document.addEventListener("DOMContentLoaded", function () {
-  initializeApp();
+  initializeApp().catch((error) => {
+    console.error("应用初始化失败:", error);
+    showError("应用初始化失败: " + error);
+  });
 });
 
-// Mod更新检测初始化
-const UPDATE_CHECK_KEY = "lastUpdateCheckTime";
 const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时
 
 let _updateCheckTimer = null;
@@ -249,14 +258,17 @@ async function initUpdateCheck() {
     appState.workshopUpdateCheckEnabled = updateCheckEnabled;
     if (!updateCheckEnabled) return;
 
-    const lastCheck = localStorage.getItem(UPDATE_CHECK_KEY);
+    const config = getConfig();
+    const lastCheck = config.lastUpdateCheckTime;
     const now = Date.now();
     if (!lastCheck || now - Number(lastCheck) >= UPDATE_CHECK_INTERVAL) {
       // 延迟30秒后首次检测，避免和IP优选等其他启动任务冲突
       setTimeout(async () => {
         try {
           await CheckModUpdates();
-          localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now()));
+          const nextConfig = getConfig();
+          nextConfig.lastUpdateCheckTime = String(Date.now());
+          saveConfig(nextConfig);
         } catch (err) {
           console.warn("更新检测失败:", err);
         }
@@ -266,11 +278,13 @@ async function initUpdateCheck() {
     // 每小时检查一次是否超过24小时
     if (_updateCheckTimer) clearInterval(_updateCheckTimer);
     _updateCheckTimer = setInterval(async () => {
-      const last = localStorage.getItem(UPDATE_CHECK_KEY);
+      const last = getConfig().lastUpdateCheckTime;
       if (!last || Date.now() - Number(last) >= UPDATE_CHECK_INTERVAL) {
         try {
           await CheckModUpdates();
-          localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now()));
+          const nextConfig = getConfig();
+          nextConfig.lastUpdateCheckTime = String(Date.now());
+          saveConfig(nextConfig);
         } catch (err) {
           console.warn("定时更新检测失败:", err);
         }
@@ -281,8 +295,22 @@ async function initUpdateCheck() {
   }
 }
 
-function initializeApp() {
+async function initializeApp() {
+  let migratedLegacyConfig = false;
+  try {
+    migratedLegacyConfig = await migrateLegacyLocalStorageIfNeeded();
+  } catch (error) {
+    console.error("旧配置迁移失败，已保留旧浏览器存储数据:", error);
+  }
+
+  await initConfig();
+  applyConfigToAppState();
+  await initServerStorage();
+  await initWatchLaterStorage();
+
+  initTheme();
   initAppShell();
+  setupThemeToggle();
   setupPageChangeListeners();
   setupSettingsAndAboutListeners();
   setupEventListeners();
@@ -292,7 +320,9 @@ function initializeApp() {
   checkInitialDirectory();
   checkAndInstallUpdate();
   initModRotationState();
-  initWorkshopState();
+  if (migratedLegacyConfig) {
+    await initWorkshopState();
+  }
   initBoxSelection();
   initUpdateCheck();
 

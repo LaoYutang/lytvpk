@@ -3,7 +3,7 @@ import { showLoadingScreen, showMainScreen, updateLoadingMessage } from "../stat
 import { getConfig, saveConfig } from "../../core/config.js";
 import { refreshFilesKeepFilter } from "../file-list/filters.js";
 import { showConfirmModal } from "../modals/confirm.js";
-import { ManualRotateMods, SetModRotation } from "../../../../wailsjs/go/app/App";
+import { GetModRotation, ManualRotateMods, SetModRotation } from "../../../../wailsjs/go/app/App";
 
 const ROTATION_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-svg">
   <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
@@ -48,8 +48,8 @@ export async function manualRotate(type) {
 }
 
 export async function initModRotationState() {
-  if (typeof SetModRotation !== "function") {
-    console.warn("后端 SetModRotation 方法不可用");
+  if (typeof GetModRotation !== "function") {
+    console.warn("后端 GetModRotation 方法不可用");
     return;
   }
 
@@ -65,7 +65,9 @@ export async function initModRotationState() {
   }
 
   try {
-    await SetModRotation(rotationConfig);
+    rotationConfig = await GetModRotation();
+    config.modRotationConfig = rotationConfig;
+    saveConfig(config);
     updateModRotationUI(rotationConfig);
   } catch (e) {
     console.error("初始化Mod轮换状态失败:", e);

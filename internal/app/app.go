@@ -76,18 +76,41 @@ type App struct {
 	workshopUpdateCheckEnabled bool
 	workshopBrowserTarget      string
 	migrationVersion           int
+	defaultDirectory           string
+	savedDirectories           []SavedDirectory
+	lastActiveDirectory        string
+	displayMode                string
+	filterLayoutMode           string
+	boxSelectionEnabled        bool
+	ctrlClickSelectionEnabled  bool
+	theme                      string
+	ignoredVersion             string
+	lastUpdateCheckTime        string
+	configDir                  string
 	configPath                 string
+	serversPath                string
+	workshopWatchLaterPath     string
 }
 
 // ConfigFile 定义配置文件结构
 type ConfigFile struct {
-	ModRotationConfig          RotationConfig `json:"modRotationConfig"`
-	WorkshopPreferredIP        *bool          `json:"workshopPreferredIP,omitempty"`
-	WorkshopFixedIP            *string        `json:"workshopFixedIP,omitempty"`
-	WorkshopMetaEnabled        *bool          `json:"workshopMetaEnabled,omitempty"`
-	WorkshopUpdateCheckEnabled *bool          `json:"workshopUpdateCheckEnabled,omitempty"`
-	WorkshopBrowserTarget      *string        `json:"workshopBrowserTarget,omitempty"`
-	// 记录已完成的迁移版本，例如: 1 表示已完成逗号到加号的迁移
+	ModRotationConfig          RotationConfig   `json:"modRotationConfig"`
+	WorkshopPreferredIP        *bool            `json:"workshopPreferredIP,omitempty"`
+	WorkshopFixedIP            *string          `json:"workshopFixedIP,omitempty"`
+	WorkshopMetaEnabled        *bool            `json:"workshopMetaEnabled,omitempty"`
+	WorkshopUpdateCheckEnabled *bool            `json:"workshopUpdateCheckEnabled,omitempty"`
+	WorkshopBrowserTarget      *string          `json:"workshopBrowserTarget,omitempty"`
+	DefaultDirectory           string           `json:"defaultDirectory"`
+	SavedDirectories           []SavedDirectory `json:"savedDirectories"`
+	LastActiveDirectory        string           `json:"lastActiveDirectory"`
+	DisplayMode                string           `json:"displayMode"`
+	FilterLayoutMode           string           `json:"filterLayoutMode"`
+	BoxSelectionEnabled        bool             `json:"boxSelectionEnabled"`
+	CtrlClickSelectionEnabled  bool             `json:"ctrlClickSelectionEnabled"`
+	Theme                      string           `json:"theme"`
+	IgnoredVersion             string           `json:"ignoredVersion"`
+	LastUpdateCheckTime        string           `json:"lastUpdateCheckTime"`
+	// migrationVersion=2 表示前端 localStorage 配置已迁移到配置目录。
 	MigrationVersion int `json:"migrationVersion"`
 }
 
@@ -95,6 +118,52 @@ type ConfigFile struct {
 type RotationConfig struct {
 	EnableCharacters bool `json:"enableCharacters"`
 	EnableWeapons    bool `json:"enableWeapons"`
+}
+
+type SavedDirectory struct {
+	Path     string `json:"path"`
+	LastUsed string `json:"lastUsed"`
+}
+
+type ServerStorage struct {
+	Servers       []SavedServer  `json:"servers"`
+	RecentServers []RecentServer `json:"recentServers"`
+}
+
+type SavedServer struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+	Weight  int    `json:"weight"`
+}
+
+type RecentServer struct {
+	Name            string `json:"name"`
+	Address         string `json:"address"`
+	LastConnectedAt int64  `json:"lastConnectedAt"`
+}
+
+type WorkshopWatchLaterStorage struct {
+	Items []WorkshopWatchLaterItem `json:"items"`
+}
+
+type WorkshopWatchLaterItem struct {
+	PublishedFileID string `json:"publishedfileid"`
+	Title           string `json:"title"`
+	PreviewURL      string `json:"preview_url"`
+	Views           int    `json:"views"`
+	Subscriptions   int    `json:"subscriptions"`
+	Favorited       int    `json:"favorited"`
+	FileType        int    `json:"file_type"`
+	AddedAt         string `json:"addedAt"`
+}
+
+type LocalStorageMigrationPayload struct {
+	Config              string `json:"config"`
+	Theme               string `json:"theme"`
+	LastUpdateCheckTime string `json:"lastUpdateCheckTime"`
+	Servers             string `json:"servers"`
+	RecentServers       string `json:"recentServers"`
+	WatchLaterItems     string `json:"watchLaterItems"`
 }
 
 // NewApp creates a new App application struct
@@ -131,14 +200,22 @@ func NewApp() *App {
 	appConfigDir := filepath.Join(configDir, "LytVPK")
 	os.MkdirAll(appConfigDir, 0755)
 	configPath := filepath.Join(appConfigDir, "config.json")
+	serversPath := filepath.Join(appConfigDir, "servers.json")
+	workshopWatchLaterPath := filepath.Join(appConfigDir, "workshop_watch_later.json")
 
 	app := &App{
-		goroutinePool:         pool,
-		restyClient:           client,
-		proxyServer:           proxy,
-		configPath:            configPath,
-		workshopPreferredIP:   true,     // 默认开启优选IP
-		workshopBrowserTarget: "mirror", // 默认使用镜像站
+		goroutinePool:          pool,
+		restyClient:            client,
+		proxyServer:            proxy,
+		configDir:              appConfigDir,
+		configPath:             configPath,
+		serversPath:            serversPath,
+		workshopWatchLaterPath: workshopWatchLaterPath,
+		workshopPreferredIP:    true,     // 默认开启优选IP
+		workshopBrowserTarget:  "mirror", // 默认使用镜像站
+		displayMode:            "list",
+		filterLayoutMode:       "compact",
+		savedDirectories:       []SavedDirectory{},
 	}
 
 	// 加载配置

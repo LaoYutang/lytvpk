@@ -73,32 +73,6 @@ func (a *App) ScanVPKFiles() error {
 		}
 	}
 
-	// 自动迁移：检查并重命名旧的逗号分隔符文件
-	// 仅当迁移版本小于1时执行
-	currentMigrationVersion := 1
-	if a.migrationVersion < currentMigrationVersion {
-		log.Printf("开始执行文件格式迁移 (v%d -> v%d)...", a.migrationVersion, currentMigrationVersion)
-		migratedCount := 0
-
-		migratedPaths := make([]string, 0, len(vpkPaths))
-		for _, path := range vpkPaths {
-			newPath := a.migrateLegacyTagFilename(path)
-			migratedPaths = append(migratedPaths, newPath)
-			if newPath != path {
-				migratedCount++
-			}
-		}
-		vpkPaths = migratedPaths
-
-		log.Printf("迁移完成，处理了 %d 个文件", migratedCount)
-
-		// 更新迁移版本并保存配置
-		a.mu.Lock()
-		a.migrationVersion = currentMigrationVersion
-		a.mu.Unlock()
-		a.saveConfig()
-	}
-
 	// 创建当前文件路径集合，用于清理不存在的缓存
 	currentPaths := make(map[string]bool)
 	for _, path := range vpkPaths {

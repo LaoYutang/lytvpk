@@ -34,6 +34,14 @@ export const appState = {
   workshopUpdateCheckEnabled: false,
 };
 
+export function applyConfigToAppState(config = getConfig()) {
+  appState.displayMode = config.displayMode || "list";
+  appState.boxSelectionEnabled = config.boxSelectionEnabled || false;
+  appState.ctrlClickSelectionEnabled =
+    config.ctrlClickSelectionEnabled || false;
+  appState.filterLayoutMode = config.filterLayoutMode || "compact";
+}
+
 export function toggleFileSelection(filePath, selected) {
   if (selected) {
     appState.selectedFiles.add(filePath);

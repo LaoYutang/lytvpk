@@ -7,14 +7,18 @@ let FetchPlayerList;
 let ConnectToServer;
 let ExportServersToFile;
 let GetMapName;
+let GetServerStorage;
+let SaveServerStorage;
 
 export function configureServers(deps) {
-  ({ showError, showNotification, showConfirmModal, switchAppPage, FetchServerInfo, FetchPlayerList, ConnectToServer, ExportServersToFile, GetMapName } = deps);
+  ({ showError, showNotification, showConfirmModal, switchAppPage, FetchServerInfo, FetchPlayerList, ConnectToServer, ExportServersToFile, GetMapName, GetServerStorage, SaveServerStorage } = deps);
 }
 
-const SERVER_CONFIG_KEY = "vpk-manager-servers";
-const RECENT_SERVER_KEY = "vpk-manager-recent-servers";
 const RECENT_SERVER_LIMIT = 2;
+let serverStorage = {
+  servers: [],
+  recentServers: [],
+};
 const SERVER_ICONS = {
   play: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
   refresh: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg>`,
@@ -25,21 +29,27 @@ const SERVER_ICONS = {
   users: `<svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
 };
 
-function getServers() {
+export async function initServerStorage() {
   try {
-    const servers = localStorage.getItem(SERVER_CONFIG_KEY);
-    const parsed = servers ? JSON.parse(servers) : [];
-    const list = Array.isArray(parsed) ? parsed : [];
-    // 按权重降序排序
-    return list.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+    const storage = await GetServerStorage();
+    serverStorage = normalizeServerStorage(storage);
   } catch (e) {
-    console.error("读取服务器列表失败:", e);
-    return [];
+    console.error("读取服务器配置失败:", e);
+    serverStorage = { servers: [], recentServers: [] };
   }
 }
 
+function getServers() {
+  // 按权重降序排序
+  return [...serverStorage.servers].sort((a, b) => (b.weight || 0) - (a.weight || 0));
+}
+
 function saveServers(servers) {
-  localStorage.setItem(SERVER_CONFIG_KEY, JSON.stringify(servers));
+  serverStorage = normalizeServerStorage({
+    ...serverStorage,
+    servers,
+  });
+  persistServerStorage();
 }
 
 function normalizeAddress(address) {
@@ -47,34 +57,56 @@ function normalizeAddress(address) {
 }
 
 function getRawRecentServers() {
-  try {
-    const raw = localStorage.getItem(RECENT_SERVER_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-
-    const seen = new Set();
-    return parsed
-      .map((server) => ({
-        name: String(server?.name || "").trim(),
-        address: normalizeAddress(server?.address),
-        lastConnectedAt: Number(server?.lastConnectedAt) || 0,
-      }))
-      .filter((server) => {
-        if (!server.address || seen.has(server.address)) return false;
-        seen.add(server.address);
-        return true;
-      });
-  } catch (e) {
-    console.error("读取最近服务器失败:", e);
-    return [];
-  }
+  const seen = new Set();
+  return serverStorage.recentServers
+    .map((server) => ({
+      name: String(server?.name || "").trim(),
+      address: normalizeAddress(server?.address),
+      lastConnectedAt: Number(server?.lastConnectedAt) || 0,
+    }))
+    .filter((server) => {
+      if (!server.address || seen.has(server.address)) return false;
+      seen.add(server.address);
+      return true;
+    });
 }
 
 function saveRawRecentServers(servers) {
-  localStorage.setItem(
-    RECENT_SERVER_KEY,
-    JSON.stringify(servers.slice(0, RECENT_SERVER_LIMIT))
-  );
+  serverStorage = normalizeServerStorage({
+    ...serverStorage,
+    recentServers: servers.slice(0, RECENT_SERVER_LIMIT),
+  });
+  persistServerStorage();
+}
+
+function persistServerStorage() {
+  SaveServerStorage?.(serverStorage).catch((e) => {
+    console.error("保存服务器配置失败:", e);
+    showError?.("保存服务器配置失败: " + e);
+  });
+}
+
+function normalizeServerStorage(storage = {}) {
+  return {
+    servers: Array.isArray(storage.servers)
+      ? storage.servers
+          .map((server) => ({
+            name: String(server?.name || "").trim(),
+            address: normalizeAddress(server?.address),
+            weight: Number(server?.weight) || 0,
+          }))
+          .filter((server) => server.name && server.address)
+      : [],
+    recentServers: Array.isArray(storage.recentServers)
+      ? storage.recentServers
+          .map((server) => ({
+            name: String(server?.name || "").trim(),
+            address: normalizeAddress(server?.address),
+            lastConnectedAt: Number(server?.lastConnectedAt) || 0,
+          }))
+          .filter((server) => server.address)
+      : [],
+  };
 }
 
 export function getRecentServers() {

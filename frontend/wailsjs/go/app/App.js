@@ -90,8 +90,16 @@ export function GetAddonListOrder() {
   return window['go']['app']['App']['GetAddonListOrder']();
 }
 
+export function GetAppConfig() {
+  return window['go']['app']['App']['GetAppConfig']();
+}
+
 export function GetAppVersion() {
   return window['go']['app']['App']['GetAppVersion']();
+}
+
+export function GetConfigMigrationVersion() {
+  return window['go']['app']['App']['GetConfigMigrationVersion']();
 }
 
 export function GetCurrentBestIP() {
@@ -134,6 +142,10 @@ export function GetSecondaryTags(arg1) {
   return window['go']['app']['App']['GetSecondaryTags'](arg1);
 }
 
+export function GetServerStorage() {
+  return window['go']['app']['App']['GetServerStorage']();
+}
+
 export function GetVPKFiles() {
   return window['go']['app']['App']['GetVPKFiles']();
 }
@@ -170,6 +182,10 @@ export function GetWorkshopUpdateCheckEnabled() {
   return window['go']['app']['App']['GetWorkshopUpdateCheckEnabled']();
 }
 
+export function GetWorkshopWatchLaterStorage() {
+  return window['go']['app']['App']['GetWorkshopWatchLaterStorage']();
+}
+
 export function HandleFileDrop(arg1) {
   return window['go']['app']['App']['HandleFileDrop'](arg1);
 }
@@ -196,6 +212,10 @@ export function LogError(arg1, arg2, arg3) {
 
 export function ManualRotateMods(arg1) {
   return window['go']['app']['App']['ManualRotateMods'](arg1);
+}
+
+export function MigrateLocalStorageConfig(arg1) {
+  return window['go']['app']['App']['MigrateLocalStorageConfig'](arg1);
 }
 
 export function MoveVpkFiles(arg1, arg2) {
@@ -228,6 +248,18 @@ export function RetryDownloadTask(arg1) {
 
 export function RotateMods() {
   return window['go']['app']['App']['RotateMods']();
+}
+
+export function SaveAppConfig(arg1) {
+  return window['go']['app']['App']['SaveAppConfig'](arg1);
+}
+
+export function SaveServerStorage(arg1) {
+  return window['go']['app']['App']['SaveServerStorage'](arg1);
+}
+
+export function SaveWorkshopWatchLaterStorage(arg1) {
+  return window['go']['app']['App']['SaveWorkshopWatchLaterStorage'](arg1);
 }
 
 export function ScanVPKFiles() {

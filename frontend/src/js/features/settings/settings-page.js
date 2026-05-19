@@ -245,12 +245,19 @@ function bindSettingsPage(deps) {
       fixedInput.style.display = useFixed ? "block" : "none";
       if (!useFixed) {
         await deps.SetWorkshopFixedIP("");
+        const config = deps.getConfig();
+        config.workshopFixedIP = "";
+        deps.saveConfig(config);
       }
     });
   });
 
   fixedInput?.addEventListener("change", async () => {
-    await deps.SetWorkshopFixedIP(fixedInput.value.trim());
+    const fixedIP = fixedInput.value.trim();
+    await deps.SetWorkshopFixedIP(fixedIP);
+    const config = deps.getConfig();
+    config.workshopFixedIP = fixedIP;
+    deps.saveConfig(config);
     deps.showNotification("已更新固定 IP 设置", "success");
   });
 
@@ -298,6 +305,8 @@ function bindSettingsPage(deps) {
 
   document.getElementById("settings-meta-enabled")?.addEventListener("change", async (event) => {
     await deps.SetWorkshopMetaEnabled(event.target.checked);
+    const config = deps.getConfig();
+    config.workshopMetaEnabled = event.target.checked;
     deps.showNotification(event.target.checked ? "已开启工坊信息存储" : "已关闭工坊信息存储", event.target.checked ? "success" : "info");
 
     // 更新更新检测开关的可用状态
@@ -322,17 +331,22 @@ function bindSettingsPage(deps) {
       if (updateCheckToggle?.checked) {
         updateCheckToggle.checked = false;
         await deps.SetWorkshopUpdateCheckEnabled(false);
+        config.workshopUpdateCheckEnabled = false;
         const checkSection = document.getElementById("settings-update-check-section");
         if (checkSection) checkSection.style.display = "none";
       }
     }
 
+    deps.saveConfig(config);
     await deps.refreshFilesKeepFilter();
   });
 
   document.getElementById("settings-update-check-enabled")?.addEventListener("change", async (event) => {
     await deps.SetWorkshopUpdateCheckEnabled(event.target.checked);
     deps.appState.workshopUpdateCheckEnabled = event.target.checked;
+    const config = deps.getConfig();
+    config.workshopUpdateCheckEnabled = event.target.checked;
+    deps.saveConfig(config);
     deps.showNotification(event.target.checked ? "已开启Mod更新检测" : "已关闭Mod更新检测", event.target.checked ? "success" : "info");
 
     const checkSection = document.getElementById("settings-update-check-section");
@@ -355,7 +369,9 @@ function bindSettingsPage(deps) {
     btn.style.pointerEvents = "none";
     try {
       const result = await deps.CheckModUpdates();
-      localStorage.setItem("lastUpdateCheckTime", String(Date.now()));
+      const config = deps.getConfig();
+      config.lastUpdateCheckTime = String(Date.now());
+      deps.saveConfig(config);
       const count = result.total_updates || 0;
       deps.showNotification(count > 0 ? `检测完成，发现 ${count} 个Mod有更新` : "检测完成，所有Mod均为最新版本", count > 0 ? "info" : "success");
       await deps.refreshFilesKeepFilter();
@@ -372,6 +388,9 @@ function bindSettingsPage(deps) {
     radio.addEventListener("change", async () => {
       if (!radio.checked) return;
       await deps.SetWorkshopBrowserTarget(radio.value);
+      const config = deps.getConfig();
+      config.workshopBrowserTarget = radio.value;
+      deps.saveConfig(config);
       deps.showNotification(radio.value === "mirror" ? "已切换到镜像站" : "已切换到 Steam 官方", "success");
     });
   });

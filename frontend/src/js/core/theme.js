@@ -1,5 +1,7 @@
+import { getConfig, saveConfig } from "./config.js";
+
 export function initTheme() {
-  const savedTheme = localStorage.getItem("theme");
+  const savedTheme = getConfig().theme;
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
@@ -36,7 +38,9 @@ export function setupThemeToggle() {
 
   themeBtn.addEventListener("click", () => {
     const isDark = document.documentElement.classList.toggle("dark-mode");
-    localStorage.setItem("theme", isDark ? "dark" : "light");
+    const config = getConfig();
+    config.theme = isDark ? "dark" : "light";
+    saveConfig(config);
     updateThemeIcon();
   });
 

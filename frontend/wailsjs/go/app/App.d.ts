@@ -47,7 +47,11 @@ export function ForceExit():Promise<void>;
 
 export function GetAddonListOrder():Promise<Array<string>>;
 
+export function GetAppConfig():Promise<app.ConfigFile>;
+
 export function GetAppVersion():Promise<string>;
+
+export function GetConfigMigrationVersion():Promise<number>;
 
 export function GetCurrentBestIP():Promise<string>;
 
@@ -69,6 +73,8 @@ export function GetRootDirectory():Promise<string>;
 
 export function GetSecondaryTags(arg1:string):Promise<Array<string>>;
 
+export function GetServerStorage():Promise<app.ServerStorage>;
+
 export function GetVPKFiles():Promise<Array<parser.VPKFile>>;
 
 export function GetVPKLoadOrder(arg1:string):Promise<number>;
@@ -87,6 +93,8 @@ export function GetWorkshopPreferredIP():Promise<boolean>;
 
 export function GetWorkshopUpdateCheckEnabled():Promise<boolean>;
 
+export function GetWorkshopWatchLaterStorage():Promise<app.WorkshopWatchLaterStorage>;
+
 export function HandleFileDrop(arg1:Array<string>):Promise<void>;
 
 export function HandleProtocolURL(arg1:string):Promise<void>;
@@ -100,6 +108,8 @@ export function LaunchL4D2():Promise<void>;
 export function LogError(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ManualRotateMods(arg1:app.RotationConfig):Promise<void>;
+
+export function MigrateLocalStorageConfig(arg1:app.LocalStorageMigrationPayload):Promise<void>;
 
 export function MoveVpkFiles(arg1:Array<string>,arg2:string):Promise<app.MoveResult>;
 
@@ -116,6 +126,12 @@ export function RestartApplication():Promise<void>;
 export function RetryDownloadTask(arg1:string):Promise<void>;
 
 export function RotateMods():Promise<void>;
+
+export function SaveAppConfig(arg1:app.ConfigFile):Promise<void>;
+
+export function SaveServerStorage(arg1:app.ServerStorage):Promise<void>;
+
+export function SaveWorkshopWatchLaterStorage(arg1:app.WorkshopWatchLaterStorage):Promise<void>;
 
 export function ScanVPKFiles():Promise<void>;
 

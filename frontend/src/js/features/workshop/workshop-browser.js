@@ -11,9 +11,11 @@ let IsSelectingIP;
 let closeModal;
 let openWorkshopModal;
 let EventsOn;
+let GetWorkshopWatchLaterStorage;
+let SaveWorkshopWatchLaterStorage;
 
 export function configureWorkshopBrowser(deps) {
-  ({ switchAppPage, showNotification, showError, BrowserOpenURL, FetchWorkshopList, FetchWorkshopDetail, GetWorkshopBrowserTarget, IsSelectingIP, closeModal, openWorkshopModal, EventsOn } = deps);
+  ({ switchAppPage, showNotification, showError, BrowserOpenURL, FetchWorkshopList, FetchWorkshopDetail, GetWorkshopBrowserTarget, IsSelectingIP, closeModal, openWorkshopModal, EventsOn, GetWorkshopWatchLaterStorage, SaveWorkshopWatchLaterStorage } = deps);
 }
 
 export const browserState = {
@@ -28,8 +30,8 @@ export const browserState = {
   data: [],
 };
 
-const WATCH_LATER_STORAGE_KEY = "workshop-watch-later-items";
 const WORKSHOP_COLLECTION_FILE_TYPE = 2;
+let watchLaterItems = [];
 const WATCH_LATER_PLACEHOLDER_SVG = `
   <svg viewBox="0 0 160 90" aria-hidden="true">
     <rect x="1" y="1" width="158" height="88" rx="8"></rect>
@@ -67,35 +69,45 @@ function formatWorkshopDate(value) {
   return Number.isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString();
 }
 
-function getWatchLaterItems() {
+export async function initWatchLaterStorage() {
   try {
-    const stored = localStorage.getItem(WATCH_LATER_STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : [];
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((item) => item && item.publishedfileid)
-      .map((item) => ({
-        publishedfileid: String(item.publishedfileid),
-        title: item.title || `工坊 #${item.publishedfileid}`,
-        preview_url: item.preview_url || "",
-        views: item.views || 0,
-        subscriptions: item.subscriptions || 0,
-        favorited: item.favorited || 0,
-        file_type: item.file_type || 0,
-        addedAt: item.addedAt || new Date().toISOString(),
-      }))
-      .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
+    const storage = await GetWorkshopWatchLaterStorage();
+    watchLaterItems = normalizeWatchLaterItems(storage?.items);
+    renderWatchLaterDrawer();
   } catch (err) {
-    console.warn("稍后再看数据读取失败，已重置:", err);
-    localStorage.removeItem(WATCH_LATER_STORAGE_KEY);
-    return [];
+    console.warn("稍后再看数据读取失败，已使用空列表:", err);
+    watchLaterItems = [];
   }
 }
 
+function getWatchLaterItems() {
+  return normalizeWatchLaterItems(watchLaterItems);
+}
+
 function saveWatchLaterItems(items) {
-  localStorage.setItem(WATCH_LATER_STORAGE_KEY, JSON.stringify(items));
+  watchLaterItems = normalizeWatchLaterItems(items);
+  SaveWorkshopWatchLaterStorage?.({ items: watchLaterItems }).catch((err) => {
+    console.error("保存稍后再看数据失败:", err);
+    showError?.("保存稍后再看失败: " + err);
+  });
   updateWatchLaterBadge();
+}
+
+function normalizeWatchLaterItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item && item.publishedfileid)
+    .map((item) => ({
+      publishedfileid: String(item.publishedfileid),
+      title: item.title || `工坊 #${item.publishedfileid}`,
+      preview_url: item.preview_url || "",
+      views: item.views || 0,
+      subscriptions: item.subscriptions || 0,
+      favorited: item.favorited || 0,
+      file_type: item.file_type || 0,
+      addedAt: item.addedAt || new Date().toISOString(),
+    }))
+    .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt));
 }
 
 function isInWatchLater(itemId) {
@@ -308,8 +320,7 @@ function clearWatchLater() {
     "确认清空",
     `确定要清空稍后再看列表吗？列表中有 ${items.length} 个物品，此操作不可撤销。`,
     () => {
-      localStorage.removeItem(WATCH_LATER_STORAGE_KEY);
-      updateWatchLaterBadge();
+      saveWatchLaterItems([]);
       renderWatchLaterDrawer();
       showNotification?.("已清空稍后再看列表", "info");
     }
