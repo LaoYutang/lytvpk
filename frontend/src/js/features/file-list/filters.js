@@ -118,9 +118,23 @@ function renderClassicFilters(tagContainer, locationContainer, primaryTags) {
   });
   primaryGroup.appendChild(primaryList);
 
-  primaryLine.appendChild(locationGroup);
-  primaryLine.appendChild(primaryGroup);
-  tagContainer.appendChild(primaryLine);
+  const secondarySearchGroup = document.createElement("div");
+  secondarySearchGroup.id = "classic-secondary-search-group";
+  secondarySearchGroup.className = "classic-secondary-search-group";
+  secondarySearchGroup.innerHTML = `
+    <input
+      id="classic-secondary-filter-input"
+      class="classic-secondary-filter-input"
+      type="text"
+      placeholder="筛选子标签..."
+      aria-label="筛选子标签"
+      autocomplete="off"
+    >
+  `;
+  secondarySearchGroup.querySelector("input").addEventListener("input", (event) => {
+    filterClassicSecondaryTagButtons(event.target.value);
+  });
+  primaryGroup.appendChild(secondarySearchGroup);
 
   const secondaryGroup = document.createElement("div");
   secondaryGroup.id = "secondary-tag-group";
@@ -130,6 +144,10 @@ function renderClassicFilters(tagContainer, locationContainer, primaryTags) {
     <div class="classic-secondary-tags-slot"></div>
     <div class="classic-secondary-action-slot"></div>
   `;
+
+  primaryLine.appendChild(locationGroup);
+  primaryLine.appendChild(primaryGroup);
+  tagContainer.appendChild(primaryLine);
   tagContainer.appendChild(secondaryGroup);
 }
 
@@ -161,6 +179,8 @@ export function createPrimaryTagButton(value, text) {
     button.classList.add("active");
     appState.selectedPrimaryTag = value;
     appState.selectedSecondaryTags = [];
+    const secondaryFilterInput = document.getElementById("classic-secondary-filter-input");
+    if (secondaryFilterInput) secondaryFilterInput.value = "";
     await renderSecondaryTags(appState.selectedPrimaryTag);
     performSearch();
   });
@@ -189,12 +209,16 @@ async function renderSecondaryTagButtons(secondaryGroup, primaryTag) {
   const existingExpandBtn = secondaryGroup.querySelector(".expand-tags-btn");
   if (existingExpandBtn) existingExpandBtn.remove();
 
+  const existingEmptyHint = secondaryGroup.querySelector(".classic-secondary-empty-hint");
+  if (existingEmptyHint) existingEmptyHint.remove();
+
   try {
     const secondaryTags = await GetSecondaryTags(primaryTag || "");
 
     if (secondaryTags.length > 0) {
       secondaryTags.sort((a, b) => a.localeCompare(b, "zh-CN"));
       secondaryGroup.style.display = "flex";
+      setClassicSecondarySearchVisible(true);
 
       const container = document.createElement("div");
       container.className = "secondary-tags-container";
@@ -206,14 +230,54 @@ async function renderSecondaryTagButtons(secondaryGroup, primaryTag) {
 
       tagsSlot.appendChild(container);
 
+      const emptyHint = document.createElement("span");
+      emptyHint.className = "classic-secondary-empty-hint hidden";
+      emptyHint.textContent = "没有匹配的子标签";
+      tagsSlot.appendChild(emptyHint);
+
+      filterClassicSecondaryTagButtons();
       scheduleSecondaryTagsCollapse(container, actionSlot);
     } else {
       secondaryGroup.style.display = "none";
+      setClassicSecondarySearchVisible(false);
     }
   } catch (error) {
     console.error("获取二级标签失败:", error);
     secondaryGroup.style.display = "none";
+    setClassicSecondarySearchVisible(false);
   }
+}
+
+function setClassicSecondarySearchVisible(isVisible) {
+  const searchGroup = document.getElementById("classic-secondary-search-group");
+  if (searchGroup) {
+    searchGroup.classList.toggle("is-empty", !isVisible);
+  }
+}
+
+function filterClassicSecondaryTagButtons(filterText) {
+  const secondaryGroup = document.getElementById("secondary-tag-group");
+  if (!secondaryGroup || secondaryGroup.classList.contains("filter-select-group")) return;
+
+  const container = secondaryGroup.querySelector(".secondary-tags-container");
+  if (!container) return;
+
+  const searchInput = document.getElementById("classic-secondary-filter-input");
+  const normalizedFilter = (filterText ?? searchInput?.value ?? "").trim().toLowerCase();
+  let visibleCount = 0;
+
+  container.querySelectorAll(".secondary-tag-btn").forEach((button) => {
+    const tag = button.dataset.tag || button.textContent || "";
+    const isVisible = !normalizedFilter || tag.toLowerCase().includes(normalizedFilter);
+    button.hidden = !isVisible;
+    if (isVisible) visibleCount += 1;
+  });
+
+  secondaryGroup
+    .querySelector(".classic-secondary-empty-hint")
+    ?.classList.toggle("hidden", visibleCount > 0);
+
+  updateClassicSecondaryTagsCollapse();
 }
 
 function scheduleSecondaryTagsCollapse(container, actionSlot) {
@@ -239,10 +303,17 @@ function updateSecondaryTagsCollapse(container, actionSlot) {
   const rect = container.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return false;
 
-  const tagButtons = Array.from(container.children);
+  let expandBtn = actionSlot.querySelector(".expand-tags-btn");
+  const tagButtons = Array.from(container.children).filter((button) => !button.hidden);
+  if (tagButtons.length === 0) {
+    container.classList.remove("collapsed");
+    container.dataset.expanded = "";
+    expandBtn?.remove();
+    return true;
+  }
+
   const firstRowTop = tagButtons[0]?.offsetTop ?? 0;
   const hasMultipleRows = tagButtons.some((button) => button.offsetTop > firstRowTop);
-  let expandBtn = actionSlot.querySelector(".expand-tags-btn");
 
   if (!hasMultipleRows) {
     container.classList.remove("collapsed");
@@ -522,6 +593,8 @@ export async function resetFilters() {
     });
     appState.selectedPrimaryTag = "";
     updatePrimaryTagDropdownUI();
+    const secondaryFilterInput = document.getElementById("classic-secondary-filter-input");
+    if (secondaryFilterInput) secondaryFilterInput.value = "";
 
     appState.selectedSecondaryTags = [];
     appState.selectedLocations = [];
