@@ -5,19 +5,28 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	rt "runtime"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 	"vpk-manager/internal/parser"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+type ConflictVPKFile struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Title    string `json:"title"`
+	Location string `json:"location"`
+}
+
 type ConflictGroup struct {
-	VpkFiles []parser.VPKFile `json:"vpk_files"` // 冲突的VPK文件完整信息
-	Files    []string         `json:"files"`
-	Severity string           `json:"severity"` // "critical", "warning", "info"
+	VpkFiles       []ConflictVPKFile `json:"vpk_files"`
+	Files          []string          `json:"files"`
+	FileCount      int               `json:"file_count"`
+	FilesTruncated bool              `json:"files_truncated"`
+	Severity       string            `json:"severity"` // "critical", "warning", "info"
 }
 
 type ConflictResult struct {
@@ -25,11 +34,15 @@ type ConflictResult struct {
 	ConflictGroups []ConflictGroup `json:"conflict_groups"`
 }
 
-const conflictVPKReadTimeout = 45 * time.Second
+const (
+	conflictWorkerLimit        = 4
+	conflictGroupFileListLimit = 2000
+)
 
-type conflictVPKFileListResult struct {
-	files []string
-	err   error
+type conflictGroupAccumulator struct {
+	files     []string
+	fileCount int
+	severity  string
 }
 
 // getConflictSeverity 判断文件冲突严重程度
@@ -91,31 +104,50 @@ func getConflictSeverity(filePath string) string {
 	return "info"
 }
 
-func getVPKFileListWithTimeout(filePath string) ([]string, error) {
-	resultCh := make(chan conflictVPKFileListResult, 1)
+func getConflictSeverityRank(severity string) int {
+	switch severity {
+	case "critical":
+		return 3
+	case "warning":
+		return 2
+	default:
+		return 1
+	}
+}
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				resultCh <- conflictVPKFileListResult{
-					err: fmt.Errorf("解析VPK文件时发生异常: %v", r),
-				}
-			}
-		}()
+func isIgnoredConflictFile(filePath string) bool {
+	if filePath == "" {
+		return true
+	}
+	if filePath == "addoninfo.txt" || filePath == "addonimage.vtf" || filePath == "addonimage.jpg" {
+		return true
+	}
+	return strings.HasPrefix(filePath, "materials/dev/") || strings.HasPrefix(filePath, "materials/temp/")
+}
 
-		files, err := parser.GetVPKFileList(filePath)
-		resultCh <- conflictVPKFileListResult{files: files, err: err}
+func normalizeConflictFilePath(filePath string) string {
+	filePath = strings.ReplaceAll(filePath, "\\", "/")
+	filePath = strings.TrimSpace(filePath)
+	return strings.ToLower(filePath)
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func getVPKFileListSafely(filePath string) (files []string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("解析VPK文件时发生异常: %v", r)
+		}
 	}()
 
-	timer := time.NewTimer(conflictVPKReadTimeout)
-	defer timer.Stop()
-
-	select {
-	case result := <-resultCh:
-		return result.files, result.err
-	case <-timer.C:
-		return nil, fmt.Errorf("解析VPK文件超时")
-	}
+	return parser.GetVPKFileList(filePath)
 }
 
 // CheckConflicts 检测VPK文件冲突
@@ -172,9 +204,15 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 	})
 
 	// 文件路径 -> VPK列表（使用完整路径）
-	fileMap := make(map[string][]string)
+	fileFirstOwner := make(map[string]string)
+	conflictOwners := make(map[string][]string)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	workerCount := min(conflictWorkerLimit, rt.GOMAXPROCS(0))
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	workerSlots := make(chan struct{}, workerCount)
 
 	// 进度计数器
 	var processedCount int
@@ -187,8 +225,10 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 
 		err := a.goroutinePool.Submit(func() {
 			defer wg.Done()
+			workerSlots <- struct{}{}
+			defer func() { <-workerSlots }()
 
-			files, err := getVPKFileListWithTimeout(p)
+			files, err := getVPKFileListSafely(p)
 
 			countMu.Lock()
 			processedCount++
@@ -211,20 +251,28 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 
 			mu.Lock()
 			for _, f := range files {
-				// 归一化 VPK 内部文件路径，确保跨平台兼容性
-				f = strings.ReplaceAll(f, "\\", "/")
-				f = strings.TrimSpace(f)
-				lowerF := strings.ToLower(f)
+				lowerF := normalizeConflictFilePath(f)
+				if isIgnoredConflictFile(lowerF) {
+					continue
+				}
 
-				if lowerF == "addoninfo.txt" || lowerF == "" || lowerF == "addonimage.vtf" || lowerF == "addonimage.jpg" {
+				firstOwner, ok := fileFirstOwner[lowerF]
+				if !ok {
+					fileFirstOwner[lowerF] = p
 					continue
 				}
-				// 忽略开发残留和临时文件
-				if strings.HasPrefix(lowerF, "materials/dev/") || strings.HasPrefix(lowerF, "materials/temp/") {
+				if firstOwner == p {
 					continue
 				}
-				// 使用完整路径存储，便于后续从缓存查找
-				fileMap[lowerF] = append(fileMap[lowerF], p)
+
+				owners := conflictOwners[lowerF]
+				if len(owners) == 0 {
+					conflictOwners[lowerF] = []string{firstOwner, p}
+					continue
+				}
+				if !containsString(owners, p) {
+					conflictOwners[lowerF] = append(owners, p)
+				}
 			}
 			mu.Unlock()
 		})
@@ -243,76 +291,83 @@ func (a *App) CheckConflicts() (*ConflictResult, error) {
 		Message: "正在整理冲突结果...",
 	})
 
-	// VPK组合 -> 冲突文件列表
+	// VPK组合 -> 冲突摘要
 	// key: "vpkFullPath1|vpkFullPath2" (sorted)
-	conflictMap := make(map[string][]string)
+	conflictMap := make(map[string]*conflictGroupAccumulator)
 
-	for f, vpks := range fileMap {
-		if len(vpks) > 1 {
-			// 排序以生成唯一key
-			sort.Strings(vpks)
-			key := strings.Join(vpks, "|")
-			conflictMap[key] = append(conflictMap[key], f)
+	for f, vpks := range conflictOwners {
+		sort.Strings(vpks)
+		key := strings.Join(vpks, "|")
+		acc, ok := conflictMap[key]
+		if !ok {
+			acc = &conflictGroupAccumulator{
+				files:    make([]string, 0, min(conflictGroupFileListLimit, 16)),
+				severity: "info",
+			}
+			conflictMap[key] = acc
+		}
+		acc.fileCount++
+		if len(acc.files) < conflictGroupFileListLimit {
+			acc.files = append(acc.files, f)
+		}
+		if s := getConflictSeverity(f); getConflictSeverityRank(s) > getConflictSeverityRank(acc.severity) {
+			acc.severity = s
 		}
 	}
 
 	var groups []ConflictGroup
-	for key, files := range conflictMap {
+	for key, acc := range conflictMap {
+		files := acc.files
 		vpkFullPaths := strings.Split(key, "|")
 		sort.Strings(files) // 文件列表也排序
 
 		// 从缓存获取完整VPK信息
-		vpkInfos := make([]parser.VPKFile, 0, len(vpkFullPaths))
+		vpkInfos := make([]ConflictVPKFile, 0, len(vpkFullPaths))
 		for _, fullPath := range vpkFullPaths {
 			if cached, ok := a.vpkCache.Load(fullPath); ok {
 				cache := cached.(*VPKFileCache)
-				vpkInfos = append(vpkInfos, cache.File)
+				vpkInfos = append(vpkInfos, newConflictVPKFile(cache.File.Name, cache.File.Path, cache.File.Title, cache.File.Location))
 			} else {
 				// 缓存不存在时的兜底处理
-				vpkInfos = append(vpkInfos, parser.VPKFile{
-					Name:     filepath.Base(fullPath),
-					Path:     fullPath,
-					Title:    filepath.Base(fullPath),
-					Location: a.getLocationFromPath(fullPath),
-				})
-			}
-		}
-
-		// 计算严重程度
-		severity := "info"
-		for _, f := range files {
-			s := getConflictSeverity(f)
-			if s == "critical" {
-				severity = "critical"
-				break // 已经是最高级别，无需继续
-			}
-			if s == "warning" {
-				severity = "warning"
+				vpkInfos = append(vpkInfos, newConflictVPKFile(filepath.Base(fullPath), fullPath, filepath.Base(fullPath), a.getLocationFromPath(fullPath)))
 			}
 		}
 
 		groups = append(groups, ConflictGroup{
-			VpkFiles: vpkInfos,
-			Files:    files,
-			Severity: severity,
+			VpkFiles:       vpkInfos,
+			Files:          files,
+			FileCount:      acc.fileCount,
+			FilesTruncated: acc.fileCount > len(files),
+			Severity:       acc.severity,
 		})
 	}
 
 	// 按严重程度和冲突数量排序 groups
 	sort.Slice(groups, func(i, j int) bool {
 		// 严重程度优先级: critical > warning > info
-		severityOrder := map[string]int{"critical": 3, "warning": 2, "info": 1}
-		si := severityOrder[groups[i].Severity]
-		sj := severityOrder[groups[j].Severity]
+		si := getConflictSeverityRank(groups[i].Severity)
+		sj := getConflictSeverityRank(groups[j].Severity)
 
 		if si != sj {
 			return si > sj
 		}
-		return len(groups[i].Files) > len(groups[j].Files)
+		return groups[i].FileCount > groups[j].FileCount
 	})
 
 	return &ConflictResult{
 		TotalConflicts: len(groups),
 		ConflictGroups: groups,
 	}, nil
+}
+
+func newConflictVPKFile(name, path, title, location string) ConflictVPKFile {
+	if title == "" {
+		title = name
+	}
+	return ConflictVPKFile{
+		Name:     name,
+		Path:     path,
+		Title:    title,
+		Location: location,
+	}
 }

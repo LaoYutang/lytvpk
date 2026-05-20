@@ -373,6 +373,18 @@
   font-weight: 800;
 }
 
+.file-tree-note {
+  margin-bottom: var(--spacing-2);
+  padding: var(--spacing-2);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--warning);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
 .conflict-pagination {
   display: flex;
   align-items: center;

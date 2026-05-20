@@ -90,9 +90,29 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class ConflictVPKFile {
+	    name: string;
+	    path: string;
+	    title: string;
+	    location: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictVPKFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.title = source["title"];
+	        this.location = source["location"];
+	    }
+	}
 	export class ConflictGroup {
-	    vpk_files: parser.VPKFile[];
+	    vpk_files: ConflictVPKFile[];
 	    files: string[];
+	    file_count: number;
+	    files_truncated: boolean;
 	    severity: string;
 	
 	    static createFrom(source: any = {}) {
@@ -101,8 +121,10 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.vpk_files = this.convertValues(source["vpk_files"], parser.VPKFile);
+	        this.vpk_files = this.convertValues(source["vpk_files"], ConflictVPKFile);
 	        this.files = source["files"];
+	        this.file_count = source["file_count"];
+	        this.files_truncated = source["files_truncated"];
 	        this.severity = source["severity"];
 	    }
 	
@@ -156,6 +178,7 @@ export namespace app {
 		    return a;
 		}
 	}
+	
 	export class DownloadTask {
 	    id: string;
 	    workshop_id: string;

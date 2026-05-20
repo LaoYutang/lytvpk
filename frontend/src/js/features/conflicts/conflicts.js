@@ -5,6 +5,7 @@ let toggleFile;
 let moveFileToAddons;
 let conflictProgressRegistered = false;
 let isConflictChecking = false;
+let isConflictModalVisible = false;
 let conflictCheckRunId = 0;
 
 export function configureConflicts(deps) {
@@ -19,6 +20,7 @@ let currentConflictPage = 1;
 const CONFLICT_PAGE_SIZE = 20;
 
 export function showConflictModal() {
+  isConflictModalVisible = true;
   document.getElementById("conflict-modal").classList.remove("hidden");
   if (isConflictChecking) {
     document
@@ -32,7 +34,10 @@ export function showConflictModal() {
 }
 
 export function hideConflictModal() {
+  isConflictModalVisible = false;
   document.getElementById("conflict-modal").classList.add("hidden");
+  currentConflictResult = null;
+  document.getElementById("conflict-list").innerHTML = "";
 }
 
 function resetConflictModal() {
@@ -46,6 +51,7 @@ function resetConflictModal() {
   document.getElementById("conflict-list").innerHTML = "";
   document.getElementById("conflict-progress-bar").style.width = "0%";
   document.getElementById("conflict-progress-text").textContent = "准备开始...";
+  currentConflictResult = null;
 
   // 重置筛选状态
   currentSeverityFilter = "critical";
@@ -112,16 +118,21 @@ export async function startConflictCheck() {
     .classList.remove("hidden");
   document.getElementById("conflict-results").classList.add("hidden");
   document.getElementById("conflict-empty").classList.add("hidden");
+  document.getElementById("conflict-list").innerHTML = "";
+  currentConflictResult = null;
 
   try {
     const result = await CheckConflicts();
-    if (runId !== conflictCheckRunId) return;
+    if (runId !== conflictCheckRunId || !isConflictModalVisible) {
+      currentConflictResult = null;
+      return;
+    }
 
     currentConflictResult = result;
     currentConflictPage = 1;
     renderConflictResults(result);
   } catch (err) {
-    if (runId === conflictCheckRunId) {
+    if (runId === conflictCheckRunId && isConflictModalVisible) {
       showError("冲突检测失败: " + err);
       document
         .getElementById("conflict-progress-container")
@@ -182,6 +193,7 @@ function getFilteredConflictGroups(result) {
 function createConflictGroupElement(group) {
   const severity = group.severity || "info";
   const files = group.files || [];
+  const fileCount = Number(group.file_count ?? files.length);
   const groupEl = document.createElement("div");
   groupEl.className = `conflict-group ${severity}`;
 
@@ -223,7 +235,7 @@ function createConflictGroupElement(group) {
                 <div class="conflict-title-section">
                     <div class="conflict-severity-row">
                         <span class="severity-badge ${severity}">${severityText}</span>
-                        <span class="conflict-file-count">${files.length} 个冲突文件</span>
+                        <span class="conflict-file-count">${fileCount} 个冲突文件</span>
                     </div>
                     <div class="conflict-vpk-names">
                         ${vpkListHtml}
@@ -292,7 +304,11 @@ function loadConflictDetails(details, group) {
 
   requestAnimationFrame(() => {
     const tree = buildTree(group.files || []);
-    inner.innerHTML = `<div class="file-tree">${renderTree(tree)}</div>`;
+    const fileCount = Number(group.file_count ?? (group.files || []).length);
+    const truncatedNote = group.files_truncated
+      ? `<div class="file-tree-note">当前仅展示前 ${(group.files || []).length} 个文件，完整冲突数为 ${fileCount} 个。</div>`
+      : "";
+    inner.innerHTML = `<div class="file-tree">${truncatedNote}${renderTree(tree)}</div>`;
     details.dataset.loaded = "true";
     delete details.dataset.loading;
   });

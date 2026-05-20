@@ -408,6 +408,12 @@ html.dark-mode .file-tree-loading {
   border-color: var(--border-default);
 }
 
+html.dark-mode .file-tree-note {
+  border-color: rgba(245, 158, 11, 0.32);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning-light);
+}
+
 html.dark-mode .conflict-page-btn {
   background: var(--bg-surface);
   border-color: var(--border-default);
