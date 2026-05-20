@@ -364,6 +364,11 @@ html.dark-mode .conflict-summary {
   color: var(--danger-light);
 }
 
+html.dark-mode .conflict-toolbar {
+  background: var(--bg-app);
+  border-bottom-color: var(--border-default);
+}
+
 html.dark-mode .conflict-filters .filter-btn {
   background: rgba(15, 23, 42, 0.72);
   border-color: rgba(148, 163, 184, 0.18);

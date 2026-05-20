@@ -17,7 +17,10 @@
 
 .conflict-modal-content .modal-body {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: var(--spacing-6);
 }
 
@@ -102,18 +105,34 @@
 }
 
 .conflict-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   margin-top: 0;
 }
 
 .conflict-toolbar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--spacing-4);
-  margin-bottom: var(--spacing-4);
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "summary desc desc"
+    "filters filters pagination";
+  align-items: center;
+  column-gap: var(--spacing-4);
+  row-gap: var(--spacing-3);
+  margin: 0 0 var(--spacing-4);
+  padding-bottom: var(--spacing-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.conflict-toolbar + .conflict-list {
+  padding-top: var(--spacing-1);
 }
 
 .conflict-summary {
+  grid-area: summary;
   margin: 0;
   color: var(--danger);
   font-size: var(--text-lg);
@@ -136,6 +155,7 @@
 }
 
 .conflict-filters {
+  grid-area: filters;
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-2);
@@ -170,18 +190,25 @@
 }
 
 .conflict-filter-desc {
+  grid-area: desc;
   color: var(--text-tertiary);
   font-size: var(--text-sm);
-  margin-top: var(--spacing-2);
+  margin-top: 0;
+  min-width: 0;
 }
 
 .conflict-list {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-4);
+  overflow-y: auto;
+  padding-right: var(--spacing-2);
 }
 
 .conflict-group {
+  flex: 0 0 auto;
   background: var(--bg-app);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
@@ -386,12 +413,14 @@
 }
 
 .conflict-pagination {
+  grid-area: pagination;
+  justify-self: end;
+  width: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-3);
-  margin-top: var(--spacing-4);
-  padding-top: var(--spacing-2);
+  margin-top: 0;
 }
 
 .conflict-pagination-info {

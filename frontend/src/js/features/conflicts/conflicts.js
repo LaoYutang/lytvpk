@@ -377,14 +377,14 @@ function renderTree(nodes) {
 }
 
 function renderConflictPagination(totalCount) {
-  const list = document.getElementById("conflict-list");
   let pagination = document.getElementById("conflict-pagination");
 
   if (!pagination) {
+    const toolbar = document.querySelector("#conflict-results .conflict-toolbar");
     pagination = document.createElement("div");
     pagination.id = "conflict-pagination";
     pagination.className = "conflict-pagination";
-    list.insertAdjacentElement("afterend", pagination);
+    toolbar?.appendChild(pagination);
   }
 
   const pageCount = Math.ceil(totalCount / CONFLICT_PAGE_SIZE);
