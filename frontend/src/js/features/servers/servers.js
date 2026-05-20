@@ -1,3 +1,31 @@
+import {
+  configureFormModal,
+  openServerFormModal,
+  closeServerFormModal,
+  saveServerForm,
+  setupFormModalListeners as setupFormListeners,
+} from "./form-modal.js";
+import {
+  configureDetailsModal,
+  openServerDetailsModal,
+  setupDetailsModalListeners as setupDetailsListeners,
+} from "./details-modal.js";
+import {
+  configurePanelModal,
+  closePanelServerDetailsModal,
+  refreshCurrentPanelStatus,
+  restartCurrentPanelServer,
+  openCurrentPanelInBrowser,
+  openPanelMapModal,
+  closePanelMapModal,
+  loadPanelMaps,
+  togglePanelOfficialMaps,
+  renderPanelMapList,
+  openPanelRconModal,
+  closePanelRconModal,
+  setupPanelModalListeners as setupPanelListeners,
+} from "./panel-modal.js";
+
 let showError;
 let showNotification;
 let showConfirmModal;
@@ -17,7 +45,67 @@ let ChangePanelMap;
 let SendPanelRconCommand;
 
 export function configureServers(deps) {
-  ({ showError, showNotification, showConfirmModal, switchAppPage, FetchServerInfo, FetchPlayerList, ConnectToServer, ExportServersToFile, GetMapName, GetServerStorage, SaveServerStorage, BrowserOpenURL, FetchPanelServerStatus, RestartPanelServer, FetchPanelMapList, ChangePanelMap, SendPanelRconCommand } = deps);
+  ({
+    showError,
+    showNotification,
+    showConfirmModal,
+    switchAppPage,
+    FetchServerInfo,
+    FetchPlayerList,
+    ConnectToServer,
+    ExportServersToFile,
+    GetMapName,
+    GetServerStorage,
+    SaveServerStorage,
+    BrowserOpenURL,
+    FetchPanelServerStatus,
+    RestartPanelServer,
+    FetchPanelMapList,
+    ChangePanelMap,
+    SendPanelRconCommand,
+  } = deps);
+
+  configureFormModal({
+    showError,
+    showNotification,
+    getServers,
+    saveServers,
+    initServerStorage,
+    renderServers,
+    renderLaunchServerMenu,
+    fetchServerInfo,
+  });
+
+  configureDetailsModal({
+    showError,
+    FetchServerInfo,
+    FetchPlayerList,
+    resolveMapName,
+    escapeHtml,
+    formatDuration,
+    getServers,
+    SERVER_ICONS,
+  });
+
+  configurePanelModal({
+    showError,
+    showNotification,
+    showConfirmModal,
+    FetchPanelServerStatus,
+    RestartPanelServer,
+    FetchPanelMapList,
+    ChangePanelMap,
+    SendPanelRconCommand,
+    BrowserOpenURL,
+    resolveMapName,
+    escapeHtml,
+    escapeAttr,
+    getIPHost,
+    getServers,
+    SERVER_ICONS,
+    PANEL_MODE_LABELS,
+    OFFICIAL_CAMPAIGNS,
+  });
 }
 
 const RECENT_SERVER_LIMIT = 2;
@@ -25,11 +113,8 @@ let serverStorage = {
   servers: [],
   recentServers: [],
 };
-let currentPanelServer = null;
-let currentPanelServerIndex = -1;
-let currentPanelMaps = [];
-let panelOfficialMapsHidden = false;
-const SERVER_ICONS = {
+
+export const SERVER_ICONS = {
   play: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
   refresh: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg>`,
   more: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>`,
@@ -38,10 +123,9 @@ const SERVER_ICONS = {
   map: `<svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3z"></path><path d="M9 3v15"></path><path d="M15 6v15"></path></svg>`,
   users: `<svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
   panel: `<svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 20h8"></path><path d="M12 18v2"></path><path d="M7 8h.01"></path><path d="M10 8h7"></path><path d="M7 12h4"></path><path d="M14 12h3"></path></svg>`,
-  terminal: `<svg class="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6"></path><path d="M12 19h8"></path></svg>`,
 };
 
-const PANEL_MODE_LABELS = {
+export const PANEL_MODE_LABELS = {
   coop: "合作",
   realism: "写实",
   versus: "对抗",
@@ -51,7 +135,7 @@ const PANEL_MODE_LABELS = {
   mutations: "突变",
 };
 
-const OFFICIAL_CAMPAIGNS = [
+export const OFFICIAL_CAMPAIGNS = [
   {
     title: "死亡中心",
     chapters: [
@@ -191,8 +275,7 @@ export async function initServerStorage() {
   }
 }
 
-function getServers() {
-  // 按权重降序排序
+export function getServers() {
   return [...serverStorage.servers].sort((a, b) => (b.weight || 0) - (a.weight || 0));
 }
 
@@ -319,401 +402,120 @@ function recordRecentServer(address) {
   renderLaunchServerMenu();
 }
 
-// --- 编辑/添加服务器功能 ---
-let currentEditIndex = -1;
-let isEditMode = false;
-
-function openServerFormModal(index = -1) {
-  const modal = document.getElementById("server-form-modal");
-  const title = document.getElementById("server-form-title");
-  const nameInput = document.getElementById("form-server-name");
-  const addressInput = document.getElementById("form-server-address");
-  const weightInput = document.getElementById("form-server-weight");
-  const panelUrlInput = document.getElementById("form-server-panel-url");
-  const panelPasswordInput = document.getElementById("form-server-panel-password");
-  const clearPasswordInput = document.getElementById("form-clear-panel-password");
-  const passwordStatus = document.getElementById("panel-password-status");
-  const advancedContent = document.getElementById("server-advanced-content");
-  const advancedToggle = document.getElementById("server-advanced-toggle");
-
-  // 重置表单
-  nameInput.value = "";
-  addressInput.value = "";
-  weightInput.value = "0";
-  if (panelUrlInput) panelUrlInput.value = "";
-  if (panelPasswordInput) {
-    panelPasswordInput.value = "";
-    panelPasswordInput.placeholder = "面板访问密码";
-  }
-  if (clearPasswordInput) clearPasswordInput.checked = false;
-  if (passwordStatus) {
-    passwordStatus.textContent = "未保存密码";
-    passwordStatus.classList.remove("active");
-  }
-  advancedContent?.classList.add("hidden");
-  advancedToggle?.setAttribute("aria-expanded", "false");
-
-  if (index >= 0) {
-    // 编辑模式
-    isEditMode = true;
-    currentEditIndex = index;
-    title.textContent = "编辑服务器";
-
-    const servers = getServers();
-    const server = servers[index];
-    if (server) {
-      nameInput.value = server.name;
-      addressInput.value = server.address;
-      weightInput.value = server.weight || 0;
-      if (panelUrlInput) panelUrlInput.value = server.panelUrl || "";
-      if (panelPasswordInput && server.panelPasswordSet) {
-        panelPasswordInput.placeholder = "留空则保留已保存密码";
-      }
-      if (passwordStatus) {
-        passwordStatus.textContent = server.panelPasswordSet
-          ? "已保存密码"
-          : "未保存密码";
-        passwordStatus.classList.toggle("active", Boolean(server.panelPasswordSet));
+export async function resolveMapName(mapCode) {
+  if (!mapCode) return mapCode;
+  try {
+    if (typeof GetMapName === "function") {
+      const name = await GetMapName(mapCode);
+      if (name && name.length > 0) {
+        return name;
       }
     }
-  } else {
-    // 添加模式
-    isEditMode = false;
-    currentEditIndex = -1;
-    title.textContent = "添加服务器";
+  } catch (e) {
+    console.error("Failed to resolve map name via backend", e);
   }
-
-  modal.classList.remove("hidden");
-  document.getElementById("global-dropdown").classList.add("hidden");
+  return mapCode;
 }
 
-function closeServerFormModal() {
-  document.getElementById("server-form-modal").classList.add("hidden");
-  currentEditIndex = -1;
-  isEditMode = false;
-}
+export async function fetchServerInfo(address, index) {
+  let detailsContainer = null;
 
-async function saveServerForm() {
-  const name = document.getElementById("form-server-name").value.trim();
-  const address = document.getElementById("form-server-address").value.trim();
-  const weight =
-    parseInt(document.getElementById("form-server-weight").value) || 0;
-  const panelUrl = document.getElementById("form-server-panel-url")?.value.trim() || "";
-  const panelPassword =
-    document.getElementById("form-server-panel-password")?.value.trim() || "";
-  const clearPanelPassword = Boolean(
-    document.getElementById("form-clear-panel-password")?.checked
-  );
-
-  if (!name || !address) {
-    showError("请输入服务器名称和地址");
-    return;
-  }
-
-  const servers = getServers();
-  const buildServerPayload = (existing = {}) => {
-    const next = {
-      ...existing,
-      name,
-      address,
-      weight,
-      panelUrl,
-      panelPasswordSet: clearPanelPassword
-        ? false
-        : Boolean(existing.panelPasswordSet || panelPassword),
-    };
-    if (panelPassword) {
-      next.panelPassword = panelPassword;
-      next.clearPanelPassword = false;
-    } else if (clearPanelPassword) {
-      next.clearPanelPassword = true;
+  const listItems = document.querySelectorAll("li.server-item");
+  for (const li of listItems) {
+    if (li.dataset.address === address) {
+      detailsContainer = li.querySelector(".server-details");
+      break;
     }
-    return next;
-  };
+  }
+
+  if (!detailsContainer) {
+    detailsContainer = document.getElementById(`server-details-${index}`);
+  }
+
+  if (!detailsContainer) return;
 
   try {
-    if (isEditMode) {
-      // 编辑模式
-      if (currentEditIndex >= 0 && currentEditIndex < servers.length) {
-        servers[currentEditIndex] = buildServerPayload(servers[currentEditIndex]);
-        await saveServers(servers);
-        await initServerStorage();
-        showNotification("服务器修改成功", "success");
-      }
-    } else {
-      // 添加模式
-      servers.push(buildServerPayload());
-      await saveServers(servers);
-      await initServerStorage();
-      showNotification("服务器添加成功", "success");
-    }
-  } catch (err) {
-    console.error("保存服务器失败:", err);
-    return;
-  }
+    const info = await FetchServerInfo(address);
 
-  renderServers();
-  renderLaunchServerMenu();
-  closeServerFormModal();
+    if (!document.body.contains(detailsContainer)) return;
 
-  // 尝试刷新该服务器信息
-  // 重新获取列表以找到新位置（因为可能排序了）
-  const newServers = getServers();
-  const newIndex = newServers.findIndex(
-    (s) => s.address === address && s.name === name
-  );
-  if (newIndex !== -1) {
-    fetchServerInfo(address, newIndex);
-  }
-}
+    detailsContainer.innerHTML = `
+      <div class="server-stats-grid">
+        <span class="stat-badge name-badge" title="${escapeAttr(info.name)}">${SERVER_ICONS.server}<span>${escapeHtml(info.name)}</span></span>
+        <span class="stat-badge mode-badge" title="游戏模式">${SERVER_ICONS.mode}<span>${escapeHtml(info.mode)}</span></span>
+        <span class="stat-badge map-badge" title="地图: ${escapeAttr(info.map)} (点击解析)" data-map-code="${escapeAttr(info.map)}">${SERVER_ICONS.map}<span>${escapeHtml(info.map)}</span></span>
+        <span class="stat-badge players-badge" title="在线人数">${SERVER_ICONS.users}<span>${info.players}/${info.max_players}</span></span>
+      </div>
+    `;
 
-export function setupServerModalListeners() {
-  document
-    .getElementById("open-add-server-modal-btn")
-    .addEventListener("click", () => openServerFormModal(-1));
+    const mapBadge = detailsContainer.querySelector(".map-badge");
+    if (mapBadge) {
+      mapBadge.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (mapBadge.dataset.resolved === "true") return;
 
-  // 编辑/添加服务器相关
-  document
-    .getElementById("close-server-form-modal-btn")
-    .addEventListener("click", closeServerFormModal);
-  document
-    .getElementById("cancel-server-form-btn")
-    .addEventListener("click", closeServerFormModal);
-  document
-    .getElementById("save-server-form-btn")
-    .addEventListener("click", saveServerForm);
+        const originalHtml = mapBadge.innerHTML;
+        mapBadge.innerHTML = `${SERVER_ICONS.map}<span>解析中...</span>`;
+        mapBadge.style.cursor = "wait";
 
-  document
-    .getElementById("global-edit-server-btn")
-    .addEventListener("click", () => {
-      const dropdown = document.getElementById("global-dropdown");
-      const index = parseInt(dropdown.dataset.index);
-      if (!isNaN(index)) {
-        openServerFormModal(index);
-      }
-    });
-
-  // 详情按钮
-  document
-    .getElementById("global-details-server-btn")
-    .addEventListener("click", () => {
-      const dropdown = document.getElementById("global-dropdown");
-      const index = parseInt(dropdown.dataset.index);
-      if (!isNaN(index)) {
-        openServerDetailsModal(index);
-        dropdown.classList.add("hidden");
-      }
-    });
-
-  document
-    .getElementById("close-server-details-modal-btn")
-    .addEventListener("click", () => {
-      document.getElementById("server-details-modal").classList.add("hidden");
-    });
-
-  document
-    .getElementById("close-panel-server-details-modal-btn")
-    ?.addEventListener("click", closePanelServerDetailsModal);
-  document
-    .getElementById("panel-refresh-btn")
-    ?.addEventListener("click", refreshCurrentPanelStatus);
-  document
-    .getElementById("panel-restart-btn")
-    ?.addEventListener("click", restartCurrentPanelServer);
-  document
-    .getElementById("panel-map-btn")
-    ?.addEventListener("click", openPanelMapModal);
-  document
-    .getElementById("panel-open-btn")
-    ?.addEventListener("click", openCurrentPanelInBrowser);
-  document
-    .getElementById("panel-rcon-btn")
-    ?.addEventListener("click", openPanelRconModal);
-
-  document
-    .getElementById("close-panel-map-modal-btn")
-    ?.addEventListener("click", closePanelMapModal);
-  document
-    .getElementById("panel-map-refresh-btn")
-    ?.addEventListener("click", loadPanelMaps);
-  document
-    .getElementById("panel-map-official-toggle-btn")
-    ?.addEventListener("click", togglePanelOfficialMaps);
-  document
-    .getElementById("panel-map-search")
-    ?.addEventListener("input", renderPanelMapList);
-  document
-    .getElementById("panel-map-list")
-    ?.addEventListener("click", handlePanelMapClick);
-
-  document
-    .getElementById("close-panel-rcon-modal-btn")
-    ?.addEventListener("click", closePanelRconModal);
-  document
-    .getElementById("panel-rcon-send-btn")
-    ?.addEventListener("click", sendPanelRconCommand);
-  document
-    .getElementById("panel-rcon-command")
-    ?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        sendPanelRconCommand();
-      }
-    });
-
-  document
-    .getElementById("server-advanced-toggle")
-    ?.addEventListener("click", toggleServerAdvancedConfig);
-
-  // 点击详情模态框外部关闭
-  document
-    .getElementById("server-details-modal")
-    .addEventListener("click", function (e) {
-      if (e.target === this) {
-        this.classList.add("hidden");
-      }
-    });
-
-  ["panel-server-details-modal", "panel-map-modal", "panel-rcon-modal"].forEach(
-    (modalId) => {
-      document.getElementById(modalId)?.addEventListener("click", function (e) {
-        if (e.target === this) {
-          this.classList.add("hidden");
+        try {
+          const realName = await resolveMapName(info.map);
+          if (realName && realName !== info.map) {
+            mapBadge.innerHTML = `${SERVER_ICONS.map}<span>${escapeHtml(realName)}</span>`;
+            mapBadge.dataset.resolved = "true";
+            mapBadge.title = `地图: ${info.map}`;
+            mapBadge.style.cursor = "default";
+            mapBadge.style.textDecoration = "none";
+            mapBadge.style.color = "inherit";
+          } else {
+            mapBadge.innerHTML = originalHtml;
+            mapBadge.style.cursor = "pointer";
+          }
+        } catch (err) {
+          mapBadge.innerHTML = originalHtml;
+          mapBadge.style.cursor = "pointer";
         }
       });
     }
-  );
-
-  // 数据导入导出
-  document
-    .getElementById("export-clipboard-btn")
-    .addEventListener("click", exportServersToClipboard);
-  document
-    .getElementById("export-file-btn")
-    .addEventListener("click", exportServersToFile);
-  document
-    .getElementById("import-clipboard-btn")
-    .addEventListener("click", importServersFromClipboard);
-
-  const fileInput = document.getElementById("import-file-input");
-  document
-    .getElementById("import-file-btn")
-    .addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      importServers(event.target.result);
-      fileInput.value = ""; // 重置以便再次选择同一文件
-    };
-    reader.onerror = () => showError("读取文件失败");
-    reader.readAsText(file);
-  });
-
-  // 全局删除按钮事件
-  document
-    .getElementById("global-delete-server-btn")
-    .addEventListener("click", (e) => {
-      const dropdown = document.getElementById("global-dropdown");
-      const index = parseInt(dropdown.dataset.index);
-      if (!isNaN(index)) {
-        deleteServer(index);
-        dropdown.classList.add("hidden");
-      }
-    });
-
-  // 刷新所有按钮
-  const refreshAllBtn = document.getElementById("refresh-all-servers-btn");
-  if (refreshAllBtn) {
-    refreshAllBtn.addEventListener("click", refreshAllServers);
+  } catch (err) {
+    console.error("获取服务器信息失败:", err);
+    if (document.body.contains(detailsContainer)) {
+      detailsContainer.innerHTML = `<span class="error-text">获取失败</span>`;
+    }
   }
-
-  // 点击模态框外部关闭
-  window.addEventListener("click", (event) => {
-    const modal = document.getElementById("server-modal");
-    if (event.target === modal) {
-      closeServerModal();
-    }
-
-    // 点击任意位置关闭全局下拉菜单
-    if (
-      !event.target.closest(".server-more-btn") &&
-      !event.target.closest("#global-dropdown")
-    ) {
-      document.getElementById("global-dropdown").classList.add("hidden");
-    }
-  });
-
-  // 滚动时关闭下拉菜单
-  window.addEventListener(
-    "scroll",
-    () => {
-      document.getElementById("global-dropdown").classList.add("hidden");
-    },
-    true
-  );
 }
 
-export function setupLaunchServerMenu() {
-  const popover = document.getElementById("launch-server-popover");
-  const wrapper = document.querySelector(".sidebar-launch-wrapper");
-  if (!popover || popover.dataset.bound === "true") return;
+export function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
 
-  popover.dataset.bound = "true";
-  renderLaunchServerMenu();
-
-  wrapper?.addEventListener("pointerenter", renderLaunchServerMenu);
-  popover.addEventListener("click", (event) => {
-    const option = event.target.closest(".launch-server-option");
-    if (!option) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    connectServer(option.dataset.address, { notify: true });
-  });
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${s
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function renderLaunchServerMenu() {
-  const popover = document.getElementById("launch-server-popover");
-  if (!popover) return;
+export function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
 
-  const recentServers = getRecentServers().slice().reverse();
-  const content =
-    recentServers.length > 0
-      ? recentServers
-          .map(
-            (server) => `
-              <button
-                class="launch-server-option"
-                type="button"
-                role="menuitem"
-                data-address="${escapeAttr(server.address)}"
-              >
-                <span class="launch-server-icon" aria-hidden="true">${SERVER_ICONS.server}</span>
-                <span class="launch-server-name">${escapeHtml(server.name)}</span>
-              </button>
-            `
-          )
-          .join("")
-      : `
-          <div class="launch-server-empty" role="status">
-            <span>暂无最近</span>
-          </div>
-        `;
+export function escapeAttr(text) {
+  return escapeHtml(text).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 
-  popover.innerHTML = `
-    <div class="launch-server-list">${content}</div>
-  `;
+function getIPHost(ip) {
+  if (!ip) return "";
+  return String(ip).split(":")[0];
 }
 
 export function openServerModal() {
   switchAppPage("servers");
-
   renderServers();
-
-  // 自动刷新所有服务器信息
   refreshAllServers();
 }
 
@@ -740,8 +542,6 @@ export function renderServers() {
   servers.forEach((server, index) => {
     const li = createServerListItem(server, index);
     list.appendChild(li);
-
-    // 初始渲染时，获取信息
     fetchServerInfo(server.address, index);
   });
 }
@@ -785,14 +585,11 @@ function createServerListItem(server, index) {
       </div>
     `;
 
-  // 双击进入详情
   li.addEventListener("dblclick", (e) => {
-    // 如果点击的是按钮，不触发详情
     if (e.target.closest("button")) return;
     openServerDetailsModal(index);
   });
 
-  // 绑定连接按钮事件
   const connectBtn = li.querySelector(".connect-server-btn");
   if (connectBtn) {
     connectBtn.addEventListener("click", (e) => {
@@ -802,7 +599,6 @@ function createServerListItem(server, index) {
     });
   }
 
-  // 绑定刷新按钮事件
   const refreshBtn = li.querySelector(".refresh-server-btn");
   if (refreshBtn) {
     refreshBtn.addEventListener("click", (e) => {
@@ -821,7 +617,6 @@ function createServerListItem(server, index) {
     });
   }
 
-  // 绑定更多按钮事件
   const moreBtn = li.querySelector(".server-more-btn");
   if (moreBtn) {
     moreBtn.addEventListener("click", (e) => {
@@ -849,9 +644,6 @@ function createServerListItem(server, index) {
   return li;
 }
 
-// 全局函数以便在HTML中调用
-// window.refreshServerInfo 已废弃，因为移除了单个刷新按钮
-
 export function refreshAllServers() {
   const servers = getServers();
 
@@ -875,108 +667,15 @@ export function refreshAllServers() {
   });
 }
 
-async function resolveMapName(mapCode) {
-  if (!mapCode) return mapCode;
-  try {
-    if (typeof GetMapName === "function") {
-      const name = await GetMapName(mapCode);
-      if (name && name.length > 0) {
-        return name;
-      }
-    }
-  } catch (e) {
-    console.error("Failed to resolve map name via backend", e);
-  }
-  return mapCode; // Fallback to original
-}
-
-async function fetchServerInfo(address, index) {
-  let detailsContainer = null;
-
-  // 优先通过地址查找，以避免索引变化导致的错位
-  // 遍历查找比querySelector更安全（防止特殊字符破坏选择器）
-  const listItems = document.querySelectorAll("li.server-item");
-  for (const li of listItems) {
-    if (li.dataset.address === address) {
-      detailsContainer = li.querySelector(".server-details");
-      break;
-    }
-  }
-
-  // 回退到通过ID查找
-  if (!detailsContainer) {
-    detailsContainer = document.getElementById(`server-details-${index}`);
-  }
-
-  if (!detailsContainer) return;
-
-  try {
-    const info = await FetchServerInfo(address);
-
-    // 再次检查元素是否存在（防止异步期间被删除）
-    if (!document.body.contains(detailsContainer)) return;
-
-    detailsContainer.innerHTML = `
-      <div class="server-stats-grid">
-        <span class="stat-badge name-badge" title="${escapeAttr(info.name)}">${SERVER_ICONS.server}<span>${escapeHtml(info.name)}</span></span>
-        <span class="stat-badge mode-badge" title="游戏模式">${SERVER_ICONS.mode}<span>${escapeHtml(info.mode)}</span></span>
-        <span class="stat-badge map-badge" title="地图: ${escapeAttr(info.map)} (点击解析)" data-map-code="${escapeAttr(info.map)}">${SERVER_ICONS.map}<span>${escapeHtml(info.map)}</span></span>
-        <span class="stat-badge players-badge" title="在线人数">${SERVER_ICONS.users}<span>${info.players}/${info.max_players}</span></span>
-      </div>
-    `;
-
-    // 绑定地图点击事件
-    const mapBadge = detailsContainer.querySelector(".map-badge");
-    if (mapBadge) {
-      mapBadge.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (mapBadge.dataset.resolved === "true") return;
-
-        const originalHtml = mapBadge.innerHTML;
-        mapBadge.innerHTML = `${SERVER_ICONS.map}<span>解析中...</span>`;
-        mapBadge.style.cursor = "wait";
-
-        try {
-          const realName = await resolveMapName(info.map);
-          if (realName && realName !== info.map) {
-            mapBadge.innerHTML = `${SERVER_ICONS.map}<span>${escapeHtml(realName)}</span>`;
-            mapBadge.dataset.resolved = "true";
-            mapBadge.title = `地图: ${info.map}`;
-            mapBadge.style.cursor = "default";
-            // 移除 hover 效果
-            mapBadge.style.textDecoration = "none";
-            mapBadge.style.color = "inherit";
-          } else {
-            mapBadge.innerHTML = originalHtml;
-            mapBadge.style.cursor = "pointer";
-          }
-        } catch (err) {
-          mapBadge.innerHTML = originalHtml;
-          mapBadge.style.cursor = "pointer";
-        }
-      });
-    }
-  } catch (err) {
-    console.error("获取服务器信息失败:", err);
-    if (document.body.contains(detailsContainer)) {
-      detailsContainer.innerHTML = `<span class="error-text">获取失败</span>`;
-    }
-  }
-}
-
-// function addServer() { ... } 已被整合到 saveServerForm 中，此处保留空函数或删除以避免引用错误
-// 但为了安全起见，如果还有其他地方调用 addServer，可以保留一个兼容版本
 function addServer() {
   openServerFormModal(-1);
 }
 
 function deleteServer(index) {
-  console.log("deleteServer called with index:", index);
   const servers = getServers();
   const server = servers[index];
 
   if (!server) {
-    console.error("Server not found at index:", index);
     showError("无法找到要删除的服务器");
     return;
   }
@@ -985,9 +684,7 @@ function deleteServer(index) {
     "删除服务器",
     `确定要删除服务器 "${server.name}" 吗？`,
     () => {
-      console.log("Confirm callback executed for index:", index);
       const currentServers = getServers();
-      // 确保 index 是数字
       const idx = parseInt(index);
 
       if (!isNaN(idx) && idx >= 0 && idx < currentServers.length) {
@@ -995,34 +692,27 @@ function deleteServer(index) {
         saveServers(currentServers);
         renderLaunchServerMenu();
 
-        // 直接从DOM中移除元素，而不是重新渲染整个列表
         const list = document.getElementById("server-list");
         const itemToRemove = list.children[idx];
         if (itemToRemove) {
           list.removeChild(itemToRemove);
 
-          // 更新剩余项的索引
           Array.from(list.children).forEach((li, newIndex) => {
-            // 更新更多按钮的索引
             const moreBtn = li.querySelector(".server-more-btn");
             if (moreBtn) moreBtn.dataset.index = newIndex;
 
-            // 更新详情容器ID (如果需要的话，虽然不更新也不影响显示，但为了保持一致性)
             const details = li.querySelector(".server-details");
             if (details) details.id = `server-details-${newIndex}`;
 
-            // 更新名称ID
             const nameEl = li.querySelector(".server-name");
             if (nameEl) nameEl.id = `server-name-${newIndex}`;
           });
         } else {
-          // 如果DOM操作失败，回退到重新渲染（但不自动刷新信息）
-          renderServers(false);
+          renderServers();
         }
 
         showNotification("服务器已删除", "success");
       } else {
-        console.error("Invalid index in callback:", idx);
         showError("删除失败：索引无效");
       }
     }
@@ -1103,7 +793,6 @@ function importServers(jsonStr) {
 
     newServers.forEach((server) => {
       if (server.name && server.address) {
-        // 检查是否存在
         const existingIndex = currentServers.findIndex(
           (s) => s.address === server.address
         );
@@ -1143,514 +832,130 @@ function getExportableServers() {
   }));
 }
 
-async function openServerDetailsModal(index) {
-  const servers = getServers();
-  const server = servers[index];
-  if (server?.panelUrl && server?.panelPasswordSet) {
-    openPanelServerDetailsModal(index);
-    return;
-  }
-  openBasicServerDetailsModal(index);
+export function setupLaunchServerMenu() {
+  const popover = document.getElementById("launch-server-popover");
+  const wrapper = document.querySelector(".sidebar-launch-wrapper");
+  if (!popover || popover.dataset.bound === "true") return;
+
+  popover.dataset.bound = "true";
+  renderLaunchServerMenu();
+
+  wrapper?.addEventListener("pointerenter", renderLaunchServerMenu);
+  popover.addEventListener("click", (event) => {
+    const option = event.target.closest(".launch-server-option");
+    if (!option) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    connectServer(option.dataset.address, { notify: true });
+  });
 }
 
-async function openBasicServerDetailsModal(index) {
-  const servers = getServers();
-  const server = servers[index];
-  if (!server) return;
+function renderLaunchServerMenu() {
+  const popover = document.getElementById("launch-server-popover");
+  if (!popover) return;
 
-  const modal = document.getElementById("server-details-modal");
-  const title = document.getElementById("details-server-name");
-  const loading = document.getElementById("server-details-loading");
-  const content = document.getElementById("server-details-content");
-  const mapEl = document.getElementById("details-map");
-  const playersEl = document.getElementById("details-players");
-  const listEl = document.getElementById("details-player-list");
+  const recentServers = getRecentServers().slice().reverse();
+  const content =
+    recentServers.length > 0
+      ? recentServers
+          .map(
+            (server) => `
+              <button
+                class="launch-server-option"
+                type="button"
+                role="menuitem"
+                data-address="${escapeAttr(server.address)}"
+              >
+                <span class="launch-server-icon" aria-hidden="true">${SERVER_ICONS.server}</span>
+                <span class="launch-server-name">${escapeHtml(server.name)}</span>
+              </button>
+            `
+          )
+          .join("")
+      : `
+          <div class="launch-server-empty" role="status">
+            <span>暂无最近</span>
+          </div>
+        `;
 
-  title.textContent = server.name;
-  loading.classList.remove("hidden");
-  content.classList.add("hidden");
-  modal.classList.remove("hidden");
+  popover.innerHTML = `
+    <div class="launch-server-list">${content}</div>
+  `;
+}
 
-  try {
-    // Fetch basic info first
-    const info = await FetchServerInfo(server.address);
-    mapEl.textContent = info.map;
-    mapEl.title = `地图: ${info.map}`;
-    playersEl.textContent = `${info.players}/${info.max_players}`;
+export function setupServerModalListeners() {
+  setupFormListeners();
+  setupDetailsListeners();
+  setupPanelListeners();
 
-    // 异步尝试解析地图名
-    resolveMapName(info.map).then((realName) => {
-      if (realName !== info.map && document.body.contains(mapEl)) {
-        mapEl.textContent = realName;
-        mapEl.title = `地图: ${info.map}`;
+  // 数据导入导出
+  document
+    .getElementById("export-clipboard-btn")
+    .addEventListener("click", exportServersToClipboard);
+  document
+    .getElementById("export-file-btn")
+    .addEventListener("click", exportServersToFile);
+  document
+    .getElementById("import-clipboard-btn")
+    .addEventListener("click", importServersFromClipboard);
+
+  const fileInput = document.getElementById("import-file-input");
+  document
+    .getElementById("import-file-btn")
+    .addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      importServers(event.target.result);
+      fileInput.value = "";
+    };
+    reader.onerror = () => showError("读取文件失败");
+    reader.readAsText(file);
+  });
+
+  // 全局删除按钮
+  document
+    .getElementById("global-delete-server-btn")
+    .addEventListener("click", () => {
+      const dropdown = document.getElementById("global-dropdown");
+      const index = parseInt(dropdown.dataset.index);
+      if (!isNaN(index)) {
+        deleteServer(index);
+        dropdown.classList.add("hidden");
       }
     });
 
-    const players = await FetchPlayerList(server.address);
+  // 刷新所有按钮
+  const refreshAllBtn = document.getElementById("refresh-all-servers-btn");
+  if (refreshAllBtn) {
+    refreshAllBtn.addEventListener("click", refreshAllServers);
+  }
 
-    listEl.innerHTML = "";
-    if (players && players.length > 0) {
-      // Sort by score desc
-      players.sort((a, b) => b.score - a.score);
-
-      players.forEach((p) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-                    <td class="player-name">${escapeHtml(p.name)}</td>
-                    <td class="text-right">${p.score}</td>
-                    <td class="text-right">${formatDuration(p.duration)}</td>
-                `;
-        listEl.appendChild(tr);
-      });
-    } else {
-      listEl.innerHTML =
-        '<tr><td colspan="3" class="empty-state">暂无玩家信息</td></tr>';
+  // 点击模态框外部关闭
+  window.addEventListener("click", (event) => {
+    const modal = document.getElementById("server-modal");
+    if (event.target === modal) {
+      closeServerModal();
     }
 
-    loading.classList.add("hidden");
-    content.classList.remove("hidden");
-  } catch (err) {
-    console.error(err);
-    loading.textContent = "获取失败: " + err;
-  }
-}
-
-function openPanelServerDetailsModal(index) {
-  const server = getServers()[index];
-  if (!server) return;
-
-  currentPanelServer = server;
-  currentPanelServerIndex = index;
-
-  const modal = document.getElementById("panel-server-details-modal");
-  const title = document.getElementById("panel-details-server-name");
-  const loading = document.getElementById("panel-details-loading");
-  const content = document.getElementById("panel-details-content");
-  const error = document.getElementById("panel-details-error");
-
-  title.textContent = server.name;
-  loading.textContent = "正在获取玩家信息...";
-  loading.classList.remove("hidden");
-  content.classList.add("hidden");
-  error.classList.add("hidden");
-  error.innerHTML = "";
-  modal.classList.remove("hidden");
-
-  loadPanelStatus(server);
-}
-
-function closePanelServerDetailsModal() {
-  document.getElementById("panel-server-details-modal")?.classList.add("hidden");
-  currentPanelServer = null;
-  currentPanelServerIndex = -1;
-}
-
-async function loadPanelStatus(server = currentPanelServer) {
-  if (!server) return;
-
-  const loading = document.getElementById("panel-details-loading");
-  const content = document.getElementById("panel-details-content");
-  const error = document.getElementById("panel-details-error");
-  const refreshBtn = document.getElementById("panel-refresh-btn");
-
-  loading.classList.remove("hidden");
-  content.classList.add("hidden");
-  error.classList.add("hidden");
-  error.innerHTML = "";
-  refreshBtn?.setAttribute("disabled", "true");
-
-  try {
-    const status = await FetchPanelServerStatus(server.id);
-    await renderPanelStatus(server, status || {});
-    loading.classList.add("hidden");
-    content.classList.remove("hidden");
-  } catch (err) {
-    console.error("获取面板状态失败:", err);
-    loading.classList.add("hidden");
-    error.textContent = "获取面板状态失败: " + err;
-    error.classList.remove("hidden");
-    renderPanelStatusError(err);
-  } finally {
-    refreshBtn?.removeAttribute("disabled");
-  }
-}
-
-function renderPanelStatusError(err) {
-  const error = document.getElementById("panel-details-error");
-  if (!error) return;
-
-  error.innerHTML = `
-    <div class="panel-error-content">
-      <span>获取面板状态失败: ${escapeHtml(err)}</span>
-      <button id="panel-details-retry-btn" class="btn btn-secondary btn-small panel-action-btn" type="button">
-        刷新
-      </button>
-    </div>
-  `;
-  error
-    .querySelector("#panel-details-retry-btn")
-    ?.addEventListener("click", refreshCurrentPanelStatus);
-  error.classList.remove("hidden");
-}
-
-async function renderPanelStatus(server, status) {
-  const summary = document.getElementById("panel-status-summary");
-  const playerList = document.getElementById("panel-player-list");
-  const rawMap = status.map || "Unknown";
-  let displayMap = rawMap;
-  try {
-    const resolved = await resolveMapName(rawMap);
-    if (resolved && resolved !== rawMap) {
-      displayMap = resolved;
+    if (
+      !event.target.closest(".server-more-btn") &&
+      !event.target.closest("#global-dropdown")
+    ) {
+      document.getElementById("global-dropdown").classList.add("hidden");
     }
-  } catch {
-    displayMap = rawMap;
-  }
+  });
 
-  summary.innerHTML = `
-    ${renderPanelStatusItem("服务器", status.hostname || server.name)}
-    ${renderPanelStatusItem("地图", displayMap, rawMap)}
-    ${renderPanelStatusItem("玩家", status.players || "0/0")}
-    ${renderPanelStatusItem("模式", status.gameMode || "未知")}
-    ${renderPanelStatusItem("难度", status.difficulty || "未知")}
-  `;
-
-  const users = Array.isArray(status.users) ? status.users : [];
-  if (users.length === 0) {
-    playerList.innerHTML =
-      '<tr><td colspan="6" class="empty-state">暂无在线玩家</td></tr>';
-    return;
-  }
-
-  playerList.innerHTML = users
-    .map(
-      (user) => `
-        <tr>
-          <td class="player-name">${escapeHtml(user.name || "Unknown")}</td>
-          <td class="panel-player-steamid">${escapeHtml(user.steamid || "-")}</td>
-          <td>${escapeHtml(user.location || getIPHost(user.ip) || "-")}</td>
-          <td class="text-right">${Number(user.delay) || 0}ms</td>
-          <td class="text-right">${Number(user.loss) || 0}%</td>
-          <td class="text-right">${escapeHtml(user.duration || "-")}</td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-function renderPanelStatusItem(label, value, title = "") {
-  return `
-    <div class="server-info-item panel-status-item" title="${escapeAttr(title || value)}">
-      <span class="server-info-label">${escapeHtml(label)}</span>
-      <span class="server-info-value">${escapeHtml(value)}</span>
-    </div>
-  `;
-}
-
-function refreshCurrentPanelStatus() {
-  loadPanelStatus(currentPanelServer);
-}
-
-function restartCurrentPanelServer() {
-  if (!currentPanelServer) return;
-  showConfirmModal(
-    "重启服务器",
-    `确定要重启 "${currentPanelServer.name}" 吗？当前玩家会断开连接。`,
-    async () => {
-      const btn = document.getElementById("panel-restart-btn");
-      btn.disabled = true;
-      try {
-        const text = await RestartPanelServer(currentPanelServer.id);
-        showNotification(text || "重启指令已发送", "success");
-      } catch (err) {
-        console.error("重启失败:", err);
-        showError("重启失败: " + err);
-      } finally {
-        btn.disabled = false;
-      }
-    }
+  // 滚动时关闭下拉菜单
+  window.addEventListener(
+    "scroll",
+    () => {
+      document.getElementById("global-dropdown").classList.add("hidden");
+    },
+    true
   );
-}
-
-function openCurrentPanelInBrowser() {
-  if (!currentPanelServer?.panelUrl) return;
-  if (typeof BrowserOpenURL === "function") {
-    BrowserOpenURL(currentPanelServer.panelUrl);
-  }
-}
-
-function openPanelMapModal() {
-  if (!currentPanelServer) return;
-  const modal = document.getElementById("panel-map-modal");
-  const title = document.getElementById("panel-map-title");
-  const search = document.getElementById("panel-map-search");
-  title.textContent = `切换地图 - ${currentPanelServer.name}`;
-  search.value = "";
-  currentPanelMaps = [];
-  updatePanelOfficialToggle();
-  modal.classList.remove("hidden");
-  loadPanelMaps();
-}
-
-function closePanelMapModal() {
-  document.getElementById("panel-map-modal")?.classList.add("hidden");
-}
-
-async function loadPanelMaps() {
-  if (!currentPanelServer) return;
-  const loading = document.getElementById("panel-map-loading");
-  const list = document.getElementById("panel-map-list");
-  const refreshBtn = document.getElementById("panel-map-refresh-btn");
-  loading.classList.remove("hidden");
-  list.innerHTML = "";
-  refreshBtn.disabled = true;
-
-  try {
-    const customMaps = await FetchPanelMapList(currentPanelServer.id);
-    currentPanelMaps = [
-      ...OFFICIAL_CAMPAIGNS.map((campaign) => normalizeCampaign(campaign, false)),
-      ...(Array.isArray(customMaps) ? customMaps : []).map((campaign) =>
-        normalizeCampaign(campaign, true)
-      ),
-    ];
-    renderPanelMapList();
-  } catch (err) {
-    console.error("获取地图列表失败:", err);
-    list.innerHTML = `<div class="panel-error-box">获取地图列表失败: ${escapeHtml(err)}</div>`;
-  } finally {
-    loading.classList.add("hidden");
-    refreshBtn.disabled = false;
-  }
-}
-
-function normalizeCampaign(campaign, isCustom) {
-  return {
-    title: campaign.title || campaign.Title || "Unknown Campaign",
-    vpkName: campaign.vpkName || campaign.VpkName || "",
-    isCustom,
-    chapters: (campaign.chapters || campaign.Chapters || []).map((chapter) => ({
-      code: chapter.code || chapter.Code || "",
-      title: chapter.title || chapter.Title || chapter.code || chapter.Code || "",
-      modes: chapter.modes || chapter.Modes || [],
-    })),
-  };
-}
-
-function togglePanelOfficialMaps() {
-  panelOfficialMapsHidden = !panelOfficialMapsHidden;
-  renderPanelMapList();
-}
-
-function updatePanelOfficialToggle() {
-  const toggleBtn = document.getElementById("panel-map-official-toggle-btn");
-  if (!toggleBtn) return;
-
-  toggleBtn.textContent = panelOfficialMapsHidden ? "显示官方" : "隐藏官方";
-  toggleBtn.classList.toggle("active", panelOfficialMapsHidden);
-}
-
-function normalizePanelModes(modes) {
-  const values = Array.isArray(modes)
-    ? modes
-    : String(modes || "").split(/[,\s/|]+/);
-  return values.map((mode) => String(mode).trim()).filter(Boolean);
-}
-
-function getPanelModeLabel(mode) {
-  const normalized = String(mode).trim().toLowerCase();
-  return PANEL_MODE_LABELS[normalized] || String(mode).trim();
-}
-
-function getPanelModeSearchText(modes) {
-  return normalizePanelModes(modes)
-    .flatMap((mode) => [mode, getPanelModeLabel(mode)])
-    .join(" ")
-    .toLowerCase();
-}
-
-function renderPanelMapModes(modes) {
-  const normalizedModes = normalizePanelModes(modes);
-  if (normalizedModes.length === 0) return "";
-
-  return `
-    <span class="panel-map-mode-list" aria-label="支持模式">
-      ${normalizedModes
-        .map(
-          (mode) =>
-            `<span class="panel-map-mode" title="${escapeAttr(mode)}">${escapeHtml(getPanelModeLabel(mode))}</span>`
-        )
-        .join("")}
-    </span>
-  `;
-}
-
-function renderPanelMapList() {
-  const list = document.getElementById("panel-map-list");
-  const query = document
-    .getElementById("panel-map-search")
-    .value.trim()
-    .toLowerCase();
-
-  updatePanelOfficialToggle();
-
-  const filtered = currentPanelMaps
-    .filter((campaign) => !panelOfficialMapsHidden || campaign.isCustom)
-    .map((campaign) => ({
-      ...campaign,
-      chapters: campaign.chapters.filter((chapter) => {
-        if (!query) return true;
-        return (
-          campaign.title.toLowerCase().includes(query) ||
-          chapter.title.toLowerCase().includes(query) ||
-          chapter.code.toLowerCase().includes(query) ||
-          campaign.vpkName.toLowerCase().includes(query) ||
-          getPanelModeSearchText(chapter.modes).includes(query)
-        );
-      }),
-    }))
-    .filter((campaign) => campaign.chapters.length > 0);
-
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="panel-empty-state">未找到匹配地图</div>`;
-    return;
-  }
-
-  list.innerHTML = filtered
-    .map(
-      (campaign) => `
-        <section class="panel-map-campaign">
-          <div class="panel-map-campaign-header">
-            <div>
-              <h4>${escapeHtml(campaign.title)}</h4>
-              ${
-                campaign.vpkName
-                  ? `<span>${escapeHtml(campaign.vpkName)}</span>`
-                  : ""
-              }
-            </div>
-            <span class="panel-map-type ${campaign.isCustom ? "custom" : ""}">
-              ${campaign.isCustom ? "三方" : "官方"}
-            </span>
-          </div>
-          <div class="panel-map-chapters">
-            ${campaign.chapters
-              .map(
-                (chapter) => `
-                  <button
-                    class="panel-map-chapter"
-                    type="button"
-                    data-map-code="${escapeAttr(chapter.code)}"
-                  >
-                    <span class="panel-map-chapter-main">
-                      <strong>${escapeHtml(chapter.title || chapter.code)}</strong>
-                      <small>${escapeHtml(chapter.code)}</small>
-                      ${renderPanelMapModes(chapter.modes)}
-                    </span>
-                    <em>切换</em>
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-        </section>
-      `
-    )
-    .join("");
-}
-
-async function handlePanelMapClick(event) {
-  const button = event.target.closest(".panel-map-chapter");
-  if (!button || !currentPanelServer) return;
-  const mapCode = button.dataset.mapCode;
-  if (!mapCode) return;
-
-  button.disabled = true;
-  try {
-    await ChangePanelMap(currentPanelServer.id, mapCode);
-    const text = "地图切换指令已发送，请稍后手动刷新状态";
-    showNotification(text || "地图切换指令已发送", "success");
-    closePanelMapModal();
-  } catch (err) {
-    console.error("切换地图失败:", err);
-    showError("切换地图失败: " + err);
-  } finally {
-    button.disabled = false;
-  }
-}
-
-function openPanelRconModal() {
-  if (!currentPanelServer) return;
-  const output = document.getElementById("panel-rcon-output");
-  document.getElementById("panel-rcon-title").textContent = `RCON - ${currentPanelServer.name}`;
-  document.getElementById("panel-rcon-command").value = "";
-  document.getElementById("panel-rcon-output").textContent = "等待发送指令...";
-  output.classList.add("panel-rcon-output-muted");
-  document.getElementById("panel-rcon-modal").classList.remove("hidden");
-  document.getElementById("panel-rcon-command").focus();
-}
-
-function closePanelRconModal() {
-  document.getElementById("panel-rcon-modal")?.classList.add("hidden");
-}
-
-async function sendPanelRconCommand() {
-  if (!currentPanelServer) return;
-  const input = document.getElementById("panel-rcon-command");
-  const output = document.getElementById("panel-rcon-output");
-  const sendBtn = document.getElementById("panel-rcon-send-btn");
-  const command = input.value.trim();
-  if (!command) {
-    showError("请输入 RCON 指令");
-    return;
-  }
-
-  sendBtn.disabled = true;
-  output.classList.add("panel-rcon-output-muted");
-  output.textContent = "正在发送...";
-  try {
-    const result = await SendPanelRconCommand(currentPanelServer.id, command);
-    output.classList.remove("panel-rcon-output-muted");
-    output.textContent = result || "指令已发送，面板未返回内容。";
-  } catch (err) {
-    console.error("RCON 指令失败:", err);
-    output.textContent = "发送失败: " + err;
-  } finally {
-    output.classList.remove("panel-rcon-output-muted");
-    sendBtn.disabled = false;
-  }
-}
-
-function toggleServerAdvancedConfig() {
-  const content = document.getElementById("server-advanced-content");
-  const toggle = document.getElementById("server-advanced-toggle");
-  const expanded = content.classList.toggle("hidden") === false;
-  toggle.setAttribute("aria-expanded", String(expanded));
-}
-
-function getIPHost(ip) {
-  if (!ip) return "";
-  return String(ip).split(":")[0];
-}
-
-function formatDuration(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${s
-      .toString()
-      .padStart(2, "0")}`;
-  }
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text == null ? "" : String(text);
-  return div.innerHTML;
-}
-
-function escapeAttr(text) {
-  return escapeHtml(text).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
