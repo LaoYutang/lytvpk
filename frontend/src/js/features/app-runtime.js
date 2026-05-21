@@ -459,6 +459,44 @@ function setupEventListeners() {
 
   // 清除已完成任务
   setupClearCompletedTasks();
+
+  // ESC 键取消所有 mod 选择
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+
+    // 如果有模态框打开，不处理（让模态框的 ESC 处理优先）
+    const visibleModal = document.querySelector(".modal:not(.hidden)");
+    if (visibleModal) return;
+
+    // 如果图片预览弹窗打开，不处理
+    const imagePreview = document.getElementById("image-preview-modal");
+    if (imagePreview && imagePreview.style.display === "flex") return;
+
+    // 如果焦点在输入元素上，不处理
+    const activeElement = document.activeElement;
+    if (
+      activeElement &&
+      (activeElement.tagName === "INPUT" ||
+        activeElement.tagName === "TEXTAREA" ||
+        activeElement.tagName === "SELECT" ||
+        activeElement.isContentEditable)
+    ) {
+      return;
+    }
+
+    // 如果右键菜单打开，不处理
+    const contextMenu = document.querySelector(".context-menu");
+    if (contextMenu) return;
+
+    // 如果当前不在主页面，不处理
+    const mainScreen = document.getElementById("main-screen");
+    if (!mainScreen || mainScreen.classList.contains("hidden")) return;
+
+    // 取消所有选择
+    if (appState.selectedFiles.size > 0) {
+      deselectAll();
+    }
+  });
 }
 
 function setupFilterDropdownEvents() {
