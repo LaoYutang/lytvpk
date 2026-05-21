@@ -1049,7 +1049,8 @@
 }
 
 .panel-upload-task.status-uploading .panel-upload-status,
-.panel-upload-task.status-pending .panel-upload-status {
+.panel-upload-task.status-pending .panel-upload-status,
+.panel-upload-task.status-compressing .panel-upload-status {
   background: rgba(79, 70, 229, 0.1);
   color: var(--primary);
 }

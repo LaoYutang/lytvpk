@@ -352,7 +352,7 @@ function createPanelUploadTaskElement(task) {
   div.dataset.status = status;
 
   const progress = Number(task.progress) || 0;
-  const isActive = ["pending", "uploading", "merging"].includes(status);
+  const isActive = ["pending", "compressing", "uploading", "merging"].includes(status);
   const canRetry = status === "failed" || status === "cancelled";
   const actionHtml = isActive
     ? `
@@ -532,6 +532,7 @@ function isPanelMapModalOpen() {
 function getPanelUploadStatusText(status) {
   const labels = {
     pending: "等待中",
+    compressing: "压缩中",
     uploading: "上传中",
     merging: "处理中",
     completed: "已完成",

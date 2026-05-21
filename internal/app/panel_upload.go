@@ -1,6 +1,7 @@
 package app
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -30,23 +31,24 @@ const (
 var panelMapUploadSequence atomic.Uint64
 
 type PanelMapUploadTask struct {
-	ID             string             `json:"id"`
-	ServerID       string             `json:"server_id"`
-	ServerName     string             `json:"server_name"`
-	FilePath       string             `json:"file_path"`
-	Filename       string             `json:"filename"`
-	UploadID       string             `json:"upload_id"`
-	Status         string             `json:"status"`
-	Progress       int                `json:"progress"`
-	TotalChunks    int                `json:"total_chunks"`
-	UploadedChunks []int              `json:"uploaded_chunks"`
-	TotalSize      int64              `json:"total_size"`
-	UploadedSize   int64              `json:"uploaded_size"`
-	Speed          string             `json:"speed"`
-	Error          string             `json:"error"`
-	CreatedAt      string             `json:"created_at"`
-	cancelFunc     context.CancelFunc `json:"-"`
-	attempt        uint64             `json:"-"`
+	ID               string             `json:"id"`
+	ServerID         string             `json:"server_id"`
+	ServerName       string             `json:"server_name"`
+	FilePath         string             `json:"file_path"`
+	Filename         string             `json:"filename"`
+	UploadID         string             `json:"upload_id"`
+	Status           string             `json:"status"`
+	Progress         int                `json:"progress"`
+	TotalChunks      int                `json:"total_chunks"`
+	UploadedChunks   []int              `json:"uploaded_chunks"`
+	TotalSize        int64              `json:"total_size"`
+	UploadedSize     int64              `json:"uploaded_size"`
+	Speed            string             `json:"speed"`
+	Error            string             `json:"error"`
+	CreatedAt        string             `json:"created_at"`
+	cancelFunc       context.CancelFunc `json:"-"`
+	attempt          uint64             `json:"-"`
+	OriginalFilePath string             `json:"-"` // 原始VPK路径，重试时恢复用
 }
 
 type panelMapUploadManager struct {
@@ -196,6 +198,12 @@ func (a *App) RetryPanelMapUpload(taskID string) {
 		task.UploadID = ""
 	}
 
+	// 如果之前是VPK压缩上传，FilePath已被改为临时ZIP路径，恢复为原始路径
+	if task.OriginalFilePath != "" {
+		task.FilePath = task.OriginalFilePath
+		task.Filename = filepath.Base(task.OriginalFilePath)
+	}
+
 	if validationErr := validatePanelMapUploadTask(task); validationErr != nil {
 		task.Status = "failed"
 		task.Error = validationErr.Error()
@@ -243,14 +251,15 @@ func newPanelMapUploadTask(serverID string, serverName string, filePath string) 
 		cleanPath = filepath.Clean(cleanPath)
 	}
 	return &PanelMapUploadTask{
-		ID:         taskID,
-		ServerID:   serverID,
-		ServerName: serverName,
-		FilePath:   cleanPath,
-		Filename:   filepath.Base(cleanPath),
-		Status:     "pending",
-		CreatedAt:  time.Now().Format("2006-01-02 15:04:05"),
-		attempt:    1,
+		ID:               taskID,
+		ServerID:         serverID,
+		ServerName:       serverName,
+		FilePath:         cleanPath,
+		Filename:         filepath.Base(cleanPath),
+		Status:           "pending",
+		CreatedAt:        time.Now().Format("2006-01-02 15:04:05"),
+		attempt:          1,
+		OriginalFilePath: cleanPath,
 	}
 }
 
@@ -284,10 +293,86 @@ func validatePanelMapUploadTask(task *PanelMapUploadTask) error {
 	return nil
 }
 
+func (a *App) compressVPKForUpload(ctx context.Context, vpkPath string) (string, int64, error) {
+	tempDir := filepath.Join(os.TempDir(), "lytvpk_upload")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return "", 0, fmt.Errorf("创建临时目录失败: %w", err)
+	}
+
+	zipName := strings.TrimSuffix(filepath.Base(vpkPath), ".vpk") + ".zip"
+	zipPath := filepath.Join(tempDir, zipName)
+
+	zipFile, err := os.Create(zipPath)
+	if err != nil {
+		return "", 0, fmt.Errorf("创建ZIP文件失败: %w", err)
+	}
+
+	zipWriter := zip.NewWriter(zipFile)
+
+	if ctx.Err() != nil {
+		zipWriter.Close()
+		zipFile.Close()
+		os.Remove(zipPath)
+		return "", 0, ctx.Err()
+	}
+
+	if err := addFileToZip(zipWriter, vpkPath); err != nil {
+		zipWriter.Close()
+		zipFile.Close()
+		os.Remove(zipPath)
+		return "", 0, fmt.Errorf("压缩文件失败: %w", err)
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		zipFile.Close()
+		os.Remove(zipPath)
+		return "", 0, fmt.Errorf("关闭ZIP文件失败: %w", err)
+	}
+
+	info, err := zipFile.Stat()
+	zipFile.Close()
+	if err != nil {
+		os.Remove(zipPath)
+		return "", 0, err
+	}
+
+	return zipPath, info.Size(), nil
+}
+
 func (a *App) processPanelMapUpload(ctx context.Context, taskID string, attempt uint64) {
 	task := a.getPanelMapUploadTaskSnapshot(taskID)
 	if task == nil || task.attempt != attempt {
 		return
+	}
+
+	var compressedPath string
+	defer func() {
+		if compressedPath != "" {
+			os.Remove(compressedPath)
+		}
+	}()
+
+	ext := strings.ToLower(filepath.Ext(task.FilePath))
+	if ext == ".vpk" {
+		a.setPanelUploadStatusForAttempt(taskID, attempt, "compressing", "")
+
+		zipPath, zipSize, err := a.compressVPKForUpload(ctx, task.FilePath)
+		if err != nil {
+			if ctx.Err() != nil {
+				a.setPanelUploadStatusForAttempt(taskID, attempt, "cancelled", "用户已取消")
+			} else {
+				a.setPanelUploadStatusForAttempt(taskID, attempt, "failed", err.Error())
+			}
+			return
+		}
+		compressedPath = zipPath
+
+		a.updatePanelUploadTaskFieldsForAttempt(taskID, attempt, func(t *PanelMapUploadTask) {
+			t.FilePath = zipPath
+			t.Filename = strings.TrimSuffix(t.Filename, ".vpk") + ".zip"
+			t.TotalSize = zipSize
+			t.TotalChunks = int((zipSize + panelMapUploadChunkSize - 1) / panelMapUploadChunkSize)
+		})
 	}
 
 	credentials, err := a.getPanelCredentials(task.ServerID)
@@ -823,7 +908,7 @@ func containsInt(values []int, target int) bool {
 }
 
 func isActivePanelUploadStatus(status string) bool {
-	return status == "pending" || status == "uploading" || status == "merging"
+	return status == "pending" || status == "compressing" || status == "uploading" || status == "merging"
 }
 
 func isClearablePanelUploadStatus(status string) bool {
