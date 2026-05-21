@@ -1076,17 +1076,18 @@
                 刷新
               </button>
             </div>
-            <div class="server-list-container">
-              <ul id="server-list" class="server-list">
-                <!-- 动态生成服务器列表 -->
-              </ul>
-            </div>
-
-            <div class="server-data-section">
-              <div class="server-data-header">
-                <h3>数据管理</h3>
+            <div class="server-scroll-content">
+              <div class="server-list-container">
+                <ul id="server-list" class="server-list">
+                  <!-- 动态生成服务器列表 -->
+                </ul>
               </div>
-              <div id="server-data-container" class="server-data-actions">
+
+              <div class="server-data-section">
+                <div class="server-data-header">
+                  <h3>数据管理</h3>
+                </div>
+                <div id="server-data-container" class="server-data-actions">
                 <button
                   id="export-clipboard-btn"
                   class="btn btn-small btn-outline"
@@ -1180,6 +1181,7 @@
                   class="d-none"
                   aria-label="导入服务器配置JSON文件"
                 />
+                </div>
               </div>
             </div>
           </div>

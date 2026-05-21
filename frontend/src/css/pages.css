@@ -191,14 +191,25 @@
 }
 
 .servers-page .server-modal-content .modal-body {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   max-height: none;
+  overflow: hidden;
+}
+
+.servers-page .server-toolbar {
+  flex-shrink: 0;
+}
+
+.servers-page .server-scroll-content {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
 .servers-page .server-list-container {
-  flex: 1;
   min-height: 0;
   max-height: none;
 }
