@@ -11,7 +11,8 @@ import {
 import { openSetTagsModal } from "./tags.js";
 import { openLoadOrderModal } from "../modals/load-order.js";
 import { openWorkshopModal, checkWorkshopUrl } from "../downloads/workshop-modal.js";
-import { showContextMenu, hideContextMenu } from "./context-menu.js";
+import { showContextMenu, hideContextMenu, showServerSubmenu, hideServerSubmenu } from "./context-menu.js";
+import { getServers } from "../servers/servers.js";
 
 export function setupFileListEventDelegation() {
   console.log("正在设置文件列表按钮事件委托...");
@@ -33,6 +34,13 @@ export function setupFileListEventDelegation() {
       });
 
       dropdown.classList.remove("dropup");
+
+      const uploadBtn = dropdown.querySelector(".upload-server-btn");
+      if (uploadBtn) {
+        const hasServers = getServers().some((s) => s.panelUrl && s.panelPasswordSet);
+        uploadBtn.style.display = hasServers ? "" : "none";
+      }
+
       dropdown.classList.toggle("hidden");
 
       if (fileContainer) {
@@ -61,6 +69,7 @@ export function setupFileListEventDelegation() {
         const container = d.closest(".file-item") || d.closest(".file-card");
         if (container) container.classList.remove("active-dropdown");
       });
+      hideServerSubmenu();
     }
 
     // 待更新标签/按钮点击 - 打开下载界面并自动解析
@@ -215,6 +224,16 @@ export function setupFileListEventDelegation() {
           if (fileItem) fileItem.classList.remove("active-dropdown");
         });
         openLoadOrderModal(filePath);
+      }
+    }
+
+    const uploadServerBtn = e.target.closest('.upload-server-btn[data-action="upload-server"]');
+    if (uploadServerBtn) {
+      const filePath = uploadServerBtn.getAttribute("data-file-path");
+      if (filePath) {
+        e.preventDefault();
+        e.stopPropagation();
+        showServerSubmenu(uploadServerBtn, [filePath]);
       }
     }
   });

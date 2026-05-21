@@ -8,6 +8,11 @@ import {
 } from "../../core/utils.js";
 import { showFileDetail } from "../modals/detail.js";
 import { GetVPKPreviewImage } from "../../../../wailsjs/go/app/App";
+import { getServers } from "../servers/servers.js";
+
+function hasPanelServers() {
+  return getServers().some((s) => s.panelUrl && s.panelPasswordSet);
+}
 
 export function renderFileList() {
   const container = document.getElementById("file-list");
@@ -82,6 +87,13 @@ export function createFileItem(file) {
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
+        ${hasPanelServers() ? `
+        <button class="dropdown-item upload-server-btn" data-file-path="${file.path}" data-action="upload-server">
+          <span class="btn-icon">${iconSvg("upload")}</span>
+          <span class="menu-item-text">上传服务器</span>
+          <span class="menu-item-arrow">${iconSvg("chevronRight")}</span>
+        </button>
+        ` : ""}
         <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
           <span class="btn-icon">${iconSvg("edit")}</span> 重命名
         </button>
@@ -267,6 +279,13 @@ export function createFileCard(file) {
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
+        ${hasPanelServers() ? `
+        <button class="dropdown-item upload-server-btn" data-file-path="${file.path}" data-action="upload-server">
+          <span class="btn-icon">${iconSvg("upload")}</span>
+          <span class="menu-item-text">上传服务器</span>
+          <span class="menu-item-arrow">${iconSvg("chevronRight")}</span>
+        </button>
+        ` : ""}
         <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
           <span class="btn-icon">${iconSvg("edit")}</span> 重命名
         </button>
@@ -397,6 +416,8 @@ export function iconSvg(name) {
     power: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v10"></path><path d="M18.4 6.6a9 9 0 1 1-12.8 0"></path></svg>`,
     check: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`,
     x: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>`,
+    chevronRight: `<svg class="icon-svg submenu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>`,
+    upload: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
   };
   return icons[name] || "";
 }

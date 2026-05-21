@@ -2367,6 +2367,50 @@ html.dark-mode .batch-disable-dropdown-content .dropdown-item:hover {
   margin: 0.3rem 0.45rem;
 }
 
+/* 服务器选择子菜单 */
+.server-submenu {
+  position: fixed;
+  z-index: 6600;
+  min-width: 11rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background: var(--bg-app);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.14), 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.server-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.45rem 0.65rem;
+  border: none;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-150) var(--ease-out), color var(--duration-150) var(--ease-out);
+}
+
+.server-submenu-item:hover {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.server-submenu-empty {
+  padding: 0.75rem 0.65rem;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
 html.dark-mode .context-menu {
   background: var(--bg-surface);
   border-color: rgba(148, 163, 184, 0.18);
@@ -2383,5 +2427,36 @@ html.dark-mode .context-menu-item-danger:hover {
 
 html.dark-mode .context-menu-divider {
   background: rgba(148, 163, 184, 0.18);
+}
+
+html.dark-mode .server-submenu {
+  background: var(--bg-surface);
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+html.dark-mode .server-submenu-item:hover {
+  background: rgba(99, 102, 241, 0.16);
+}
+
+/* 二级菜单箭头 */
+.menu-item-text {
+  flex: 1;
+}
+
+.menu-item-arrow {
+  width: 0.9rem;
+  height: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.5;
+  margin-left: 0.5rem;
+}
+
+.server-submenu-item:hover .menu-item-arrow,
+.context-menu-item:hover .menu-item-arrow {
+  opacity: 0.8;
+  color: var(--primary);
 }
 

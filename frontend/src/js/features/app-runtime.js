@@ -21,6 +21,7 @@ import {
   refreshAllServers,
   setupLaunchServerMenu,
   initServerStorage,
+  getServers,
 } from "./servers/servers.js";
 import {
   updatePanelUploadTaskInList,
@@ -74,6 +75,7 @@ import {
 } from "./file-list/actions.js";
 import { setupFileListEventDelegation } from "./file-list/events.js";
 import { initBoxSelection } from "./file-list/box-selection.js";
+import { showServerSubmenu } from "./file-list/context-menu.js";
 import {
   toggleFile,
   moveFileToAddons,
@@ -537,6 +539,12 @@ function setupBatchActionEvents() {
         }
       });
 
+      const batchUploadBtn = document.getElementById("batch-upload-server-btn");
+      if (batchUploadBtn) {
+        const hasServers = getServers().some((s) => s.panelUrl && s.panelPasswordSet);
+        batchUploadBtn.style.display = hasServers ? "" : "none";
+      }
+
       const dropdown = document.getElementById("batch-dropdown-content");
       dropdown?.classList.toggle("hidden");
     });
@@ -591,6 +599,18 @@ function setupBatchActionEvents() {
     moveSelectedBtn.addEventListener("click", () => {
       closeBatchDropdown();
       moveSelected();
+    });
+  }
+
+  const batchUploadServerBtn = document.getElementById("batch-upload-server-btn");
+  if (batchUploadServerBtn) {
+    batchUploadServerBtn.addEventListener("click", () => {
+      const filePaths = Array.from(appState.selectedFiles);
+      if (filePaths.length === 0) {
+        showNotification("请先选择文件", "info");
+        return;
+      }
+      showServerSubmenu(batchUploadServerBtn, filePaths);
     });
   }
 
