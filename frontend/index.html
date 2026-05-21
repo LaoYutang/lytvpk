@@ -1314,6 +1314,10 @@
                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg>
                 换图
               </button>
+              <button id="panel-upload-btn" class="btn btn-secondary btn-small panel-action-btn">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                地图
+              </button>
               <button id="panel-rcon-btn" class="btn btn-secondary btn-small panel-action-btn">
                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
                 RCON
@@ -1388,6 +1392,40 @@
         </div>
       </div>
 
+      <div id="panel-upload-modal" class="modal hidden z-1070">
+        <div class="modal-content panel-upload-modal-content">
+          <div class="modal-header">
+            <h2 id="panel-upload-title">地图</h2>
+            <button id="close-panel-upload-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="panel-upload-toolbar">
+              <button id="panel-select-upload-files-btn" class="btn btn-primary btn-small panel-action-btn" type="button">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                上传地图
+              </button>
+              <button id="panel-clear-maps-btn" class="btn btn-danger btn-small panel-action-btn" type="button">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                清空地图
+              </button>
+              <button id="panel-upload-clear-completed-btn" class="btn btn-outline btn-small panel-action-btn" type="button">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="m9 14 2 2 4-4"/></svg>
+                清理已完成
+              </button>
+            </div>
+            <div class="panel-upload-hint">
+              支持 .vpk、.zip、.rar、.7z，单文件最大 2GB。
+            </div>
+            <div id="panel-upload-tasks-list" class="panel-upload-tasks-list">
+              <div class="panel-upload-empty">
+                <div class="panel-upload-empty-title">暂无上传任务</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div id="panel-rcon-modal" class="modal hidden z-1070">
         <div class="modal-content panel-rcon-modal-content">
           <div class="modal-header">
@@ -1528,7 +1566,7 @@
           </div>
           <div class="modal-body">
             <p>
-              当前有正在进行的下载任务，退出将导致任务中断。<br />确定要退出吗？
+              当前有正在进行的下载或上传任务，退出将导致任务中断。<br />确定要退出吗？
             </p>
           </div>
           <div class="modal-footer">

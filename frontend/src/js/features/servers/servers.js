@@ -12,17 +12,6 @@ import {
 } from "./details-modal.js";
 import {
   configurePanelModal,
-  closePanelServerDetailsModal,
-  refreshCurrentPanelStatus,
-  restartCurrentPanelServer,
-  openCurrentPanelInBrowser,
-  openPanelMapModal,
-  closePanelMapModal,
-  loadPanelMaps,
-  togglePanelOfficialMaps,
-  renderPanelMapList,
-  openPanelRconModal,
-  closePanelRconModal,
   setupPanelModalListeners as setupPanelListeners,
 } from "./panel-modal.js";
 
@@ -41,8 +30,15 @@ let BrowserOpenURL;
 let FetchPanelServerStatus;
 let RestartPanelServer;
 let FetchPanelMapList;
+let ClearPanelMaps;
 let ChangePanelMap;
 let SendPanelRconCommand;
+let SelectPanelMapUploadFiles;
+let StartPanelMapUpload;
+let GetPanelMapUploadTasks;
+let RetryPanelMapUpload;
+let CancelPanelMapUpload;
+let ClearCompletedPanelMapUploads;
 
 export function configureServers(deps) {
   ({
@@ -61,8 +57,15 @@ export function configureServers(deps) {
     FetchPanelServerStatus,
     RestartPanelServer,
     FetchPanelMapList,
+    ClearPanelMaps,
     ChangePanelMap,
     SendPanelRconCommand,
+    SelectPanelMapUploadFiles,
+    StartPanelMapUpload,
+    GetPanelMapUploadTasks,
+    RetryPanelMapUpload,
+    CancelPanelMapUpload,
+    ClearCompletedPanelMapUploads,
   } = deps);
 
   configureFormModal({
@@ -94,8 +97,15 @@ export function configureServers(deps) {
     FetchPanelServerStatus,
     RestartPanelServer,
     FetchPanelMapList,
+    ClearPanelMaps,
     ChangePanelMap,
     SendPanelRconCommand,
+    SelectPanelMapUploadFiles,
+    StartPanelMapUpload,
+    GetPanelMapUploadTasks,
+    RetryPanelMapUpload,
+    CancelPanelMapUpload,
+    ClearCompletedPanelMapUploads,
     BrowserOpenURL,
     resolveMapName,
     escapeHtml,

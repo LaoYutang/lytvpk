@@ -139,7 +139,7 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 		return false
 	}
 
-	if a.HasActiveDownloads() {
+	if a.HasActiveDownloads() || a.HasActivePanelUploads() {
 		runtime.EventsEmit(a.ctx, "show_exit_confirmation", nil)
 		return true
 	}

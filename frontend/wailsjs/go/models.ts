@@ -322,6 +322,46 @@ export namespace app {
 		}
 	}
 	
+	export class PanelMapUploadTask {
+	    id: string;
+	    server_id: string;
+	    server_name: string;
+	    file_path: string;
+	    filename: string;
+	    upload_id: string;
+	    status: string;
+	    progress: number;
+	    total_chunks: number;
+	    uploaded_chunks: number[];
+	    total_size: number;
+	    uploaded_size: number;
+	    speed: string;
+	    error: string;
+	    created_at: string;
+
+	    static createFrom(source: any = {}) {
+	        return new PanelMapUploadTask(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.server_id = source["server_id"];
+	        this.server_name = source["server_name"];
+	        this.file_path = source["file_path"];
+	        this.filename = source["filename"];
+	        this.upload_id = source["upload_id"];
+	        this.status = source["status"];
+	        this.progress = source["progress"];
+	        this.total_chunks = source["total_chunks"];
+	        this.uploaded_chunks = source["uploaded_chunks"];
+	        this.total_size = source["total_size"];
+	        this.uploaded_size = source["uploaded_size"];
+	        this.speed = source["speed"];
+	        this.error = source["error"];
+	        this.created_at = source["created_at"];
+	    }
+	}
 	export class PanelUser {
 	    name: string;
 	    id: number;
@@ -956,4 +996,3 @@ export namespace parser {
 	}
 
 }
-

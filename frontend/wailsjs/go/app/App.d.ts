@@ -7,6 +7,8 @@ export function AutoDiscoverAddons():Promise<string>;
 
 export function CancelDownloadTask(arg1:string):Promise<void>;
 
+export function CancelPanelMapUpload(arg1:string):Promise<void>;
+
 export function ChangePanelMap(arg1:string,arg2:string):Promise<string>;
 
 export function CheckConflicts():Promise<app.ConflictResult>;
@@ -15,7 +17,11 @@ export function CheckModUpdates():Promise<app.UpdateCheckResult>;
 
 export function CheckUpdate():Promise<app.UpdateInfo>;
 
+export function ClearCompletedPanelMapUploads():Promise<void>;
+
 export function ClearCompletedTasks():Promise<void>;
+
+export function ClearPanelMaps(arg1:string):Promise<string>;
 
 export function ConnectToServer(arg1:string):Promise<void>;
 
@@ -73,6 +79,8 @@ export function GetMirrorsWithLatency():Promise<Array<app.MirrorWithLatency>>;
 
 export function GetModRotation():Promise<app.RotationConfig>;
 
+export function GetPanelMapUploadTasks():Promise<Array<app.PanelMapUploadTask>>;
+
 export function GetPrimaryTags():Promise<Array<string>>;
 
 export function GetRootDirectory():Promise<string>;
@@ -107,6 +115,8 @@ export function HandleProtocolURL(arg1:string):Promise<void>;
 
 export function HasActiveDownloads():Promise<boolean>;
 
+export function HasActivePanelUploads():Promise<boolean>;
+
 export function IsSelectingIP():Promise<boolean>;
 
 export function LaunchL4D2():Promise<void>;
@@ -133,6 +143,8 @@ export function RestartPanelServer(arg1:string):Promise<string>;
 
 export function RetryDownloadTask(arg1:string):Promise<void>;
 
+export function RetryPanelMapUpload(arg1:string):Promise<void>;
+
 export function RotateMods():Promise<void>;
 
 export function SaveAppConfig(arg1:app.ConfigFile):Promise<void>;
@@ -148,6 +160,8 @@ export function SearchVPKFiles(arg1:string,arg2:string,arg3:Array<string>):Promi
 export function SelectDirectory():Promise<string>;
 
 export function SelectFiles():Promise<Array<string>>;
+
+export function SelectPanelMapUploadFiles():Promise<Array<string>>;
 
 export function SendPanelRconCommand(arg1:string,arg2:string):Promise<string>;
 
@@ -170,6 +184,8 @@ export function SetWorkshopPreferredIP(arg1:boolean):Promise<void>;
 export function SetWorkshopUpdateCheckEnabled(arg1:boolean):Promise<void>;
 
 export function StartDownloadTask(arg1:app.WorkshopFileDetails,arg2:boolean):Promise<string>;
+
+export function StartPanelMapUpload(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
 export function TestMirrorsLatency():Promise<void>;
 

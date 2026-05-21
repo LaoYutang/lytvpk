@@ -46,8 +46,9 @@ type PanelChapter struct {
 }
 
 type panelCredentials struct {
-	baseURL  string
-	password string
+	baseURL    string
+	password   string
+	serverName string
 }
 
 func (a *App) FetchPanelServerStatus(serverID string) (*PanelServerStatus, error) {
@@ -81,6 +82,10 @@ func (a *App) FetchPanelMapList(serverID string) ([]PanelCampaign, error) {
 		return []PanelCampaign{}, nil
 	}
 	return maps, nil
+}
+
+func (a *App) ClearPanelMaps(serverID string) (string, error) {
+	return a.panelPost(serverID, "/clear", nil, nil)
 }
 
 func (a *App) ChangePanelMap(serverID string, mapName string) (string, error) {
@@ -126,7 +131,11 @@ func (a *App) getPanelCredentials(serverID string) (*panelCredentials, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &panelCredentials{baseURL: baseURL, password: password}, nil
+		return &panelCredentials{
+			baseURL:    baseURL,
+			password:   password,
+			serverName: firstNonEmpty(server.Name, server.Address, server.ID),
+		}, nil
 	}
 
 	return nil, fmt.Errorf("未找到面板配置对应的服务器")

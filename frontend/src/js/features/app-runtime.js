@@ -23,6 +23,11 @@ import {
   initServerStorage,
 } from "./servers/servers.js";
 import {
+  updatePanelUploadTaskInList,
+  updatePanelUploadProgress,
+  handlePanelUploadTasksCleared,
+} from "./servers/panel-modal.js";
+import {
   configureUpdates,
   checkAndInstallUpdate,
   manualCheckUpdate,
@@ -154,8 +159,15 @@ import {
   FetchPanelServerStatus,
   RestartPanelServer,
   FetchPanelMapList,
+  ClearPanelMaps,
   ChangePanelMap,
   SendPanelRconCommand,
+  SelectPanelMapUploadFiles,
+  StartPanelMapUpload,
+  GetPanelMapUploadTasks,
+  RetryPanelMapUpload,
+  CancelPanelMapUpload,
+  ClearCompletedPanelMapUploads,
   GetWorkshopWatchLaterStorage,
   SaveWorkshopWatchLaterStorage,
 } from "../../../wailsjs/go/app/App";
@@ -188,8 +200,15 @@ configureServers({
   FetchPanelServerStatus,
   RestartPanelServer,
   FetchPanelMapList,
+  ClearPanelMaps,
   ChangePanelMap,
   SendPanelRconCommand,
+  SelectPanelMapUploadFiles,
+  StartPanelMapUpload,
+  GetPanelMapUploadTasks,
+  RetryPanelMapUpload,
+  CancelPanelMapUpload,
+  ClearCompletedPanelMapUploads,
 });
 
 configureUpdates({
@@ -814,6 +833,18 @@ function setupWailsEvents() {
 
   EventsOn("tasks_cleared", () => {
     refreshTaskList();
+  });
+
+  EventsOn("panel_upload_task_updated", (task) => {
+    updatePanelUploadTaskInList(task);
+  });
+
+  EventsOn("panel_upload_task_progress", (task) => {
+    updatePanelUploadProgress(task);
+  });
+
+  EventsOn("panel_upload_tasks_cleared", () => {
+    handlePanelUploadTasksCleared();
   });
 
   EventsOn("show_exit_confirmation", () => {

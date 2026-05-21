@@ -10,6 +10,10 @@ export function CancelDownloadTask(arg1) {
   return window['go']['app']['App']['CancelDownloadTask'](arg1);
 }
 
+export function CancelPanelMapUpload(arg1) {
+  return window['go']['app']['App']['CancelPanelMapUpload'](arg1);
+}
+
 export function ChangePanelMap(arg1, arg2) {
   return window['go']['app']['App']['ChangePanelMap'](arg1, arg2);
 }
@@ -26,8 +30,16 @@ export function CheckUpdate() {
   return window['go']['app']['App']['CheckUpdate']();
 }
 
+export function ClearCompletedPanelMapUploads() {
+  return window['go']['app']['App']['ClearCompletedPanelMapUploads']();
+}
+
 export function ClearCompletedTasks() {
   return window['go']['app']['App']['ClearCompletedTasks']();
+}
+
+export function ClearPanelMaps(arg1) {
+  return window['go']['app']['App']['ClearPanelMaps'](arg1);
 }
 
 export function ConnectToServer(arg1) {
@@ -142,6 +154,10 @@ export function GetModRotation() {
   return window['go']['app']['App']['GetModRotation']();
 }
 
+export function GetPanelMapUploadTasks() {
+  return window['go']['app']['App']['GetPanelMapUploadTasks']();
+}
+
 export function GetPrimaryTags() {
   return window['go']['app']['App']['GetPrimaryTags']();
 }
@@ -210,6 +226,10 @@ export function HasActiveDownloads() {
   return window['go']['app']['App']['HasActiveDownloads']();
 }
 
+export function HasActivePanelUploads() {
+  return window['go']['app']['App']['HasActivePanelUploads']();
+}
+
 export function IsSelectingIP() {
   return window['go']['app']['App']['IsSelectingIP']();
 }
@@ -262,6 +282,10 @@ export function RetryDownloadTask(arg1) {
   return window['go']['app']['App']['RetryDownloadTask'](arg1);
 }
 
+export function RetryPanelMapUpload(arg1) {
+  return window['go']['app']['App']['RetryPanelMapUpload'](arg1);
+}
+
 export function RotateMods() {
   return window['go']['app']['App']['RotateMods']();
 }
@@ -292,6 +316,10 @@ export function SelectDirectory() {
 
 export function SelectFiles() {
   return window['go']['app']['App']['SelectFiles']();
+}
+
+export function SelectPanelMapUploadFiles() {
+  return window['go']['app']['App']['SelectPanelMapUploadFiles']();
 }
 
 export function SendPanelRconCommand(arg1, arg2) {
@@ -336,6 +364,10 @@ export function SetWorkshopUpdateCheckEnabled(arg1) {
 
 export function StartDownloadTask(arg1, arg2) {
   return window['go']['app']['App']['StartDownloadTask'](arg1, arg2);
+}
+
+export function StartPanelMapUpload(arg1, arg2) {
+  return window['go']['app']['App']['StartPanelMapUpload'](arg1, arg2);
 }
 
 export function TestMirrorsLatency() {

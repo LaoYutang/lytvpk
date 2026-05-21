@@ -310,6 +310,8 @@ func TestPanelProxyRequests(t *testing.T) {
 				t.Fatalf("unexpected rcon cmd: %q", got)
 			}
 			w.Write([]byte("hostname: Test Host"))
+		case "/panel/clear":
+			w.Write([]byte("清空成功！"))
 		default:
 			http.NotFound(w, r)
 		}
@@ -343,8 +345,11 @@ func TestPanelProxyRequests(t *testing.T) {
 	if text, err := app.SendPanelRconCommand("srv_panel", "status"); err != nil || text != "hostname: Test Host" {
 		t.Fatalf("send rcon = %q, %v", text, err)
 	}
+	if text, err := app.ClearPanelMaps("srv_panel"); err != nil || text != "清空成功！" {
+		t.Fatalf("clear maps = %q, %v", text, err)
+	}
 
-	expected := []string{"/panel/rcon/getstatus", "/panel/rcon/changemap", "/panel/rcon"}
+	expected := []string{"/panel/rcon/getstatus", "/panel/rcon/changemap", "/panel/rcon", "/panel/clear"}
 	if strings.Join(seen, ",") != strings.Join(expected, ",") {
 		t.Fatalf("unexpected request paths: %#v", seen)
 	}
