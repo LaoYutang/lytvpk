@@ -168,10 +168,17 @@
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
+.server-form-modal-content .modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--spacing-4);
+}
+
 .server-form-header {
   border-bottom: 1px solid var(--border-light);
   padding-bottom: 15px;
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .server-form-title {
@@ -214,10 +221,11 @@
 }
 
 .server-form-footer {
-  background: transparent;
-  border-top: none;
-  padding: 0;
-  padding-top: 10px;
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: var(--spacing-4) var(--spacing-6) var(--spacing-5);
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-app);
   justify-content: flex-end;
 }
 
