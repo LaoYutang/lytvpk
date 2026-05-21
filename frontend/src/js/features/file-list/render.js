@@ -79,9 +79,6 @@ export function createFileItem(file) {
           <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
         ` : ""}
-        <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
-          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
-        </button>
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
@@ -101,8 +98,12 @@ export function createFileItem(file) {
           </span> 加载顺序
         </button>
         <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
-          <span class="btn-icon">${iconSvg("folderOpen")}</span> 位置
+          <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
         </button>
+        <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
+          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+        </button>
+        <div class="dropdown-divider"></div>
         <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
           <span class="btn-icon">${iconSvg("trash")}</span> 删除
         </button>
@@ -263,9 +264,6 @@ export function createFileCard(file) {
           <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
         ` : ""}
-        <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
-          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
-        </button>
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
@@ -285,8 +283,12 @@ export function createFileCard(file) {
           </span> 加载顺序
         </button>
         <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
-          <span class="btn-icon">${iconSvg("folderOpen")}</span> 位置
+          <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
         </button>
+        <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
+          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+        </button>
+        <div class="dropdown-divider"></div>
         <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
           <span class="btn-icon">${iconSvg("trash")}</span> 删除
         </button>

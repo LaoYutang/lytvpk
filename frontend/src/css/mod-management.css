@@ -348,6 +348,95 @@ html.dark-mode .multi-select-menu {
   color: var(--primary);
 }
 
+.mod-management-page .more-actions-dropdown .dropdown-content,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content {
+  min-width: 11rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background: var(--bg-app);
+  box-shadow:
+    0 18px 50px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+  gap: 0;
+  z-index: 6500;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-content {
+  top: calc(100% + 0.25rem);
+  margin-top: 0;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-content.dropup {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+  margin-bottom: 0;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-item,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item {
+  min-height: 2rem;
+  padding: 0.45rem 0.65rem !important;
+  gap: 0.65rem;
+  border: 0 !important;
+  border-radius: 0.55rem;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  justify-content: flex-start !important;
+  white-space: nowrap;
+  transform: none !important;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-item:hover,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item:hover {
+  background: var(--primary-50) !important;
+  color: var(--primary) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-item .btn-icon,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item .btn-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
+  font-size: 1rem;
+  line-height: 1;
+  margin-right: 0;
+  opacity: 0.72;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-item:hover .btn-icon,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item:hover .btn-icon {
+  opacity: 1;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-item.delete-btn,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item.delete-btn {
+  color: var(--danger) !important;
+}
+
+.mod-management-page .more-actions-dropdown .dropdown-item.delete-btn:hover,
+.mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: var(--danger) !important;
+}
+
+.mod-management-page .dropdown-divider {
+  height: 1px;
+  margin: 0.3rem 0.45rem;
+  background: var(--border-light);
+  flex: 0 0 auto;
+}
+
 .filter-actions {
   margin-left: auto;
   display: flex;
@@ -450,6 +539,31 @@ html.dark-mode .dropdown-item.active {
   background: rgba(99, 102, 241, 0.16);
   border-color: rgba(129, 140, 248, 0.34);
   color: var(--primary-light);
+}
+
+html.dark-mode .mod-management-page .more-actions-dropdown .dropdown-content,
+html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content {
+  background: var(--bg-surface);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow:
+    0 18px 50px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+html.dark-mode .mod-management-page .more-actions-dropdown .dropdown-item:hover,
+html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item:hover {
+  background: rgba(99, 102, 241, 0.16) !important;
+  color: var(--primary-light) !important;
+}
+
+html.dark-mode .mod-management-page .more-actions-dropdown .dropdown-item.delete-btn:hover,
+html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item.delete-btn:hover {
+  background: rgba(248, 113, 113, 0.14) !important;
+  color: var(--danger-light) !important;
+}
+
+html.dark-mode .mod-management-page .dropdown-divider {
+  background: rgba(148, 163, 184, 0.18);
 }
 
 /* 子标签筛选输入框 - 样式与现有下拉菜单统一 */
