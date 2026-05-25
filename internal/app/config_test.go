@@ -15,15 +15,18 @@ func newConfigTestApp(t *testing.T) *App {
 	t.Helper()
 	dir := t.TempDir()
 	return &App{
-		configDir:              dir,
-		configPath:             filepath.Join(dir, "config.json"),
-		serversPath:            filepath.Join(dir, "servers.json"),
-		workshopWatchLaterPath: filepath.Join(dir, "workshop_watch_later.json"),
-		workshopPreferredIP:    true,
-		workshopBrowserTarget:  "mirror",
-		displayMode:            "list",
-		filterLayoutMode:       "compact",
-		savedDirectories:       []SavedDirectory{},
+		configDir:                 dir,
+		configPath:                filepath.Join(dir, "config.json"),
+		serversPath:               filepath.Join(dir, "servers.json"),
+		workshopWatchLaterPath:    filepath.Join(dir, "workshop_watch_later.json"),
+		workshopPreferredIP:       true,
+		workshopMetaEnabled:       true,
+		workshopBrowserTarget:     "mirror",
+		displayMode:               "list",
+		filterLayoutMode:          "compact",
+		boxSelectionEnabled:       true,
+		ctrlClickSelectionEnabled: true,
+		savedDirectories:          []SavedDirectory{},
 	}
 }
 
@@ -38,6 +41,9 @@ func TestConfigDefaultsWithoutFile(t *testing.T) {
 	if config.WorkshopBrowserTarget == nil || *config.WorkshopBrowserTarget != "mirror" {
 		t.Fatalf("expected browser target mirror, got %#v", config.WorkshopBrowserTarget)
 	}
+	if config.WorkshopMetaEnabled == nil || !*config.WorkshopMetaEnabled {
+		t.Fatalf("expected workshop meta storage to default to true")
+	}
 	if config.DisplayMode != "list" {
 		t.Fatalf("expected display mode list, got %q", config.DisplayMode)
 	}
@@ -49,6 +55,12 @@ func TestConfigDefaultsWithoutFile(t *testing.T) {
 	}
 	if len(config.SavedDirectories) != 0 {
 		t.Fatalf("expected no saved directories, got %d", len(config.SavedDirectories))
+	}
+	if config.BoxSelectionEnabled == nil || !*config.BoxSelectionEnabled {
+		t.Fatalf("expected box selection to default to true")
+	}
+	if config.CtrlClickSelectionEnabled == nil || !*config.CtrlClickSelectionEnabled {
+		t.Fatalf("expected ctrl click selection to default to true")
 	}
 }
 
@@ -103,7 +115,7 @@ func TestMigrateLocalStorageConfigFromVersionOne(t *testing.T) {
 	if config.DisplayMode != "card" || config.FilterLayoutMode != "classic" {
 		t.Fatalf("expected migrated display/filter modes, got %q/%q", config.DisplayMode, config.FilterLayoutMode)
 	}
-	if !config.BoxSelectionEnabled || !config.CtrlClickSelectionEnabled {
+	if config.BoxSelectionEnabled == nil || !*config.BoxSelectionEnabled || config.CtrlClickSelectionEnabled == nil || !*config.CtrlClickSelectionEnabled {
 		t.Fatalf("expected migrated selection settings enabled")
 	}
 	if config.Theme != "dark" || config.IgnoredVersion != "1.2.3" || config.LastUpdateCheckTime != "1779169113000" {

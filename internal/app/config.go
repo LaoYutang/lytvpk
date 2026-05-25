@@ -96,8 +96,12 @@ func (a *App) loadConfig() {
 	if config.FilterLayoutMode != "" {
 		a.filterLayoutMode = config.FilterLayoutMode
 	}
-	a.boxSelectionEnabled = config.BoxSelectionEnabled
-	a.ctrlClickSelectionEnabled = config.CtrlClickSelectionEnabled
+	if config.BoxSelectionEnabled != nil {
+		a.boxSelectionEnabled = *config.BoxSelectionEnabled
+	}
+	if config.CtrlClickSelectionEnabled != nil {
+		a.ctrlClickSelectionEnabled = *config.CtrlClickSelectionEnabled
+	}
 	a.theme = config.Theme
 	a.ignoredVersion = config.IgnoredVersion
 	a.lastUpdateCheckTime = config.LastUpdateCheckTime
@@ -122,6 +126,8 @@ func (a *App) snapshotConfig() ConfigFile {
 	metaEnabled := a.workshopMetaEnabled
 	updateCheckEnabled := a.workshopUpdateCheckEnabled
 	browserTarget := a.workshopBrowserTarget
+	boxSelectionEnabled := a.boxSelectionEnabled
+	ctrlClickSelectionEnabled := a.ctrlClickSelectionEnabled
 
 	return ConfigFile{
 		ModRotationConfig:          a.modRotationConfig,
@@ -135,8 +141,8 @@ func (a *App) snapshotConfig() ConfigFile {
 		LastActiveDirectory:        a.lastActiveDirectory,
 		DisplayMode:                defaultString(a.displayMode, "list"),
 		FilterLayoutMode:           defaultString(a.filterLayoutMode, "compact"),
-		BoxSelectionEnabled:        a.boxSelectionEnabled,
-		CtrlClickSelectionEnabled:  a.ctrlClickSelectionEnabled,
+		BoxSelectionEnabled:        &boxSelectionEnabled,
+		CtrlClickSelectionEnabled:  &ctrlClickSelectionEnabled,
 		Theme:                      a.theme,
 		IgnoredVersion:             a.ignoredVersion,
 		LastUpdateCheckTime:        a.lastUpdateCheckTime,
@@ -176,8 +182,12 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.lastActiveDirectory = config.LastActiveDirectory
 	a.displayMode = defaultString(config.DisplayMode, "list")
 	a.filterLayoutMode = defaultString(config.FilterLayoutMode, "compact")
-	a.boxSelectionEnabled = config.BoxSelectionEnabled
-	a.ctrlClickSelectionEnabled = config.CtrlClickSelectionEnabled
+	if config.BoxSelectionEnabled != nil {
+		a.boxSelectionEnabled = *config.BoxSelectionEnabled
+	}
+	if config.CtrlClickSelectionEnabled != nil {
+		a.ctrlClickSelectionEnabled = *config.CtrlClickSelectionEnabled
+	}
 	a.theme = config.Theme
 	a.ignoredVersion = config.IgnoredVersion
 	a.lastUpdateCheckTime = config.LastUpdateCheckTime

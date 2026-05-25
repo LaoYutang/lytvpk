@@ -105,8 +105,8 @@ type ConfigFile struct {
 	LastActiveDirectory        string           `json:"lastActiveDirectory"`
 	DisplayMode                string           `json:"displayMode"`
 	FilterLayoutMode           string           `json:"filterLayoutMode"`
-	BoxSelectionEnabled        bool             `json:"boxSelectionEnabled"`
-	CtrlClickSelectionEnabled  bool             `json:"ctrlClickSelectionEnabled"`
+	BoxSelectionEnabled        *bool            `json:"boxSelectionEnabled,omitempty"`
+	CtrlClickSelectionEnabled  *bool            `json:"ctrlClickSelectionEnabled,omitempty"`
 	Theme                      string           `json:"theme"`
 	IgnoredVersion             string           `json:"ignoredVersion"`
 	LastUpdateCheckTime        string           `json:"lastUpdateCheckTime"`
@@ -210,18 +210,21 @@ func NewApp() *App {
 	workshopWatchLaterPath := filepath.Join(appConfigDir, "workshop_watch_later.json")
 
 	app := &App{
-		goroutinePool:          pool,
-		restyClient:            client,
-		proxyServer:            proxy,
-		configDir:              appConfigDir,
-		configPath:             configPath,
-		serversPath:            serversPath,
-		workshopWatchLaterPath: workshopWatchLaterPath,
-		workshopPreferredIP:    true,     // 默认开启优选IP
-		workshopBrowserTarget:  "mirror", // 默认使用镜像站
-		displayMode:            "list",
-		filterLayoutMode:       "compact",
-		savedDirectories:       []SavedDirectory{},
+		goroutinePool:             pool,
+		restyClient:               client,
+		proxyServer:               proxy,
+		configDir:                 appConfigDir,
+		configPath:                configPath,
+		serversPath:               serversPath,
+		workshopWatchLaterPath:    workshopWatchLaterPath,
+		workshopPreferredIP:       true,     // 默认开启优选IP
+		workshopMetaEnabled:       true,     // 默认开启工坊meta信息存储
+		workshopBrowserTarget:     "mirror", // 默认使用镜像站
+		displayMode:               "list",
+		filterLayoutMode:          "compact",
+		boxSelectionEnabled:       true,
+		ctrlClickSelectionEnabled: true,
+		savedDirectories:          []SavedDirectory{},
 	}
 
 	// 加载配置

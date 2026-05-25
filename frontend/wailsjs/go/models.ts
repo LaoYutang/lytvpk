@@ -40,8 +40,8 @@ export namespace app {
 	    lastActiveDirectory: string;
 	    displayMode: string;
 	    filterLayoutMode: string;
-	    boxSelectionEnabled: boolean;
-	    ctrlClickSelectionEnabled: boolean;
+	    boxSelectionEnabled?: boolean;
+	    ctrlClickSelectionEnabled?: boolean;
 	    theme: string;
 	    ignoredVersion: string;
 	    lastUpdateCheckTime: string;
