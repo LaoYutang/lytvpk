@@ -21,6 +21,10 @@ import {
   moveSelected,
   batchToggleVisibility,
 } from "./actions.js";
+import {
+  shareSelectedWorkshopItems,
+  shareWorkshopItem,
+} from "./share.js";
 import { getServers } from "../servers/servers.js";
 import { StartPanelMapUpload } from "../../../../wailsjs/go/app/App";
 import { showNotification } from "../../core/toast.js";
@@ -175,6 +179,7 @@ function buildSingleMenu(menu, file) {
     );
   }
 
+  menu.appendChild(createMenuItem("分享物品", iconSvg("share"), () => shareWorkshopItem(file)));
   menu.appendChild(createMenuItem("设置标签", iconSvg("tag"), () => openSetTagsModal(file.path)));
 
   const panelServers = getPanelServers();
@@ -229,6 +234,7 @@ function buildBatchMenu(menu) {
   }
 
   menu.appendChild(createDivider());
+  menu.appendChild(createMenuItem("分享物品", iconSvg("share"), () => shareSelectedWorkshopItems()));
   menu.appendChild(createMenuItem("设置标签", iconSvg("tag"), () => openBatchSetTagsModal()));
 
   const panelServers = getPanelServers();

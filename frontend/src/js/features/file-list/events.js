@@ -12,6 +12,7 @@ import { openSetTagsModal } from "./tags.js";
 import { openLoadOrderModal } from "../modals/load-order.js";
 import { openWorkshopModal, checkWorkshopUrl } from "../downloads/workshop-modal.js";
 import { showContextMenu, hideContextMenu, showServerSubmenu, hideServerSubmenu } from "./context-menu.js";
+import { shareWorkshopFileByPath } from "./share.js";
 import { getServers } from "../servers/servers.js";
 
 export function setupFileListEventDelegation() {
@@ -114,6 +115,21 @@ export function setupFileListEventDelegation() {
           if (container) container.classList.remove("active-dropdown");
         });
         handleProtocolWorkshop(workshopId);
+      }
+    }
+
+    const shareWorkshopBtn = e.target.closest('.share-workshop-btn[data-action="share-workshop"]');
+    if (shareWorkshopBtn) {
+      const filePath = shareWorkshopBtn.getAttribute("data-file-path");
+      if (filePath) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.querySelectorAll(".dropdown-content").forEach((d) => {
+          d.classList.add("hidden");
+          const container = d.closest(".file-item") || d.closest(".file-card");
+          if (container) container.classList.remove("active-dropdown");
+        });
+        shareWorkshopFileByPath(filePath);
       }
     }
 

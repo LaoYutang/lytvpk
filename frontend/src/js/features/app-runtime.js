@@ -76,6 +76,7 @@ import {
 import { setupFileListEventDelegation } from "./file-list/events.js";
 import { initBoxSelection } from "./file-list/box-selection.js";
 import { showServerSubmenu } from "./file-list/context-menu.js";
+import { shareSelectedWorkshopItems } from "./file-list/share.js";
 import {
   toggleFile,
   moveFileToAddons,
@@ -629,6 +630,14 @@ function setupBatchActionEvents() {
     batchSetTagsBtn.addEventListener("click", () => {
       closeBatchDropdown();
       openBatchSetTagsModal();
+    });
+  }
+
+  const shareSelectedBtn = document.getElementById("share-selected-btn");
+  if (shareSelectedBtn) {
+    shareSelectedBtn.addEventListener("click", () => {
+      closeBatchDropdown();
+      shareSelectedWorkshopItems();
     });
   }
 

@@ -84,6 +84,9 @@ export function createFileItem(file) {
           <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
         ` : ""}
+        <button class="dropdown-item share-workshop-btn" data-file-path="${file.path}" data-action="share-workshop">
+          <span class="btn-icon">${iconSvg("share")}</span> 分享物品
+        </button>
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
@@ -276,6 +279,9 @@ export function createFileCard(file) {
           <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
         ` : ""}
+        <button class="dropdown-item share-workshop-btn" data-file-path="${file.path}" data-action="share-workshop">
+          <span class="btn-icon">${iconSvg("share")}</span> 分享物品
+        </button>
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
@@ -418,6 +424,7 @@ export function iconSvg(name) {
     x: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>`,
     chevronRight: `<svg class="icon-svg submenu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>`,
     upload: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
+    share: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 10.5 6.8-4"></path><path d="m8.6 13.5 6.8 4"></path></svg>`,
   };
   return icons[name] || "";
 }
