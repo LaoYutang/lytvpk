@@ -348,6 +348,7 @@ html.dark-mode .multi-select-menu {
   color: var(--primary);
 }
 
+.mod-floating-dropdown,
 .mod-management-page .more-actions-dropdown .dropdown-content,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content {
   min-width: 11rem;
@@ -362,6 +363,11 @@ html.dark-mode .multi-select-menu {
   z-index: 6500;
 }
 
+.mod-floating-dropdown {
+  display: flex;
+  flex-direction: column;
+}
+
 .mod-management-page .more-actions-dropdown .dropdown-content {
   top: calc(100% + 0.25rem);
   margin-top: 0;
@@ -373,6 +379,7 @@ html.dark-mode .multi-select-menu {
   margin-bottom: 0;
 }
 
+.mod-floating-dropdown .dropdown-item,
 .mod-management-page .more-actions-dropdown .dropdown-item,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item {
   min-height: 2rem;
@@ -391,6 +398,7 @@ html.dark-mode .multi-select-menu {
   transform: none !important;
 }
 
+.mod-floating-dropdown .dropdown-item:hover,
 .mod-management-page .more-actions-dropdown .dropdown-item:hover,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item:hover {
   background: var(--primary-50) !important;
@@ -399,6 +407,7 @@ html.dark-mode .multi-select-menu {
   transform: none !important;
 }
 
+.mod-floating-dropdown .dropdown-item .btn-icon,
 .mod-management-page .more-actions-dropdown .dropdown-item .btn-icon,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item .btn-icon {
   width: 1.1rem;
@@ -414,16 +423,19 @@ html.dark-mode .multi-select-menu {
   opacity: 0.72;
 }
 
+.mod-floating-dropdown .dropdown-item:hover .btn-icon,
 .mod-management-page .more-actions-dropdown .dropdown-item:hover .btn-icon,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item:hover .btn-icon {
   opacity: 1;
 }
 
+.mod-floating-dropdown .dropdown-item.delete-btn,
 .mod-management-page .more-actions-dropdown .dropdown-item.delete-btn,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item.delete-btn {
   color: var(--danger) !important;
 }
 
+.mod-floating-dropdown .dropdown-item.delete-btn:hover,
 .mod-management-page .more-actions-dropdown .dropdown-item.delete-btn:hover,
 .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item.delete-btn:hover {
   background: rgba(239, 68, 68, 0.08) !important;
@@ -541,6 +553,7 @@ html.dark-mode .dropdown-item.active {
   color: var(--primary-light);
 }
 
+html.dark-mode .mod-floating-dropdown,
 html.dark-mode .mod-management-page .more-actions-dropdown .dropdown-content,
 html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content {
   background: var(--bg-surface);
@@ -550,12 +563,14 @@ html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dro
     0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
+html.dark-mode .mod-floating-dropdown .dropdown-item:hover,
 html.dark-mode .mod-management-page .more-actions-dropdown .dropdown-item:hover,
 html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item:hover {
   background: rgba(99, 102, 241, 0.16) !important;
   color: var(--primary-light) !important;
 }
 
+html.dark-mode .mod-floating-dropdown .dropdown-item.delete-btn:hover,
 html.dark-mode .mod-management-page .more-actions-dropdown .dropdown-item.delete-btn:hover,
 html.dark-mode .mod-management-page .batch-actions-dropdown-container #batch-dropdown-content .dropdown-item.delete-btn:hover {
   background: rgba(248, 113, 113, 0.14) !important;

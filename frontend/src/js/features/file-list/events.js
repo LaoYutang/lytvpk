@@ -15,6 +15,98 @@ import { showContextMenu, hideContextMenu, showServerSubmenu, hideServerSubmenu 
 import { shareWorkshopFileByPath } from "./share.js";
 import { getServers } from "../servers/servers.js";
 
+const DROPDOWN_EDGE_GAP = 8;
+const DROPDOWN_TRIGGER_GAP = 4;
+let activeFloatingDropdown = null;
+
+function resetDropdownLayout(dropdown) {
+  if (!dropdown) return;
+  restoreFloatingDropdown(dropdown);
+  dropdown.classList.remove("dropup", "mod-floating-dropdown");
+  dropdown.style.maxHeight = "";
+  dropdown.style.overflowY = "";
+  dropdown.style.position = "";
+  dropdown.style.left = "";
+  dropdown.style.top = "";
+  dropdown.style.right = "";
+  dropdown.style.bottom = "";
+  dropdown.style.width = "";
+  dropdown.style.minWidth = "";
+}
+
+function closeDropdown(dropdown) {
+  if (!dropdown) return;
+  const container =
+    dropdown._floatingState?.container ||
+    dropdown.closest(".file-item") ||
+    dropdown.closest(".file-card");
+  dropdown.classList.add("hidden");
+  resetDropdownLayout(dropdown);
+  container?.classList.remove("active-dropdown");
+}
+
+function closeAllDropdowns(exceptDropdown = null) {
+  document.querySelectorAll(".dropdown-content").forEach((dropdown) => {
+    if (dropdown !== exceptDropdown) {
+      closeDropdown(dropdown);
+    }
+  });
+}
+
+function restoreFloatingDropdown(dropdown = activeFloatingDropdown) {
+  if (!dropdown || !dropdown._floatingState) return;
+
+  const { parent, nextSibling, container } = dropdown._floatingState;
+  if (parent) {
+    parent.insertBefore(dropdown, nextSibling);
+  }
+  container?.classList.remove("active-dropdown");
+  dropdown._floatingState = null;
+  if (activeFloatingDropdown === dropdown) {
+    activeFloatingDropdown = null;
+  }
+}
+
+function positionFloatingDropdown(dropdown, trigger, container) {
+  if (!dropdown || !trigger) return;
+
+  restoreFloatingDropdown();
+
+  dropdown._floatingState = {
+    parent: dropdown.parentNode,
+    nextSibling: dropdown.nextSibling,
+    container,
+  };
+  activeFloatingDropdown = dropdown;
+  document.body.appendChild(dropdown);
+  dropdown.classList.add("mod-floating-dropdown");
+
+  const triggerRect = trigger.getBoundingClientRect();
+  const dropdownWidth = Math.max(dropdown.offsetWidth || 0, 176);
+  const dropdownHeight = dropdown.offsetHeight || dropdown.scrollHeight || 0;
+  const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+  const windowWidth = window.innerWidth || document.documentElement.clientWidth;
+  const preferredLeft = triggerRect.left - dropdownWidth - DROPDOWN_TRIGGER_GAP;
+  const left = Math.max(
+    DROPDOWN_EDGE_GAP,
+    Math.min(preferredLeft, windowWidth - dropdownWidth - DROPDOWN_EDGE_GAP)
+  );
+  const preferredTop = triggerRect.bottom + 4;
+  const top = Math.min(
+    preferredTop,
+    Math.max(DROPDOWN_EDGE_GAP, windowHeight - dropdownHeight - DROPDOWN_EDGE_GAP)
+  );
+
+  dropdown.style.position = "fixed";
+  dropdown.style.left = `${left}px`;
+  dropdown.style.top = `${top}px`;
+  dropdown.style.right = "auto";
+  dropdown.style.bottom = "auto";
+  dropdown.style.minWidth = `${dropdownWidth}px`;
+  dropdown.style.maxHeight = "";
+  dropdown.style.overflowY = "";
+}
+
 export function setupFileListEventDelegation() {
   console.log("正在设置文件列表按钮事件委托...");
 
@@ -23,18 +115,14 @@ export function setupFileListEventDelegation() {
     if (moreBtn) {
       e.preventDefault();
       e.stopPropagation();
-      const dropdown = moreBtn.nextElementSibling;
+      const dropdown = moreBtn._dropdown || moreBtn.nextElementSibling;
+      if (!dropdown) return;
+      moreBtn._dropdown = dropdown;
       const fileContainer = moreBtn.closest(".file-item") || moreBtn.closest(".file-card");
 
-      document.querySelectorAll(".dropdown-content").forEach((d) => {
-        if (d !== dropdown) {
-          d.classList.add("hidden");
-          const otherContainer = d.closest(".file-item") || d.closest(".file-card");
-          if (otherContainer) otherContainer.classList.remove("active-dropdown");
-        }
-      });
+      closeAllDropdowns(dropdown);
 
-      dropdown.classList.remove("dropup");
+      resetDropdownLayout(dropdown);
 
       const uploadBtn = dropdown.querySelector(".upload-server-btn");
       if (uploadBtn) {
@@ -42,20 +130,16 @@ export function setupFileListEventDelegation() {
         uploadBtn.style.display = hasServers ? "" : "none";
       }
 
-      dropdown.classList.toggle("hidden");
+      const willOpen = dropdown.classList.contains("hidden");
+      dropdown.classList.toggle("hidden", !willOpen);
 
       if (fileContainer) {
-        if (dropdown.classList.contains("hidden")) {
+        if (!willOpen) {
+          restoreFloatingDropdown(dropdown);
           fileContainer.classList.remove("active-dropdown");
         } else {
           fileContainer.classList.add("active-dropdown");
-          const rect = dropdown.getBoundingClientRect();
-          const windowHeight = window.innerHeight || document.documentElement.clientHeight;
-          const statusBar = document.querySelector(".status-bar");
-          const bottomMargin = statusBar ? statusBar.offsetHeight + 10 : 20;
-          if (rect.bottom > windowHeight - bottomMargin) {
-            dropdown.classList.add("dropup");
-          }
+          positionFloatingDropdown(dropdown, moreBtn, fileContainer);
         }
       }
       return;
@@ -63,13 +147,10 @@ export function setupFileListEventDelegation() {
 
     if (
       !e.target.closest(".more-actions-dropdown") &&
+      !e.target.closest(".dropdown-content") &&
       !e.target.closest(".batch-actions-dropdown-container")
     ) {
-      document.querySelectorAll(".dropdown-content").forEach((d) => {
-        d.classList.add("hidden");
-        const container = d.closest(".file-item") || d.closest(".file-card");
-        if (container) container.classList.remove("active-dropdown");
-      });
+      closeAllDropdowns();
       hideServerSubmenu();
     }
 
@@ -109,11 +190,7 @@ export function setupFileListEventDelegation() {
       if (workshopId) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const container = d.closest(".file-item") || d.closest(".file-card");
-          if (container) container.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         handleProtocolWorkshop(workshopId);
       }
     }
@@ -124,11 +201,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const container = d.closest(".file-item") || d.closest(".file-card");
-          if (container) container.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         shareWorkshopFileByPath(filePath);
       }
     }
@@ -139,11 +212,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const fileItem = d.closest(".file-item");
-          if (fileItem) fileItem.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         openFileLocation(filePath);
       }
     }
@@ -154,11 +223,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const fileItem = d.closest(".file-item");
-          if (fileItem) fileItem.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         toggleFileVisibility(filePath);
       }
     }
@@ -189,11 +254,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const fileItem = d.closest(".file-item");
-          if (fileItem) fileItem.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         openSetTagsModal(filePath);
       }
     }
@@ -204,11 +265,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const fileItem = d.closest(".file-item");
-          if (fileItem) fileItem.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         renameFile(filePath);
       }
     }
@@ -219,11 +276,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const fileItem = d.closest(".file-item");
-          if (fileItem) fileItem.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         deleteFile(filePath);
       }
     }
@@ -234,11 +287,7 @@ export function setupFileListEventDelegation() {
       if (filePath) {
         e.preventDefault();
         e.stopPropagation();
-        document.querySelectorAll(".dropdown-content").forEach((d) => {
-          d.classList.add("hidden");
-          const fileItem = d.closest(".file-item");
-          if (fileItem) fileItem.classList.remove("active-dropdown");
-        });
+        closeAllDropdowns();
         openLoadOrderModal(filePath);
       }
     }
@@ -275,11 +324,7 @@ export function setupFileListEventDelegation() {
     e.preventDefault();
     e.stopPropagation();
 
-    document.querySelectorAll(".dropdown-content").forEach((d) => {
-      d.classList.add("hidden");
-      const container = d.closest(".file-item") || d.closest(".file-card");
-      if (container) container.classList.remove("active-dropdown");
-    });
+    closeAllDropdowns();
 
     hideContextMenu();
     showContextMenu(e, filePath);
