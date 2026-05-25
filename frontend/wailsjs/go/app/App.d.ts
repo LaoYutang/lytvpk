@@ -99,6 +99,8 @@ export function GetWorkshopBrowserTarget():Promise<string>;
 
 export function GetWorkshopDetails(arg1:string):Promise<Array<app.WorkshopFileDetails>>;
 
+export function GetWorkshopDetailsGrouped(arg1:string):Promise<app.WorkshopDetailsResult>;
+
 export function GetWorkshopFixedIP():Promise<string>;
 
 export function GetWorkshopMetaEnabled():Promise<boolean>;

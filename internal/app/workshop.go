@@ -41,6 +41,17 @@ type WorkshopFileDetails struct {
 	Children    []WorkshopChild `json:"children"`
 }
 
+type WorkshopDetailsGroup struct {
+	RootID            string                `json:"root_id"`
+	Main              WorkshopFileDetails   `json:"main"`
+	Items             []WorkshopFileDetails `json:"items"`
+	DownloadableItems []WorkshopFileDetails `json:"downloadable_items"`
+}
+
+type WorkshopDetailsResult struct {
+	Groups []WorkshopDetailsGroup `json:"groups"`
+}
+
 type DownloadTask struct {
 	ID             string             `json:"id"`
 	WorkshopID     string             `json:"workshop_id"`
@@ -181,6 +192,44 @@ func (a *App) ParseWorkshopID(workshopUrl string) (string, error) {
 	return "", fmt.Errorf("could not find valid workshop ID in URL")
 }
 
+func (a *App) parseWorkshopIDs(workshopInput string) ([]string, error) {
+	workshopInput = strings.TrimSpace(workshopInput)
+	if workshopInput == "" {
+		return nil, fmt.Errorf("工坊ID不能为空")
+	}
+
+	if decoded, err := url.PathUnescape(workshopInput); err == nil {
+		workshopInput = strings.TrimSpace(decoded)
+	}
+
+	parts := strings.Split(workshopInput, protocol.WorkshopIDDelimiter)
+	ids := make([]string, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, fmt.Errorf("工坊ID列表包含空项")
+		}
+
+		id, err := a.ParseWorkshopID(part)
+		if err != nil {
+			return nil, fmt.Errorf("无效的工坊ID片段 %q: %w", part, err)
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("工坊ID不能为空")
+	}
+
+	return ids, nil
+}
+
 // GetWorkshopDetails fetches details from steamworkshopdownloader.io
 func (a *App) GetWorkshopDetails(workshopUrl string) ([]WorkshopFileDetails, error) {
 	id, err := a.ParseWorkshopID(workshopUrl)
@@ -223,6 +272,94 @@ func (a *App) GetWorkshopDetails(workshopUrl string) ([]WorkshopFileDetails, err
 	return a.processDetails(details)
 }
 
+func (a *App) GetWorkshopDetailsGrouped(workshopInput string) (WorkshopDetailsResult, error) {
+	rootIDs, err := a.parseWorkshopIDs(workshopInput)
+	if err != nil {
+		return WorkshopDetailsResult{}, err
+	}
+
+	groups := make([]WorkshopDetailsGroup, 0, len(rootIDs))
+	for _, rootID := range rootIDs {
+		group, err := a.getWorkshopDetailsGroup(rootID)
+		if err != nil {
+			return WorkshopDetailsResult{}, fmt.Errorf("解析工坊ID %s 失败: %w", rootID, err)
+		}
+		groups = append(groups, group)
+	}
+
+	return WorkshopDetailsResult{Groups: groups}, nil
+}
+
+func (a *App) getWorkshopDetailsGroup(rootID string) (WorkshopDetailsGroup, error) {
+	details, err := a.fetchWorkshopDetails(workshopPayload([]string{rootID}))
+	if err != nil {
+		return WorkshopDetailsGroup{}, err
+	}
+
+	if len(details) == 0 {
+		return WorkshopDetailsGroup{}, fmt.Errorf("no details found")
+	}
+
+	main := details[0]
+	childrenDetails := []WorkshopFileDetails{}
+	if len(main.Children) > 0 {
+		childIDs := make([]string, 0, len(main.Children))
+		for _, child := range main.Children {
+			if child.PublishedFileId != "" {
+				childIDs = append(childIDs, child.PublishedFileId)
+			}
+		}
+
+		if len(childIDs) > 0 {
+			childrenDetails, err = a.fetchWorkshopDetails(workshopPayload(childIDs))
+			if err != nil {
+				return WorkshopDetailsGroup{}, fmt.Errorf("failed to fetch children details: %v", err)
+			}
+		}
+	}
+
+	return buildWorkshopDetailsGroup(rootID, main, childrenDetails), nil
+}
+
+func workshopPayload(ids []string) string {
+	return "[" + strings.Join(ids, ",") + "]"
+}
+
+func buildWorkshopDetailsGroup(rootID string, main WorkshopFileDetails, children []WorkshopFileDetails) WorkshopDetailsGroup {
+	main = prepareWorkshopDetail(main)
+	if main.PublishedFileId == "" {
+		main.PublishedFileId = rootID
+	}
+
+	items := []WorkshopFileDetails{main}
+	seen := map[string]bool{
+		main.PublishedFileId: true,
+	}
+
+	for _, child := range children {
+		child = prepareWorkshopDetail(child)
+		if child.PublishedFileId == "" || seen[child.PublishedFileId] {
+			continue
+		}
+		seen[child.PublishedFileId] = true
+		items = append(items, child)
+	}
+
+	downloadableItems := make([]WorkshopFileDetails, 0, len(items))
+	for _, item := range items {
+		if isDownloadableWorkshopDetail(item) {
+			downloadableItems = append(downloadableItems, item)
+		}
+	}
+
+	return WorkshopDetailsGroup{
+		RootID:            rootID,
+		Main:              main,
+		Items:             items,
+		DownloadableItems: downloadableItems,
+	}
+}
+
 func (a *App) fetchWorkshopDetails(payload string) ([]WorkshopFileDetails, error) {
 	apiUrl := "https://l4d2-workshop-parse.laoyutang.cn"
 
@@ -258,11 +395,7 @@ func (a *App) processDetails(details []WorkshopFileDetails) ([]WorkshopFileDetai
 	var validDetails []WorkshopFileDetails
 	for i := range details {
 		if details[i].Result == 1 {
-			// Remove Creator info as requested
-			details[i].Creator = ""
-			// Clean filename
-			details[i].Filename = cleanFilename(details[i].Filename)
-			validDetails = append(validDetails, details[i])
+			validDetails = append(validDetails, prepareWorkshopDetail(details[i]))
 		}
 	}
 
@@ -271,6 +404,16 @@ func (a *App) processDetails(details []WorkshopFileDetails) ([]WorkshopFileDetai
 	}
 
 	return validDetails, nil
+}
+
+func prepareWorkshopDetail(detail WorkshopFileDetails) WorkshopFileDetails {
+	detail.Creator = ""
+	detail.Filename = cleanFilename(detail.Filename)
+	return detail
+}
+
+func isDownloadableWorkshopDetail(detail WorkshopFileDetails) bool {
+	return detail.Result == 1 && strings.TrimSpace(detail.FileUrl) != ""
 }
 
 func cleanFilename(filename string) string {

@@ -8,8 +8,7 @@ export async function handleProtocolParse(workshopId) {
   workshopDeps.showNotification(`正在解析工坊ID: ${workshopId}`, "info");
   workshopDeps.openWorkshopModal();
 
-  const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`;
-  document.getElementById("workshop-url").value = workshopUrl;
+  document.getElementById("workshop-url").value = workshopId;
 
   setTimeout(() => {
     const checkBtn = document.getElementById("check-workshop-btn");

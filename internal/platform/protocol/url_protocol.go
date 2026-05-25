@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	neturl "net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,6 +18,8 @@ const (
 	ProtocolActionWorkshop ProtocolAction = "workshop"
 )
 
+const WorkshopIDDelimiter = ","
+
 // ProtocolURL 协议URL结构
 type ProtocolURL struct {
 	Action     ProtocolAction
@@ -26,24 +29,29 @@ type ProtocolURL struct {
 // ParseProtocolURL 解析 lytvpk:// 协议URL
 // 支持格式:
 //   - lytvpk://parse/{workshop_id}
+//   - lytvpk://parse/{workshop_id},{workshop_id}
 //   - lytvpk://workshop/{workshop_id}
-func ParseProtocolURL(url string) (*ProtocolURL, error) {
+func ParseProtocolURL(rawURL string) (*ProtocolURL, error) {
 	// 检查协议前缀
-	if !strings.HasPrefix(url, "lytvpk://") {
-		return nil, fmt.Errorf("无效的协议URL: %s", url)
+	if !strings.HasPrefix(rawURL, "lytvpk://") {
+		return nil, fmt.Errorf("无效的协议URL: %s", rawURL)
 	}
 
 	// 移除协议前缀
-	path := strings.TrimPrefix(url, "lytvpk://")
+	path := strings.TrimPrefix(rawURL, "lytvpk://")
 
 	// 分割路径
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("协议URL格式错误: %s", url)
+		return nil, fmt.Errorf("协议URL格式错误: %s", rawURL)
 	}
 
 	action := strings.ToLower(parts[0])
 	id := parts[1]
+	decodedID, err := neturl.PathUnescape(id)
+	if err != nil {
+		return nil, fmt.Errorf("协议URL编码错误: %s", id)
+	}
 
 	// 验证操作类型
 	var protocolAction ProtocolAction
@@ -56,15 +64,61 @@ func ParseProtocolURL(url string) (*ProtocolURL, error) {
 		return nil, fmt.Errorf("未知的协议操作: %s", action)
 	}
 
-	// 验证工坊ID（必须是数字）
-	if !IsValidWorkshopID(id) {
-		return nil, fmt.Errorf("无效的工坊ID: %s", id)
+	switch protocolAction {
+	case ProtocolActionParse:
+		ids, err := ParseWorkshopIDList(decodedID)
+		if err != nil {
+			return nil, err
+		}
+		id = strings.Join(ids, WorkshopIDDelimiter)
+	case ProtocolActionWorkshop:
+		if strings.Contains(decodedID, WorkshopIDDelimiter) {
+			return nil, fmt.Errorf("工坊打开协议只支持单个工坊ID: %s", decodedID)
+		}
+		if !IsValidWorkshopID(decodedID) {
+			return nil, fmt.Errorf("无效的工坊ID: %s", decodedID)
+		}
+		id = decodedID
 	}
 
 	return &ProtocolURL{
 		Action:     protocolAction,
 		WorkshopID: id,
 	}, nil
+}
+
+// ParseWorkshopIDList 解析由英文逗号分隔的工坊ID列表。
+// 返回值会去重并保留首次出现顺序。
+func ParseWorkshopIDList(input string) ([]string, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil, fmt.Errorf("工坊ID不能为空")
+	}
+
+	parts := strings.Split(input, WorkshopIDDelimiter)
+	ids := make([]string, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+
+	for _, part := range parts {
+		id := strings.TrimSpace(part)
+		if id == "" {
+			return nil, fmt.Errorf("工坊ID列表包含空项")
+		}
+		if !IsValidWorkshopID(id) {
+			return nil, fmt.Errorf("无效的工坊ID: %s", id)
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("工坊ID不能为空")
+	}
+
+	return ids, nil
 }
 
 // isValidWorkshopID 验证工坊ID是否有效

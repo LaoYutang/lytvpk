@@ -194,6 +194,10 @@ export function GetWorkshopDetails(arg1) {
   return window['go']['app']['App']['GetWorkshopDetails'](arg1);
 }
 
+export function GetWorkshopDetailsGrouped(arg1) {
+  return window['go']['app']['App']['GetWorkshopDetailsGrouped'](arg1);
+}
+
 export function GetWorkshopFixedIP() {
   return window['go']['app']['App']['GetWorkshopFixedIP']();
 }
