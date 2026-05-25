@@ -83,10 +83,10 @@ export function createFileItem(file) {
         <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
           <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
-        ` : ""}
         <button class="dropdown-item share-workshop-btn" data-file-path="${file.path}" data-action="share-workshop">
           <span class="btn-icon">${iconSvg("share")}</span> 分享物品
         </button>
+        ` : ""}
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>
@@ -278,10 +278,10 @@ export function createFileCard(file) {
         <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
           <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
         </button>
-        ` : ""}
         <button class="dropdown-item share-workshop-btn" data-file-path="${file.path}" data-action="share-workshop">
           <span class="btn-icon">${iconSvg("share")}</span> 分享物品
         </button>
+        ` : ""}
         <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
           <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
         </button>

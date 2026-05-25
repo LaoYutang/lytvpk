@@ -179,7 +179,9 @@ function buildSingleMenu(menu, file) {
     );
   }
 
-  menu.appendChild(createMenuItem("分享物品", iconSvg("share"), () => shareWorkshopItem(file)));
+  if (file.workshopId) {
+    menu.appendChild(createMenuItem("分享物品", iconSvg("share"), () => shareWorkshopItem(file)));
+  }
   menu.appendChild(createMenuItem("设置标签", iconSvg("tag"), () => openSetTagsModal(file.path)));
 
   const panelServers = getPanelServers();
