@@ -2,7 +2,6 @@ const SETTINGS_NAV_ICONS = {
   network: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>`,
   interface: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/></svg>`,
   workshop: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>`,
-  diagnostics: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 4 14h7l-1 8 10-12h-7l1-8z"/></svg>`,
 };
 
 export async function renderSettingsPage({
@@ -26,8 +25,6 @@ export async function renderSettingsPage({
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
   CheckModUpdates,
-  GetProblemModScanSession,
-  openProblemModScanIntro,
 }) {
   const container = document.getElementById("settings-page-content");
   if (!container) return;
@@ -38,8 +35,6 @@ export async function renderSettingsPage({
   const metaEnabled = await GetWorkshopMetaEnabled();
   const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
   const browserTarget = await GetWorkshopBrowserTarget();
-  const problemScanSession = GetProblemModScanSession ? await GetProblemModScanSession() : null;
-  const problemScanActive = Boolean(problemScanSession?.active);
   const isSelecting = enabled ? await IsSelectingIP() : false;
   const bestIP = enabled && !isSelecting ? await GetCurrentBestIP() : "";
 
@@ -60,7 +55,6 @@ export async function renderSettingsPage({
         <button class="settings-nav-item active" data-panel="network">网络设置</button>
         <button class="settings-nav-item" data-panel="interface">界面设置</button>
         <button class="settings-nav-item" data-panel="workshop">工坊设置</button>
-        <button class="settings-nav-item" data-panel="diagnostics">诊断工具</button>
       </div>
       <div class="settings-content">
         <div class="settings-panels-track">
@@ -192,24 +186,6 @@ export async function renderSettingsPage({
           </div>
         </div>
 
-        <div class="settings-panel" id="settings-panel-diagnostics">
-          <div class="setting-card">
-            <div class="setting-card-title">问题排查</div>
-            <div class="setting-row">
-              <div class="setting-row-info">
-                <div class="setting-row-label">问题 Mod 查找</div>
-                <div class="setting-row-desc">使用二分法临时禁用部分已启用 Mod，配合游戏验证逐步定位单个问题 Mod。</div>
-                <div class="setting-row-status ${problemScanActive ? "problem-scan-status-active" : ""}">
-                  ${problemScanActive ? `正在查找中：第 ${problemScanSession.round || 1} 轮，剩余 ${problemScanSession.currentCandidates?.length || 0} 个候选` : "当前没有进行中的查找"}
-                </div>
-              </div>
-              <button type="button" class="trigger-check-btn problem-scan-open-btn" id="settings-problem-scan-btn">
-                <svg class="trigger-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 4 14h7l-1 8 10-12h-7l1-8z"/></svg>
-                <span class="trigger-check-text">${problemScanActive ? "继续查找" : "打开查找工具"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
         </div>
       </div>
     </div>
@@ -234,7 +210,6 @@ export async function renderSettingsPage({
     SetWorkshopUpdateCheckEnabled,
     SetWorkshopBrowserTarget,
     CheckModUpdates,
-    openProblemModScanIntro,
   });
 }
 
@@ -421,9 +396,6 @@ function bindSettingsPage(deps) {
     });
   });
 
-  document.getElementById("settings-problem-scan-btn")?.addEventListener("click", () => {
-    deps.openProblemModScanIntro?.();
-  });
 }
 
 function enhanceSettingsNav() {

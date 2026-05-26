@@ -8,6 +8,7 @@
 @import "./app/forms-tags.css";
 @import "./app/workshop-browser.css";
 @import "./app/settings.css";
+@import "./app/diagnostics.css";
 @import "./app/problem-scan.css";
 @import "./dark-mode.css";
 @import "./titlebar.css";

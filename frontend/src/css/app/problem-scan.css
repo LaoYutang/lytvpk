@@ -314,15 +314,6 @@
   height: 28px;
 }
 
-.problem-scan-status-active {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--warning);
-}
-
-.problem-scan-open-btn {
-  white-space: nowrap;
-}
-
 .problem-scan-modal .btn-spinner {
   width: 14px;
   height: 14px;

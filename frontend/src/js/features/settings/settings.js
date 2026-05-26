@@ -19,15 +19,10 @@ let SetWorkshopMetaEnabled;
 let SetWorkshopUpdateCheckEnabled;
 let SetWorkshopBrowserTarget;
 let CheckModUpdates;
-let GetProblemModScanSession;
-let openProblemModScanIntro;
-let refreshActiveIndicator;
 let switchAppPage;
-let showConfirmModal;
-let showError;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, GetProblemModScanSession, openProblemModScanIntro, refreshActiveIndicator, switchAppPage, showConfirmModal, showError } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -58,8 +53,6 @@ export async function renderSettingsPageWithDeps() {
       SetWorkshopUpdateCheckEnabled,
       SetWorkshopBrowserTarget,
       CheckModUpdates,
-      GetProblemModScanSession,
-      openProblemModScanIntro,
     });
   } catch (error) {
     console.error("设置页面渲染失败:", error);

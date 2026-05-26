@@ -11,6 +11,7 @@ import {
 } from "../core/config.js";
 import { initTheme, setupThemeToggle } from "../core/theme.js";
 import { renderAboutPage } from "./about/about.js";
+import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
 import { renderSettingsPage } from "./settings/settings-page.js";
 import {
   configureServers,
@@ -260,8 +261,7 @@ configureSettings({
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
   CheckModUpdates,
-  GetProblemModScanSession,
-  openProblemModScanIntro,
+  switchAppPage,
 });
 
 configureWorkshopBrowser({
@@ -398,6 +398,12 @@ function setupSettingsAndAboutListeners() {
 
     if (page === "settings") {
       renderSettingsPageWithDeps();
+    } else if (page === "diagnostics") {
+      renderDiagnosticsPage({
+        GetProblemModScanSession,
+        openProblemModScanIntro,
+        showConflictModal,
+      });
     } else if (page === "about") {
       renderAboutPage({
         BrowserOpenURL,
@@ -696,10 +702,7 @@ function setupBatchActionEvents() {
     .getElementById("reset-filter-btn")
     ?.addEventListener("click", resetFilters);
 
-  // 冲突检测按钮
-  document
-    .getElementById("conflict-check-btn")
-    ?.addEventListener("click", showConflictModal);
+  // 冲突检测弹窗按钮
   document
     .getElementById("close-conflict-modal")
     ?.addEventListener("click", hideConflictModal);
