@@ -162,6 +162,10 @@ export function GetPrimaryTags() {
   return window['go']['app']['App']['GetPrimaryTags']();
 }
 
+export function GetProblemModScanSession() {
+  return window['go']['app']['App']['GetProblemModScanSession']();
+}
+
 export function GetRootDirectory() {
   return window['go']['app']['App']['GetRootDirectory']();
 }
@@ -242,6 +246,10 @@ export function LaunchL4D2() {
   return window['go']['app']['App']['LaunchL4D2']();
 }
 
+export function LaunchL4D2ForProblemScan() {
+  return window['go']['app']['App']['LaunchL4D2ForProblemScan']();
+}
+
 export function LogError(arg1, arg2, arg3) {
   return window['go']['app']['App']['LogError'](arg1, arg2, arg3);
 }
@@ -280,6 +288,10 @@ export function RestartApplication() {
 
 export function RestartPanelServer(arg1) {
   return window['go']['app']['App']['RestartPanelServer'](arg1);
+}
+
+export function RestoreProblemModScan() {
+  return window['go']['app']['App']['RestoreProblemModScan']();
 }
 
 export function RetryDownloadTask(arg1) {
@@ -372,6 +384,14 @@ export function StartDownloadTask(arg1, arg2) {
 
 export function StartPanelMapUpload(arg1, arg2) {
   return window['go']['app']['App']['StartPanelMapUpload'](arg1, arg2);
+}
+
+export function StartProblemModScan() {
+  return window['go']['app']['App']['StartProblemModScan']();
+}
+
+export function SubmitProblemModScanResult(arg1) {
+  return window['go']['app']['App']['SubmitProblemModScanResult'](arg1);
 }
 
 export function TestMirrorsLatency() {

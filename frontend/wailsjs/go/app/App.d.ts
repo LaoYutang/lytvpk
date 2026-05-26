@@ -83,6 +83,8 @@ export function GetPanelMapUploadTasks():Promise<Array<app.PanelMapUploadTask>>;
 
 export function GetPrimaryTags():Promise<Array<string>>;
 
+export function GetProblemModScanSession():Promise<app.ProblemModScanSession>;
+
 export function GetRootDirectory():Promise<string>;
 
 export function GetSecondaryTags(arg1:string):Promise<Array<string>>;
@@ -123,6 +125,8 @@ export function IsSelectingIP():Promise<boolean>;
 
 export function LaunchL4D2():Promise<void>;
 
+export function LaunchL4D2ForProblemScan():Promise<void>;
+
 export function LogError(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ManualRotateMods(arg1:app.RotationConfig):Promise<void>;
@@ -142,6 +146,8 @@ export function RenameVPKFile(arg1:string,arg2:string):Promise<string>;
 export function RestartApplication():Promise<void>;
 
 export function RestartPanelServer(arg1:string):Promise<string>;
+
+export function RestoreProblemModScan():Promise<app.ProblemModScanSession>;
 
 export function RetryDownloadTask(arg1:string):Promise<void>;
 
@@ -188,6 +194,10 @@ export function SetWorkshopUpdateCheckEnabled(arg1:boolean):Promise<void>;
 export function StartDownloadTask(arg1:app.WorkshopFileDetails,arg2:boolean):Promise<string>;
 
 export function StartPanelMapUpload(arg1:string,arg2:Array<string>):Promise<Array<string>>;
+
+export function StartProblemModScan():Promise<app.ProblemModScanSession>;
+
+export function SubmitProblemModScanResult(arg1:string):Promise<app.ProblemModScanSession>;
 
 export function TestMirrorsLatency():Promise<void>;
 

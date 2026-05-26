@@ -90,6 +90,7 @@ type App struct {
 	configPath                 string
 	serversPath                string
 	workshopWatchLaterPath     string
+	problemScanPath            string
 }
 
 // ConfigFile 定义配置文件结构
@@ -208,6 +209,7 @@ func NewApp() *App {
 	configPath := filepath.Join(appConfigDir, "config.json")
 	serversPath := filepath.Join(appConfigDir, "servers.json")
 	workshopWatchLaterPath := filepath.Join(appConfigDir, "workshop_watch_later.json")
+	problemScanPath := filepath.Join(appConfigDir, "problem_mod_scan.json")
 
 	app := &App{
 		goroutinePool:             pool,
@@ -217,6 +219,7 @@ func NewApp() *App {
 		configPath:                configPath,
 		serversPath:               serversPath,
 		workshopWatchLaterPath:    workshopWatchLaterPath,
+		problemScanPath:           problemScanPath,
 		workshopPreferredIP:       true,     // 默认开启优选IP
 		workshopMetaEnabled:       true,     // 默认开启工坊meta信息存储
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站

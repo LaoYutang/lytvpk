@@ -49,6 +49,9 @@ func (a *App) ensureConfigPaths() {
 	if a.workshopWatchLaterPath == "" {
 		a.workshopWatchLaterPath = filepath.Join(a.configDir, "workshop_watch_later.json")
 	}
+	if a.problemScanPath == "" {
+		a.problemScanPath = filepath.Join(a.configDir, "problem_mod_scan.json")
+	}
 }
 
 func (a *App) loadConfig() {

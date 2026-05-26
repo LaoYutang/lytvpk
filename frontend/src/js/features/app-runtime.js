@@ -42,6 +42,10 @@ import {
 } from "./conflicts/conflicts.js";
 import { configureSettings, showGlobalSettings, renderSettingsPageWithDeps } from "./settings/settings.js";
 import {
+  initProblemModScanAutoRestore,
+  openProblemModScanIntro,
+} from "./settings/problem-mod-scan.js";
+import {
   configureWorkshopBrowser,
   browserState,
   openBrowser,
@@ -173,6 +177,7 @@ import {
   ClearCompletedPanelMapUploads,
   GetWorkshopWatchLaterStorage,
   SaveWorkshopWatchLaterStorage,
+  GetProblemModScanSession,
 } from "../../../wailsjs/go/app/App";
 
 import {
@@ -255,6 +260,8 @@ configureSettings({
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
   CheckModUpdates,
+  GetProblemModScanSession,
+  openProblemModScanIntro,
 });
 
 configureWorkshopBrowser({
@@ -350,7 +357,7 @@ async function initializeApp() {
   setupWailsEvents();
   setupInputContextMenu();
   disableGlobalContextMenu();
-  checkInitialDirectory();
+  await checkInitialDirectory();
   checkAndInstallUpdate();
   initModRotationState();
   if (migratedLegacyConfig) {
@@ -358,6 +365,7 @@ async function initializeApp() {
   }
   initBoxSelection();
   initUpdateCheck();
+  await initProblemModScanAutoRestore();
 
   if (!window._ipEventsRegistered) {
     EventsOn("ip_selection_start", () => {

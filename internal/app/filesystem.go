@@ -244,10 +244,14 @@ func (a *App) ValidateDirectory(path string) error {
 // LaunchL4D2 启动L4D2游戏
 func (a *App) LaunchL4D2() error {
 	// 尝试执行 Mod 轮换
-	if err := a.RotateMods(); err != nil {
-		// 仅记录日志，不弹窗，因为 RotateMods 内部已经弹窗报错了
-		log.Printf("Mod轮换失败: %v", err)
-		// 即使轮换失败，也继续启动游戏
+	if !a.hasActiveProblemModScanSession() {
+		if err := a.RotateMods(); err != nil {
+			// 仅记录日志，不弹窗，因为 RotateMods 内部已经弹窗报错了
+			log.Printf("Mod轮换失败: %v", err)
+			// 即使轮换失败，也继续启动游戏
+		}
+	} else {
+		log.Printf("问题 Mod 查找进行中，跳过 Mod 轮换")
 	}
 
 	// 使用 Steam 协议启动游戏
@@ -262,8 +266,12 @@ func (a *App) LaunchL4D2() error {
 // ConnectToServer 连接到指定服务器
 func (a *App) ConnectToServer(address string) error {
 	// 尝试执行 Mod 轮换
-	if err := a.RotateMods(); err != nil {
-		log.Printf("Mod轮换失败: %v", err)
+	if !a.hasActiveProblemModScanSession() {
+		if err := a.RotateMods(); err != nil {
+			log.Printf("Mod轮换失败: %v", err)
+		}
+	} else {
+		log.Printf("问题 Mod 查找进行中，跳过 Mod 轮换")
 	}
 
 	steamURL := fmt.Sprintf("steam://connect/%s", address)

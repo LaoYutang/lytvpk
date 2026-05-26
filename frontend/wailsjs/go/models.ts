@@ -453,6 +453,86 @@ export namespace app {
 	        this.duration = source["duration"];
 	    }
 	}
+	export class ProblemModScanItem {
+	    name: string;
+	    path: string;
+	    size: number;
+	    lastModified: string;
+	    title: string;
+	    primaryTag: string;
+	    secondaryTags: string[];
+	    workshopId: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ProblemModScanItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.size = source["size"];
+	        this.lastModified = source["lastModified"];
+	        this.title = source["title"];
+	        this.primaryTag = source["primaryTag"];
+	        this.secondaryTags = source["secondaryTags"];
+	        this.workshopId = source["workshopId"];
+	    }
+	}
+	export class ProblemModScanSession {
+	    active: boolean;
+	    status: string;
+	    rootDir: string;
+	    round: number;
+	    originalEnabled: ProblemModScanItem[];
+	    currentCandidates: ProblemModScanItem[];
+	    currentDisabled: ProblemModScanItem[];
+	    currentEnabled: ProblemModScanItem[];
+	    appliedDisabled: ProblemModScanItem[];
+	    suspiciousMod?: ProblemModScanItem;
+	    startedAt: string;
+	    updatedAt: string;
+	    message?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ProblemModScanSession(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.active = source["active"];
+	        this.status = source["status"];
+	        this.rootDir = source["rootDir"];
+	        this.round = source["round"];
+	        this.originalEnabled = this.convertValues(source["originalEnabled"], ProblemModScanItem);
+	        this.currentCandidates = this.convertValues(source["currentCandidates"], ProblemModScanItem);
+	        this.currentDisabled = this.convertValues(source["currentDisabled"], ProblemModScanItem);
+	        this.currentEnabled = this.convertValues(source["currentEnabled"], ProblemModScanItem);
+	        this.appliedDisabled = this.convertValues(source["appliedDisabled"], ProblemModScanItem);
+	        this.suspiciousMod = this.convertValues(source["suspiciousMod"], ProblemModScanItem);
+	        this.startedAt = source["startedAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.message = source["message"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class RecentServer {
 	    name: string;
 	    address: string;
@@ -1063,4 +1143,3 @@ export namespace parser {
 	}
 
 }
-
