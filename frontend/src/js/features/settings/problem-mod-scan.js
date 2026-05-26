@@ -257,6 +257,7 @@ async function launchProblemScanGame() {
 }
 
 function showProblemScanFeedback() {
+  document.querySelector(".problem-scan-active")?.classList.add("is-feedback-open");
   const feedback = document.getElementById("problem-scan-feedback");
   feedback?.classList.remove("hidden");
   document.getElementById("problem-scan-tested")?.setAttribute("disabled", "true");

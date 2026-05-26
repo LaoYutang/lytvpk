@@ -1,7 +1,17 @@
 .problem-scan-modal-content {
   max-width: min(820px, 94vw);
   width: 94vw;
-  max-height: 88vh;
+  max-height: 94vh;
+}
+
+.problem-scan-modal-content #problem-scan-body {
+  flex: 0 1 auto;
+  padding-bottom: 12px;
+}
+
+.problem-scan-modal-content #problem-scan-footer {
+  padding-top: 14px;
+  padding-bottom: 14px;
 }
 
 .problem-scan-modal-header h2 {
@@ -173,6 +183,22 @@
   flex-direction: column;
 }
 
+.problem-scan-active.is-feedback-open {
+  gap: 12px;
+}
+
+.problem-scan-active.is-feedback-open .problem-scan-stat {
+  padding: 10px 14px;
+}
+
+.problem-scan-active.is-feedback-open .problem-scan-round-title {
+  padding: 14px 16px 10px;
+}
+
+.problem-scan-active.is-feedback-open .problem-scan-actions {
+  display: none;
+}
+
 .problem-scan-toggle-list {
   flex-shrink: 0;
   white-space: nowrap;
@@ -267,7 +293,7 @@
 }
 
 .problem-scan-feedback {
-  padding: 14px;
+  padding: 12px 14px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-light);
   background: var(--bg-surface);
@@ -277,15 +303,28 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   margin-bottom: 12px;
   color: var(--text-primary);
+  cursor: pointer;
   font-size: 0.9rem;
   line-height: 1.5;
+  transition:
+    background var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out);
+}
+
+.problem-scan-closed-check:hover {
+  background: color-mix(in srgb, var(--primary) 5%, var(--bg-app));
+  border-color: rgba(79, 70, 229, 0.14);
 }
 
 .problem-scan-closed-check input {
   margin-top: 3px;
   accent-color: var(--primary);
+  cursor: pointer;
 }
 
 .problem-scan-footer-hint {

@@ -1058,7 +1058,6 @@ export namespace app {
 	}
 
 }
-
 export namespace parser {
 	
 	export class ChapterInfo {
