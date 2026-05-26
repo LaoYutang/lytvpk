@@ -11,6 +11,148 @@ export function configureUpdates(deps) {
   ({ getConfig, saveConfig, EventsOn, CheckUpdate, GetMirrorsInitial, TestMirrorsLatency, DoUpdate, RestartApplication } = deps);
 }
 
+const updateNoteCategories = [
+  { key: "feat", title: "新功能", badge: "feat" },
+  { key: "refactor", title: "修改", badge: "refactor" },
+  { key: "fix", title: "问题修复", badge: "fix" },
+];
+
+const otherUpdateNoteCategory = {
+  key: "other",
+  title: "其他",
+  badge: "other",
+};
+
+function parseReleaseNotes(rawNote) {
+  const groups = {
+    feat: [],
+    refactor: [],
+    fix: [],
+    other: [],
+  };
+  let currentVersion = "";
+  const lines = (rawNote || "").split(/\r?\n/);
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const versionMatch = trimmed.match(/^[【\[](.+?)[】\]]$/);
+    if (versionMatch) {
+      currentVersion = versionMatch[1].trim();
+      return;
+    }
+
+    const listItemMatch = trimmed.match(/^[-*]\s+(.+)$/);
+    const content = listItemMatch ? listItemMatch[1].trim() : trimmed;
+    const typeMatch = content.match(
+      /^(feat|refactor|fix)(?:\([^)]+\))?\s*:?\s*(.*)$/i
+    );
+
+    if (!typeMatch) {
+      groups.other.push({ text: content, version: currentVersion });
+      return;
+    }
+
+    const type = typeMatch[1].toLowerCase();
+    const text = typeMatch[2].trim() || content;
+    groups[type].push({ text, version: currentVersion });
+  });
+
+  return groups;
+}
+
+function renderReleaseNoteCategory(container, category, items) {
+  const section = document.createElement("section");
+  section.className = `update-note-category ${category.key}`;
+
+  const header = document.createElement("div");
+  header.className = "update-note-category-header";
+
+  const badge = document.createElement("span");
+  badge.className = `update-note-type-badge ${category.badge}`;
+  badge.textContent = category.badge;
+
+  const title = document.createElement("span");
+  title.className = "update-note-category-title";
+  title.textContent = category.title;
+
+  const count = document.createElement("span");
+  count.className = "update-note-category-count";
+  count.textContent = `${items.length} 项`;
+
+  header.append(badge, title, count);
+
+  const list = document.createElement("ul");
+  list.className = "update-note-list";
+
+  items.forEach((item) => {
+    const listItem = document.createElement("li");
+    listItem.className = "update-note-item";
+
+    const text = document.createElement("span");
+    text.className = "update-note-text";
+    text.textContent = item.text;
+
+    listItem.appendChild(text);
+
+    if (item.version) {
+      const version = document.createElement("span");
+      version.className = "update-note-version";
+      version.textContent = item.version;
+      listItem.appendChild(version);
+    }
+
+    list.appendChild(listItem);
+  });
+
+  section.append(header, list);
+  container.appendChild(section);
+}
+
+function renderReleaseNotes(container, rawNote, view) {
+  container.replaceChildren();
+  container.classList.remove("is-category-view", "is-version-view");
+
+  if (view === "version") {
+    container.classList.add("is-version-view");
+    container.textContent = rawNote || "暂无更新日志";
+    return;
+  }
+
+  container.classList.add("is-category-view");
+  const groups = parseReleaseNotes(rawNote);
+  let hasItems = false;
+
+  updateNoteCategories.forEach((category) => {
+    const items = groups[category.key];
+    if (!items.length) return;
+    hasItems = true;
+    renderReleaseNoteCategory(container, category, items);
+  });
+
+  if (groups.other.length) {
+    hasItems = true;
+    renderReleaseNoteCategory(container, otherUpdateNoteCategory, groups.other);
+  }
+
+  if (!hasItems) {
+    const empty = document.createElement("div");
+    empty.className = "update-note-empty";
+    empty.textContent = "暂无可分类的更新内容";
+    container.appendChild(empty);
+  }
+}
+
+function setReleaseNotesView(container, buttons, rawNote, view) {
+  buttons.forEach((button) => {
+    const isActive = button.dataset.updateNotesView === view;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  renderReleaseNotes(container, rawNote, view);
+}
+
 export async function checkAndInstallUpdate() {
   try {
     const info = await CheckUpdate();
@@ -93,6 +235,7 @@ export async function showUpdateModal(info) {
   const newVer = document.getElementById("new-version-number");
   const curVer = document.getElementById("current-version-number");
   const notes = document.getElementById("release-notes-content");
+  const noteViewButtons = modal.querySelectorAll("[data-update-notes-view]");
 
   // Custom Dropdown Elements
   const mirrorSelectContainer = document.getElementById(
@@ -119,7 +262,19 @@ export async function showUpdateModal(info) {
 
   newVer.textContent = info.latest_ver;
   curVer.textContent = info.current_ver;
-  notes.textContent = info.release_note || "暂无更新日志";
+  const releaseNote = info.release_note || "暂无更新日志";
+  setReleaseNotesView(notes, noteViewButtons, releaseNote, "category");
+
+  noteViewButtons.forEach((button) => {
+    button.onclick = () => {
+      setReleaseNotesView(
+        notes,
+        noteViewButtons,
+        releaseNote,
+        button.dataset.updateNotesView || "category"
+      );
+    };
+  });
 
   // Helper to set selected option
   const setSelected = (value, htmlContent) => {

@@ -734,7 +734,25 @@
               </div>
 
               <div class="update-notes">
-                <h4>更新内容:</h4>
+                <div class="update-notes-header">
+                  <h4>更新内容:</h4>
+                  <div class="update-notes-view-toggle" role="tablist">
+                    <button
+                      type="button"
+                      class="update-notes-view-btn active"
+                      data-update-notes-view="category"
+                    >
+                      分类视图
+                    </button>
+                    <button
+                      type="button"
+                      class="update-notes-view-btn"
+                      data-update-notes-view="version"
+                    >
+                      版本视图
+                    </button>
+                  </div>
+                </div>
                 <div id="release-notes-content" class="notes-content"></div>
               </div>
 
