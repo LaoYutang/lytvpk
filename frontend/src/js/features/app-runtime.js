@@ -193,6 +193,14 @@ import {
 // 暴露给全局使用，以便在 onclick 中调用
 window.BrowserOpenURL = BrowserOpenURL;
 
+const ChangePanelDifficulty = (serverID, difficulty) => {
+  const method = window?.go?.app?.App?.ChangePanelDifficulty;
+  if (typeof method !== "function") {
+    return Promise.reject(new Error("当前后端不支持修改难度"));
+  }
+  return method(serverID, difficulty);
+};
+
 configureServers({
   showError,
   showNotification,
@@ -211,6 +219,7 @@ configureServers({
   FetchPanelMapList,
   ClearPanelMaps,
   ChangePanelMap,
+  ChangePanelDifficulty,
   SendPanelRconCommand,
   SelectPanelMapUploadFiles,
   StartPanelMapUpload,

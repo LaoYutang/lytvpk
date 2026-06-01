@@ -96,6 +96,16 @@ func (a *App) ChangePanelMap(serverID string, mapName string) (string, error) {
 	return a.panelPost(serverID, "/rcon/changemap", map[string]string{"mapName": mapName}, nil)
 }
 
+func (a *App) ChangePanelDifficulty(serverID string, difficulty string) (string, error) {
+	difficulty = strings.TrimSpace(difficulty)
+	switch difficulty {
+	case "简单", "普通", "高级", "专家":
+	default:
+		return "", fmt.Errorf("难度无效")
+	}
+	return a.panelPost(serverID, "/rcon/changedifficulty", map[string]string{"difficulty": difficulty}, nil)
+}
+
 func (a *App) SendPanelRconCommand(serverID string, cmd string) (string, error) {
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {

@@ -9,6 +9,8 @@ export function CancelDownloadTask(arg1:string):Promise<void>;
 
 export function CancelPanelMapUpload(arg1:string):Promise<void>;
 
+export function ChangePanelDifficulty(arg1:string,arg2:string):Promise<string>;
+
 export function ChangePanelMap(arg1:string,arg2:string):Promise<string>;
 
 export function CheckConflicts():Promise<app.ConflictResult>;

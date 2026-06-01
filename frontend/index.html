@@ -1350,6 +1350,10 @@
                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3z"/><path d="M9 3v15"/><path d="M15 6v15"/></svg>
                 换图
               </button>
+              <button id="panel-difficulty-btn" class="btn btn-secondary btn-small panel-action-btn">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
+                难度
+              </button>
               <button id="panel-upload-btn" class="btn btn-secondary btn-small panel-action-btn">
                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 地图
@@ -1424,6 +1428,20 @@
               正在读取地图列表...
             </div>
             <div id="panel-map-list" class="panel-map-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="panel-difficulty-modal" class="modal hidden z-1070">
+        <div class="modal-content panel-difficulty-modal-content">
+          <div class="modal-header">
+            <h2 id="panel-difficulty-title">修改难度</h2>
+            <button id="close-panel-difficulty-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div id="panel-difficulty-options" class="panel-difficulty-options"></div>
           </div>
         </div>
       </div>

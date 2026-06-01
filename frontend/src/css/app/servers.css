@@ -524,6 +524,11 @@
   max-width: 92vw;
 }
 
+.panel-difficulty-modal-content {
+  width: 460px;
+  max-width: 92vw;
+}
+
 .panel-map-modal-content .modal-body {
   display: flex;
   flex-direction: column;
@@ -583,6 +588,55 @@
 .panel-action-btn .icon-svg {
   width: 1rem;
   height: 1rem;
+}
+
+.panel-difficulty-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-3);
+}
+
+.panel-difficulty-option {
+  min-height: 76px;
+  padding: var(--spacing-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--spacing-1);
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.panel-difficulty-option:hover {
+  border-color: var(--primary-200);
+  background: var(--bg-hover);
+}
+
+.panel-difficulty-option.active {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 3px var(--primary-100);
+}
+
+.panel-difficulty-option span {
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.panel-difficulty-option small {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.2;
 }
 
 .panel-error-box {
@@ -1127,6 +1181,10 @@
   .panel-upload-task-top {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .panel-difficulty-options {
+    grid-template-columns: 1fr;
   }
 }
 

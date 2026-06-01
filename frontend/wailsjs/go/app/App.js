@@ -14,6 +14,10 @@ export function CancelPanelMapUpload(arg1) {
   return window['go']['app']['App']['CancelPanelMapUpload'](arg1);
 }
 
+export function ChangePanelDifficulty(arg1, arg2) {
+  return window['go']['app']['App']['ChangePanelDifficulty'](arg1, arg2);
+}
+
 export function ChangePanelMap(arg1, arg2) {
   return window['go']['app']['App']['ChangePanelMap'](arg1, arg2);
 }

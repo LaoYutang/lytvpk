@@ -8,6 +8,7 @@ let RestartPanelServer;
 let FetchPanelMapList;
 let ClearPanelMaps;
 let ChangePanelMap;
+let ChangePanelDifficulty;
 let SendPanelRconCommand;
 let SelectPanelMapUploadFiles;
 let StartPanelMapUpload;
@@ -35,6 +36,7 @@ export function configurePanelModal(deps) {
     FetchPanelMapList,
     ClearPanelMaps,
     ChangePanelMap,
+    ChangePanelDifficulty,
     SendPanelRconCommand,
     SelectPanelMapUploadFiles,
     StartPanelMapUpload,
@@ -57,8 +59,16 @@ export function configurePanelModal(deps) {
 let currentPanelServer = null;
 let currentPanelServerIndex = -1;
 let currentPanelMaps = [];
+let currentPanelDifficulty = "";
 let panelOfficialMapsHidden = false;
 const completedPanelUploadNotifications = new Set();
+
+const PANEL_DIFFICULTIES = [
+  { value: "简单", desc: "Easy" },
+  { value: "普通", desc: "Normal" },
+  { value: "高级", desc: "Hard" },
+  { value: "专家", desc: "Impossible" },
+];
 
 const PANEL_UPLOAD_ICON = `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`;
 const PANEL_CANCEL_ICON = `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
@@ -70,6 +80,7 @@ export function openPanelServerDetailsModal(index) {
 
   currentPanelServer = server;
   currentPanelServerIndex = index;
+  currentPanelDifficulty = "";
 
   const modal = document.getElementById("panel-server-details-modal");
   const title = document.getElementById("panel-details-server-name");
@@ -146,6 +157,7 @@ async function renderPanelStatus(server, status) {
   const summary = document.getElementById("panel-status-summary");
   const playerList = document.getElementById("panel-player-list");
   const rawMap = status.map || "Unknown";
+  currentPanelDifficulty = status.difficulty || "";
   let displayMap = rawMap;
   try {
     const resolved = await resolveMapName(rawMap);
@@ -225,6 +237,86 @@ export function openCurrentPanelInBrowser() {
   if (!currentPanelServer?.panelUrl) return;
   if (typeof BrowserOpenURL === "function") {
     BrowserOpenURL(normalizePanelUrl(currentPanelServer.panelUrl));
+  }
+}
+
+export function openPanelDifficultyModal() {
+  if (!currentPanelServer) return;
+
+  const modal = document.getElementById("panel-difficulty-modal");
+  const title = document.getElementById("panel-difficulty-title");
+  if (title) {
+    title.textContent = `修改难度 - ${currentPanelServer.name}`;
+  }
+  renderPanelDifficultyOptions();
+  modal?.classList.remove("hidden");
+}
+
+export function closePanelDifficultyModal() {
+  document.getElementById("panel-difficulty-modal")?.classList.add("hidden");
+}
+
+function renderPanelDifficultyOptions() {
+  const list = document.getElementById("panel-difficulty-options");
+  if (!list) return;
+
+  list.replaceChildren();
+  const activeValue = normalizePanelDifficultyValue(currentPanelDifficulty);
+
+  PANEL_DIFFICULTIES.forEach((difficulty) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "panel-difficulty-option";
+    button.dataset.difficulty = difficulty.value;
+    button.setAttribute("aria-pressed", String(difficulty.value === activeValue));
+    if (difficulty.value === activeValue) {
+      button.classList.add("active");
+    }
+
+    const label = document.createElement("span");
+    label.textContent = difficulty.value;
+    const desc = document.createElement("small");
+    desc.textContent = difficulty.desc;
+    button.append(label, desc);
+    list.appendChild(button);
+  });
+}
+
+function normalizePanelDifficultyValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  const aliases = {
+    easy: "简单",
+    "简单": "简单",
+    normal: "普通",
+    "普通": "普通",
+    hard: "高级",
+    advanced: "高级",
+    "高级": "高级",
+    impossible: "专家",
+    expert: "专家",
+    "专家": "专家",
+  };
+  return aliases[normalized] || "";
+}
+
+async function handlePanelDifficultyClick(event) {
+  const button = event.target.closest(".panel-difficulty-option");
+  if (!button || !currentPanelServer) return;
+
+  const difficulty = button.dataset.difficulty;
+  if (!difficulty) return;
+
+  button.disabled = true;
+  try {
+    const text = await ChangePanelDifficulty(currentPanelServer.id, difficulty);
+    currentPanelDifficulty = difficulty;
+    showNotification(text || `难度已切换为 ${difficulty}`, "success");
+    closePanelDifficultyModal();
+  } catch (err) {
+    console.error("修改难度失败:", err);
+    showError("修改难度失败: " + err);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -764,6 +856,9 @@ export function setupPanelModalListeners() {
     .getElementById("panel-map-btn")
     ?.addEventListener("click", openPanelMapModal);
   document
+    .getElementById("panel-difficulty-btn")
+    ?.addEventListener("click", openPanelDifficultyModal);
+  document
     .getElementById("panel-upload-btn")
     ?.addEventListener("click", openPanelUploadModal);
   document
@@ -788,6 +883,13 @@ export function setupPanelModalListeners() {
   document
     .getElementById("panel-map-list")
     ?.addEventListener("click", handlePanelMapClick);
+
+  document
+    .getElementById("close-panel-difficulty-modal-btn")
+    ?.addEventListener("click", closePanelDifficultyModal);
+  document
+    .getElementById("panel-difficulty-options")
+    ?.addEventListener("click", handlePanelDifficultyClick);
 
   document
     .getElementById("close-panel-upload-modal-btn")
@@ -817,7 +919,7 @@ export function setupPanelModalListeners() {
       }
     });
 
-  ["panel-server-details-modal", "panel-map-modal", "panel-upload-modal", "panel-rcon-modal"].forEach(
+  ["panel-server-details-modal", "panel-map-modal", "panel-difficulty-modal", "panel-upload-modal", "panel-rcon-modal"].forEach(
     (modalId) => {
       document.getElementById(modalId)?.addEventListener("click", function (e) {
         if (e.target === this) {
