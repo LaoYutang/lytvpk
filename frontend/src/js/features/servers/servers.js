@@ -14,6 +14,7 @@ import {
   configurePanelModal,
   setupPanelModalListeners as setupPanelListeners,
 } from "./panel-modal.js";
+import { normalizePanelUrl } from "./panel-url.js";
 
 let showError;
 let showNotification;
@@ -342,7 +343,7 @@ function normalizeServerStorage(storage = {}) {
             name: String(server?.name || "").trim(),
             address: normalizeAddress(server?.address),
             weight: Number(server?.weight) || 0,
-            panelUrl: String(server?.panelUrl || "").trim(),
+            panelUrl: normalizePanelUrl(server?.panelUrl),
             panelPasswordSet: Boolean(
               server?.panelPasswordSet || server?.panelPassword
             ),
@@ -812,7 +813,7 @@ function importServers(jsonStr) {
             name: server.name,
             address: server.address,
             weight: server.weight || 0,
-            panelUrl: String(server.panelUrl || "").trim(),
+            panelUrl: normalizePanelUrl(server.panelUrl),
           });
           addedCount++;
         }

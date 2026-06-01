@@ -1,3 +1,5 @@
+import { normalizePanelUrl } from "./panel-url.js";
+
 let showError;
 let showNotification;
 let showConfirmModal;
@@ -222,7 +224,7 @@ export function restartCurrentPanelServer() {
 export function openCurrentPanelInBrowser() {
   if (!currentPanelServer?.panelUrl) return;
   if (typeof BrowserOpenURL === "function") {
-    BrowserOpenURL(currentPanelServer.panelUrl);
+    BrowserOpenURL(normalizePanelUrl(currentPanelServer.panelUrl));
   }
 }
 

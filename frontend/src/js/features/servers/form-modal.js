@@ -1,3 +1,5 @@
+import { normalizePanelUrl } from "./panel-url.js";
+
 let showError;
 let showNotification;
 let getServers;
@@ -95,7 +97,9 @@ export async function saveServerForm() {
   const address = document.getElementById("form-server-address").value.trim();
   const weight =
     parseInt(document.getElementById("form-server-weight").value) || 0;
-  const panelUrl = document.getElementById("form-server-panel-url")?.value.trim() || "";
+  const panelUrl = normalizePanelUrl(
+    document.getElementById("form-server-panel-url")?.value
+  );
   const panelPassword =
     document.getElementById("form-server-panel-password")?.value.trim() || "";
   const clearPanelPassword = Boolean(
