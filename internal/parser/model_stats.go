@@ -190,7 +190,7 @@ func parseVTXLOD0Stats(data []byte) (vtxLOD0Stats, error) {
 		return vtxLOD0Stats{}, fmt.Errorf("VTX 版本不支持: %d", version)
 	}
 
-	numBodyParts, err := safeI32(data, 28)
+	numBodyParts, err := parseVTXBodyPartCount(data, 28)
 	if err != nil {
 		return vtxLOD0Stats{}, err
 	}
@@ -198,10 +198,6 @@ func parseVTXLOD0Stats(data []byte) (vtxLOD0Stats, error) {
 	if err != nil {
 		return vtxLOD0Stats{}, err
 	}
-	if numBodyParts < 0 || numBodyParts > 4096 {
-		return vtxLOD0Stats{}, fmt.Errorf("bodypart 数量无效")
-	}
-
 	stats := vtxLOD0Stats{}
 	for bp := 0; bp < numBodyParts; bp++ {
 		bpOff := bodyPartOffset + bp*vtxBodyPartSize
@@ -235,6 +231,27 @@ func parseVTXLOD0Stats(data []byte) (vtxLOD0Stats, error) {
 	}
 
 	return stats, nil
+}
+
+func parseVTXBodyPartCount(data []byte, offset int) (int, error) {
+	count, err := safeI32(data, offset)
+	if err != nil {
+		return 0, err
+	}
+	if count >= 0 && count <= 4096 {
+		return count, nil
+	}
+
+	// Some third-party compiled VTX files keep a valid low-byte count but leave
+	// garbage in the high bytes. Range checks below still guard every bodypart.
+	if err := requireRange(data, offset, 1); err != nil {
+		return 0, err
+	}
+	fallback := int(data[offset])
+	if fallback > 0 && fallback <= 4096 {
+		return fallback, nil
+	}
+	return 0, fmt.Errorf("bodypart 数量无效")
 }
 
 func (stats *vtxLOD0Stats) add(next vtxLOD0Stats) {

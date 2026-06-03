@@ -105,6 +105,19 @@ func TestParseVTXRejectsOutOfRangePackedOffsets(t *testing.T) {
 	}
 }
 
+func TestParseVTXLOD0StatsAcceptsDirtyHighBytesInBodyPartCount(t *testing.T) {
+	data := buildMinimalVTXFixture(t, 300, 0x01)
+	binary.LittleEndian.PutUint32(data[28:], 0x00238401)
+
+	stats, err := parseVTXLOD0Stats(data)
+	if err != nil {
+		t.Fatalf("parse VTX with dirty bodypart count high bytes: %v", err)
+	}
+	if stats.Triangles != 100 {
+		t.Fatalf("expected 100 triangles, got %d", stats.Triangles)
+	}
+}
+
 func TestParseVTXRejectsUnsupportedVersion(t *testing.T) {
 	data := buildMinimalVTXFixture(t, 300, 0x01)
 	binary.LittleEndian.PutUint32(data[0:], 6)
