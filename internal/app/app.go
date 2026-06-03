@@ -57,16 +57,21 @@ type VPKFileCache struct {
 
 // App struct
 type App struct {
-	ctx             context.Context
-	vpkCache        sync.Map // map[string]*VPKFileCache, key是文件路径
-	mu              sync.RWMutex
-	rootDir         string
-	goroutinePool   *ants.Pool
-	conflictCheckMu sync.Mutex
-	forceClose      bool
-	restyClient     *resty.Client
-	proxyServer     *network.ImageProxyServer
-	singletonMgr    *SingletonManager // 单例管理器
+	ctx                    context.Context
+	vpkCache               sync.Map // map[string]*VPKFileCache, key是文件路径
+	mu                     sync.RWMutex
+	rootDir                string
+	goroutinePool          *ants.Pool
+	conflictCheckMu        sync.Mutex
+	modelStatsScanMu       sync.Mutex
+	modelStatsScanRunning  bool
+	modelStatsScanID       string
+	modelStatsScanRoot     string
+	modelStatsScanProgress ProgressInfo
+	forceClose             bool
+	restyClient            *resty.Client
+	proxyServer            *network.ImageProxyServer
+	singletonMgr           *SingletonManager // 单例管理器
 
 	// 配置项
 	modRotationConfig          RotationConfig

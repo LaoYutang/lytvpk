@@ -158,6 +158,10 @@ export function GetModRotation() {
   return window['go']['app']['App']['GetModRotation']();
 }
 
+export function GetModelStatsScanState() {
+  return window['go']['app']['App']['GetModelStatsScanState']();
+}
+
 export function GetPanelMapUploadTasks() {
   return window['go']['app']['App']['GetPanelMapUploadTasks']();
 }
@@ -384,6 +388,10 @@ export function SetWorkshopUpdateCheckEnabled(arg1) {
 
 export function StartDownloadTask(arg1, arg2) {
   return window['go']['app']['App']['StartDownloadTask'](arg1, arg2);
+}
+
+export function StartModelStatsScan() {
+  return window['go']['app']['App']['StartModelStatsScan']();
 }
 
 export function StartPanelMapUpload(arg1, arg2) {

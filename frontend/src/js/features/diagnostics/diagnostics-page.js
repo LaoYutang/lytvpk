@@ -1,6 +1,7 @@
 export async function renderDiagnosticsPage({
   GetProblemModScanSession,
   openProblemModScanIntro,
+  openModelStatsScanModal,
   showConflictModal,
 } = {}) {
   const container = document.getElementById("diagnostics-page-content");
@@ -59,6 +60,20 @@ export async function renderDiagnosticsPage({
             开始检测
           </button>
         </section>
+
+        <section class="diagnostics-tool-card">
+          <div class="diagnostics-tool-icon is-model">${modelIcon()}</div>
+          <div class="diagnostics-tool-main">
+            <div class="diagnostics-tool-title-row">
+              <h3>Mod 模型面数检测 <span class="diagnostics-beta-badge">Beta</span></h3>
+              <span class="diagnostics-status">可检测</span>
+            </div>
+            <p>读取启用和创意工坊 Mod 内模型的 LOD0 顶点数与三角形数量，快速定位高面数资源。</p>
+          </div>
+          <button type="button" class="btn btn-primary diagnostics-tool-action" id="diagnostics-model-stats-btn">
+            打开检测工具
+          </button>
+        </section>
       </div>
     </div>
   `;
@@ -70,6 +85,10 @@ export async function renderDiagnosticsPage({
   document.getElementById("diagnostics-conflict-check-btn")?.addEventListener("click", () => {
     showConflictModal?.();
   });
+
+  document.getElementById("diagnostics-model-stats-btn")?.addEventListener("click", () => {
+    openModelStatsScanModal?.();
+  });
 }
 
 function boltIcon() {
@@ -78,4 +97,8 @@ function boltIcon() {
 
 function conflictIcon() {
   return `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 2.5 18a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.6a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`;
+}
+
+function modelIcon() {
+  return `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7.2v9.6L12 21l8-4.2V7.2L12 3Z"/><path d="m4 7.2 8 4.2 8-4.2"/><path d="M12 11.4V21"/><path d="m8.2 5.2 8 4.2"/></svg>`;
 }

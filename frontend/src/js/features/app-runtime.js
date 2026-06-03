@@ -12,6 +12,10 @@ import {
 import { initTheme, setupThemeToggle } from "../core/theme.js";
 import { renderAboutPage } from "./about/about.js";
 import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
+import {
+  configureModelStatsScan,
+  openModelStatsScanModal,
+} from "./diagnostics/model-stats-scan.js";
 import { renderSettingsPage } from "./settings/settings-page.js";
 import {
   configureServers,
@@ -248,6 +252,11 @@ configureConflicts({
   moveFileToAddons,
 });
 
+configureModelStatsScan({
+  EventsOn,
+  showError,
+});
+
 configureSettings({
   appState,
   getConfig,
@@ -411,6 +420,7 @@ function setupSettingsAndAboutListeners() {
       renderDiagnosticsPage({
         GetProblemModScanSession,
         openProblemModScanIntro,
+        openModelStatsScanModal,
         showConflictModal,
       });
     } else if (page === "about") {

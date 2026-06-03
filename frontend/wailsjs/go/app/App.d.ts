@@ -81,6 +81,8 @@ export function GetMirrorsWithLatency():Promise<Array<app.MirrorWithLatency>>;
 
 export function GetModRotation():Promise<app.RotationConfig>;
 
+export function GetModelStatsScanState():Promise<app.ModelStatsScanState>;
+
 export function GetPanelMapUploadTasks():Promise<Array<app.PanelMapUploadTask>>;
 
 export function GetPrimaryTags():Promise<Array<string>>;
@@ -194,6 +196,8 @@ export function SetWorkshopPreferredIP(arg1:boolean):Promise<void>;
 export function SetWorkshopUpdateCheckEnabled(arg1:boolean):Promise<void>;
 
 export function StartDownloadTask(arg1:app.WorkshopFileDetails,arg2:boolean):Promise<string>;
+
+export function StartModelStatsScan():Promise<app.ModelStatsScanState>;
 
 export function StartPanelMapUpload(arg1:string,arg2:Array<string>):Promise<Array<string>>;
 
