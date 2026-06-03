@@ -343,8 +343,8 @@ function createModResultRow(item, rankNumber) {
   const rank = createEl("span", "model-stats-rank", String(rankNumber));
   const main = createEl("div", "model-stats-mod-main");
   main.append(
-    createEl("strong", "model-stats-mod-title", item.title || item.name || "未知 Mod"),
-    createEl("span", "model-stats-mod-file", item.name || item.path || ""),
+    createTextWithTitle("strong", "model-stats-mod-title", item.title || item.name || "未知 Mod"),
+    createTextWithTitle("span", "model-stats-mod-file", item.name || item.path || ""),
   );
 
   const chevron = createEl("span", "model-stats-chevron");
@@ -387,13 +387,13 @@ function createModelResultRow(row, rankNumber) {
   const rank = createEl("span", "model-stats-rank", String(rankNumber));
   const modRef = createEl("div", "model-stats-row-mod-ref");
   modRef.append(
-    createEl("strong", "", row.mod.title || row.mod.name || "未知 Mod"),
-    createEl("span", "", row.mod.name || row.mod.path || ""),
+    createTextWithTitle("strong", "", row.mod.title || row.mod.name || "未知 Mod"),
+    createTextWithTitle("span", "", row.mod.name || row.mod.path || ""),
   );
   const main = createEl("div", "model-stats-mod-main");
   main.append(
-    createEl("strong", "model-stats-mod-title", row.model.path || "未知模型"),
-    createEl("span", "model-stats-mod-file", row.model.message || row.model.vtxPath || row.model.vvdPath || "LOD0"),
+    createTextWithTitle("strong", "model-stats-mod-title", row.model.path || "未知模型"),
+    createTextWithTitle("span", "model-stats-mod-file", row.model.message || row.model.vtxPath || row.model.vvdPath || "LOD0"),
   );
   const chevron = createEl("span", "model-stats-chevron");
   content.append(
@@ -433,19 +433,19 @@ function createStripGroupResultRow(row, rankNumber) {
   const rank = createEl("span", "model-stats-rank", String(rankNumber));
   const main = createEl("div", "model-stats-mod-main");
   main.append(
-    createEl("strong", "model-stats-mod-title", row.mod.title || row.mod.name || "未知 Mod"),
-    createEl("span", "model-stats-mod-file", row.mod.name || row.mod.path || ""),
+    createTextWithTitle("strong", "model-stats-mod-title", row.mod.title || row.mod.name || "未知 Mod"),
+    createTextWithTitle("span", "model-stats-mod-file", row.mod.name || row.mod.path || ""),
   );
 
   const modelRef = createEl("div", "model-stats-row-mod-ref");
   modelRef.append(
-    createEl("strong", "", getModelDisplayName(row.model)),
-    createEl("span", "", row.model.path || row.model.vtxPath || row.model.vvdPath || "LOD0"),
+    createTextWithTitle("strong", "", getModelDisplayName(row.model)),
+    createTextWithTitle("span", "", row.model.path || row.model.vtxPath || row.model.vvdPath || "LOD0"),
   );
   const groupRef = createEl("div", "model-stats-row-group-ref");
   groupRef.append(
-    createEl("strong", "", formatStripGroupName(row.group)),
-    createEl("span", "", formatStripGroupLabel(row.group)),
+    createTextWithTitle("strong", "", formatStripGroupName(row.group)),
+    createTextWithTitle("span", "", formatStripGroupLabel(row.group)),
   );
   const spacer = createEl("span", "model-stats-list-spacer");
   content.append(
@@ -483,8 +483,8 @@ function createModelDetailSection(model, index) {
 
   const main = createEl("div", "model-stats-model-main");
   main.append(
-    createEl("strong", "", model.path || `模型 ${index + 1}`),
-    createEl("span", "", model.message || model.vtxPath || model.vvdPath || "LOD0"),
+    createTextWithTitle("strong", "", model.path || `模型 ${index + 1}`),
+    createTextWithTitle("span", "", model.message || model.vtxPath || model.vvdPath || "LOD0"),
   );
   const values = createEl("div", "model-stats-model-values");
   values.append(
@@ -741,6 +741,12 @@ function createEl(tag, className = "", text = "") {
   const element = document.createElement(tag);
   if (className) element.className = className;
   if (text !== "") element.textContent = text;
+  return element;
+}
+
+function createTextWithTitle(tag, className = "", text = "") {
+  const element = createEl(tag, className, text);
+  if (text !== "") element.title = text;
   return element;
 }
 

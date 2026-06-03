@@ -308,7 +308,9 @@
   color: var(--text-primary);
   font-size: 0.92rem;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-stats-mod-file,
@@ -319,7 +321,9 @@
   color: var(--text-tertiary);
   font-size: 0.78rem;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-stats-mod-values,
@@ -487,7 +491,7 @@
 
 .model-stats-strip-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 12px 14px 14px 62px;
   background: color-mix(in srgb, var(--bg-app) 72%, var(--bg-surface));
@@ -507,7 +511,9 @@
   color: var(--text-primary);
   font-size: 0.78rem;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .model-stats-strip-card span,
@@ -671,7 +677,17 @@
     padding-left: 14px;
   }
 
+  .model-stats-strip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .model-stats-pagination {
     justify-content: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .model-stats-strip-grid {
+    grid-template-columns: 1fr;
   }
 }
