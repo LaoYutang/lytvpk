@@ -8,11 +8,13 @@ let showNotification;
 let renderSettingsPage;
 let GetWorkshopPreferredIP;
 let GetWorkshopFixedIP;
+let GetWorkshopIPOptions;
 let GetWorkshopMetaEnabled;
 let GetWorkshopUpdateCheckEnabled;
 let GetWorkshopBrowserTarget;
 let IsSelectingIP;
 let GetCurrentBestIP;
+let GetCurrentBestIPOption;
 let SetWorkshopPreferredIP;
 let SetWorkshopFixedIP;
 let SetWorkshopMetaEnabled;
@@ -22,7 +24,7 @@ let CheckModUpdates;
 let switchAppPage;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, switchAppPage } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -42,11 +44,13 @@ export async function renderSettingsPageWithDeps() {
       showNotification,
       GetWorkshopPreferredIP,
       GetWorkshopFixedIP,
+      GetWorkshopIPOptions,
       GetWorkshopMetaEnabled,
       GetWorkshopUpdateCheckEnabled,
       GetWorkshopBrowserTarget,
       IsSelectingIP,
       GetCurrentBestIP,
+      GetCurrentBestIPOption,
       SetWorkshopPreferredIP,
       SetWorkshopFixedIP,
       SetWorkshopMetaEnabled,

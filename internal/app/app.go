@@ -21,6 +21,9 @@ import (
 // VPKFile 类型别名,用于Wails绑定
 type VPKFile = parser.VPKFile
 
+// IPOption 类型别名,用于Wails绑定
+type IPOption = network.IPOption
+
 // ServerInfo 服务器信息
 type ServerInfo struct {
 	Name       string `json:"name"`

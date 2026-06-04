@@ -9,9 +9,22 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
+
+const (
+	steamCDNDomain          = "cdn.steamusercontent.com"
+	uncategorizedIPCategory = "未分类"
+	builtinIPCategory       = "内置"
+	customIPCategory        = "自定义"
+)
+
+type IPOption struct {
+	IP       string `json:"ip"`
+	Category string `json:"category"`
+}
 
 // Embedded Steam CDN IP list (Fallback)
 var defaultSteamCDNIPs = []string{
@@ -23,8 +36,54 @@ var defaultSteamCDNIPs = []string{
 	"23.67.75.74",
 }
 
-func fetchRemoteIPs(domain string) ([]string, error) {
-	apiURL := fmt.Sprintf("https://lytvpk-get-ips.laoyutang.cn/?domain=%s", domain)
+func defaultIPOptions() []IPOption {
+	options := make([]IPOption, 0, len(defaultSteamCDNIPs))
+	for _, ip := range defaultSteamCDNIPs {
+		options = append(options, IPOption{IP: ip, Category: builtinIPCategory})
+	}
+	return options
+}
+
+func decodeIPOptions(body io.Reader) ([]IPOption, error) {
+	var options []IPOption
+	if err := json.NewDecoder(body).Decode(&options); err != nil {
+		return nil, err
+	}
+	return normalizeIPOptions(options), nil
+}
+
+func normalizeIPOptions(options []IPOption) []IPOption {
+	normalized := make([]IPOption, 0, len(options))
+	seen := make(map[string]struct{}, len(options))
+	for _, option := range options {
+		ip := strings.TrimSpace(option.IP)
+		if ip == "" || net.ParseIP(ip) == nil {
+			continue
+		}
+		if _, exists := seen[ip]; exists {
+			continue
+		}
+
+		category := strings.TrimSpace(option.Category)
+		if category == "" {
+			category = uncategorizedIPCategory
+		}
+		normalized = append(normalized, IPOption{IP: ip, Category: category})
+		seen[ip] = struct{}{}
+	}
+	return normalized
+}
+
+func ipOptionsToIPs(options []IPOption) []string {
+	ips := make([]string, 0, len(options))
+	for _, option := range options {
+		ips = append(ips, option.IP)
+	}
+	return ips
+}
+
+func fetchRemoteIPOptions(domain string) ([]IPOption, error) {
+	apiURL := fmt.Sprintf("https://lytvpk-get-ips.laoyutang.cn/?domain=%s&format=entries", url.QueryEscape(domain))
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -45,20 +104,40 @@ func fetchRemoteIPs(domain string) ([]string, error) {
 		return nil, fmt.Errorf("API returned status: %d", resp.StatusCode)
 	}
 
-	var ips []string
-	if err := json.NewDecoder(resp.Body).Decode(&ips); err != nil {
+	options, err := decodeIPOptions(resp.Body)
+	if err != nil {
 		return nil, err
 	}
-	return ips, nil
+	return options, nil
+}
+
+func fetchRemoteIPs(domain string) ([]string, error) {
+	options, err := fetchRemoteIPOptions(domain)
+	if err != nil {
+		return nil, err
+	}
+	return ipOptionsToIPs(options), nil
+}
+
+func GetSteamCDNIPOptions() []IPOption {
+	options, err := fetchRemoteIPOptions(steamCDNDomain)
+	if err != nil || len(options) == 0 {
+		options = defaultIPOptions()
+	}
+	GlobalIPSelector.SetIPOptions(options)
+	return options
 }
 
 type IPSelector struct {
-	cachedBestIP string
-	cachedSpeed  float64 // Cached download speed in MB/s
-	lastCheck    time.Time
-	isSelecting  bool
-	fixedIP      string
-	mu           sync.RWMutex
+	cachedBestIP       string
+	cachedBestCategory string
+	cachedSpeed        float64 // Cached download speed in MB/s
+	lastCheck          time.Time
+	isSelecting        bool
+	fixedIP            string
+	ipOptions          []IPOption
+	ipCategories       map[string]string
+	mu                 sync.RWMutex
 }
 
 var GlobalIPSelector = &IPSelector{}
@@ -69,6 +148,7 @@ func (s *IPSelector) SetFixedIP(ip string) {
 	s.fixedIP = ip
 	if ip == "" {
 		s.cachedBestIP = ""
+		s.cachedBestCategory = ""
 		s.cachedSpeed = 0
 	}
 }
@@ -121,6 +201,66 @@ func (s *IPSelector) GetCachedBestIP() string {
 	return s.cachedBestIP
 }
 
+func (s *IPSelector) SetIPOptions(options []IPOption) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.setIPOptionsLocked(normalizeIPOptions(options))
+}
+
+func (s *IPSelector) setIPOptionsForTest(options []IPOption) {
+	s.SetIPOptions(options)
+}
+
+func (s *IPSelector) GetCachedBestIPOption() IPOption {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.fixedIP != "" {
+		return IPOption{IP: s.fixedIP, Category: s.categoryForIPLocked(s.fixedIP)}
+	}
+	if s.cachedBestIP == "" {
+		return IPOption{}
+	}
+	category := s.cachedBestCategory
+	if category == "" {
+		category = s.categoryForIPLocked(s.cachedBestIP)
+	}
+	return IPOption{IP: s.cachedBestIP, Category: category}
+}
+
+func (s *IPSelector) setIPOptionsLocked(options []IPOption) {
+	s.ipOptions = cloneIPOptions(options)
+	s.ipCategories = make(map[string]string, len(options))
+	for _, option := range options {
+		if _, exists := s.ipCategories[option.IP]; !exists {
+			s.ipCategories[option.IP] = option.Category
+		}
+	}
+	if s.cachedBestIP != "" {
+		s.cachedBestCategory = s.categoryForIPLocked(s.cachedBestIP)
+	}
+}
+
+func (s *IPSelector) categoryForIPLocked(ip string) string {
+	if category, ok := s.ipCategories[ip]; ok && category != "" {
+		return category
+	}
+	for _, option := range defaultIPOptions() {
+		if option.IP == ip {
+			return option.Category
+		}
+	}
+	return customIPCategory
+}
+
+func cloneIPOptions(options []IPOption) []IPOption {
+	if options == nil {
+		return []IPOption{}
+	}
+	next := make([]IPOption, len(options))
+	copy(next, options)
+	return next
+}
+
 func (s *IPSelector) refreshBestIP(testUrl string) string {
 	s.mu.Lock()
 	// 如果已经在优选，直接返回空字符串或者等待（这里简化为返回，前端会轮询状态）
@@ -166,22 +306,24 @@ func (s *IPSelector) refreshBestIP(testUrl string) string {
 	}()
 
 	// Fetch remote IPs
-	var candidateIPs []string
-	remoteIPs, err := fetchRemoteIPs("cdn.steamusercontent.com")
-	if err == nil && len(remoteIPs) > 0 {
-		fmt.Printf("[IPSelector] Fetched %d IPs from remote API\n", len(remoteIPs))
-		candidateIPs = remoteIPs
+	var candidateOptions []IPOption
+	remoteOptions, err := fetchRemoteIPOptions(steamCDNDomain)
+	if err == nil && len(remoteOptions) > 0 {
+		fmt.Printf("[IPSelector] Fetched %d IPs from remote API\n", len(remoteOptions))
+		candidateOptions = remoteOptions
 	} else {
 		fmt.Printf("[IPSelector] Failed to fetch remote IPs (using built-in): %v\n", err)
-		candidateIPs = make([]string, len(defaultSteamCDNIPs))
-		copy(candidateIPs, defaultSteamCDNIPs)
+		candidateOptions = defaultIPOptions()
 	}
+	s.SetIPOptions(candidateOptions)
 
+	candidateIPs := ipOptionsToIPs(candidateOptions)
 	bestIP, speed := selectBestIP(candidateIPs, testUrl)
 
 	s.mu.Lock()
 	if bestIP != "" {
 		s.cachedBestIP = bestIP
+		s.cachedBestCategory = s.categoryForIPLocked(bestIP)
 		s.cachedSpeed = speed
 		s.lastCheck = time.Now()
 	}

@@ -404,6 +404,16 @@ func (a *App) GetCurrentBestIP() string {
 	return network.GlobalIPSelector.GetCachedBestIP()
 }
 
+// GetCurrentBestIPOption 获取当前优选IP及分类
+func (a *App) GetCurrentBestIPOption() IPOption {
+	return network.GlobalIPSelector.GetCachedBestIPOption()
+}
+
+// GetWorkshopIPOptions 获取可手动选择的工坊IP列表
+func (a *App) GetWorkshopIPOptions() []IPOption {
+	return network.GetSteamCDNIPOptions()
+}
+
 // SetWorkshopFixedIP 设置工坊固定IP（留空则使用自动优选）
 func (a *App) SetWorkshopFixedIP(ip string) {
 	a.mu.Lock()

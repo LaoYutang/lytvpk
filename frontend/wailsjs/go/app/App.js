@@ -134,6 +134,10 @@ export function GetCurrentBestIP() {
   return window['go']['app']['App']['GetCurrentBestIP']();
 }
 
+export function GetCurrentBestIPOption() {
+  return window['go']['app']['App']['GetCurrentBestIPOption']();
+}
+
 export function GetDownloadTasks() {
   return window['go']['app']['App']['GetDownloadTasks']();
 }
@@ -212,6 +216,10 @@ export function GetWorkshopDetailsGrouped(arg1) {
 
 export function GetWorkshopFixedIP() {
   return window['go']['app']['App']['GetWorkshopFixedIP']();
+}
+
+export function GetWorkshopIPOptions() {
+  return window['go']['app']['App']['GetWorkshopIPOptions']();
 }
 
 export function GetWorkshopMetaEnabled() {

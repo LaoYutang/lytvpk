@@ -14,11 +14,13 @@ export async function renderSettingsPage({
   showNotification,
   GetWorkshopPreferredIP,
   GetWorkshopFixedIP,
+  GetWorkshopIPOptions,
   GetWorkshopMetaEnabled,
   GetWorkshopUpdateCheckEnabled,
   GetWorkshopBrowserTarget,
   IsSelectingIP,
   GetCurrentBestIP,
+  GetCurrentBestIPOption,
   SetWorkshopPreferredIP,
   SetWorkshopFixedIP,
   SetWorkshopMetaEnabled,
@@ -36,14 +38,17 @@ export async function renderSettingsPage({
   const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
   const browserTarget = await GetWorkshopBrowserTarget();
   const isSelecting = enabled ? await IsSelectingIP() : false;
-  const bestIP = enabled && !isSelecting ? await GetCurrentBestIP() : "";
+  const ipOptions = await GetWorkshopIPOptions();
+  const bestIPOption = enabled && !isSelecting ? await GetCurrentBestIPOption() : null;
+  const bestIP = bestIPOption?.ip || (enabled && !isSelecting ? await GetCurrentBestIP() : "");
 
   let ipStatusText = "";
   if (enabled) {
     if (isSelecting) {
       ipStatusText = "正在优选最佳线路...";
     } else if (bestIP) {
-      ipStatusText = useFixedIP ? `当前固定 IP: ${bestIP}` : `当前优选 IP: ${bestIP}`;
+      const optionLabel = formatIPOptionLabel(bestIPOption || findIPOption(ipOptions, bestIP) || { ip: bestIP, category: useFixedIP ? "自定义" : "" });
+      ipStatusText = useFixedIP ? `当前固定 IP: ${optionLabel}` : `当前优选 IP: ${optionLabel}`;
     } else {
       ipStatusText = "尚未获取到优选 IP";
     }
@@ -65,7 +70,7 @@ export async function renderSettingsPage({
               <div class="setting-row-info">
                 <div class="setting-row-label">开启优选 IP 加速</div>
                 <div class="setting-row-desc">加速创意工坊图片与文件下载</div>
-                ${ipStatusText ? `<div class="setting-row-status">${ipStatusText}</div>` : ""}
+                ${ipStatusText ? `<div class="setting-row-status">${escapeHtml(ipStatusText)}</div>` : ""}
               </div>
               <label class="toggle-switch">
                 <input type="checkbox" id="settings-preferred-ip" ${enabled ? "checked" : ""}>
@@ -78,7 +83,13 @@ export async function renderSettingsPage({
                 <label class="setting-radio-label"><input type="radio" name="settings-ip-mode" value="auto" ${useFixedIP ? "" : "checked"}><span>自动优选最佳 IP（推荐）</span></label>
                 <label class="setting-radio-label"><input type="radio" name="settings-ip-mode" value="fixed" ${useFixedIP ? "checked" : ""}><span>手动指定 IP</span></label>
               </div>
-              <input type="text" id="settings-fixed-ip" class="form-input" value="${escapeAttr(fixedIP)}" placeholder="例如: 23.59.72.59" style="${useFixedIP ? "" : "display:none"}">
+              <div id="settings-fixed-ip-tools" class="settings-fixed-ip-tools" style="${useFixedIP ? "" : "display:none"}">
+                <div class="single-select-dropdown settings-ip-option-dropdown">
+                  <button type="button" id="settings-ip-option-trigger" class="select-trigger"></button>
+                  <div id="settings-ip-option-menu" class="select-menu settings-ip-option-menu hidden"></div>
+                </div>
+                <input type="text" id="settings-fixed-ip" class="form-input" value="${escapeAttr(fixedIP)}" placeholder="例如: 23.59.72.59">
+              </div>
             </div>
           </div>
         </div>
@@ -194,6 +205,7 @@ export async function renderSettingsPage({
   bindSettingsPage({
     enabled,
     fixedIP,
+    ipOptions,
     metaEnabled,
     updateCheckEnabled,
     browserTarget,
@@ -230,7 +242,23 @@ function bindSettingsPage(deps) {
 
   const ipToggle = document.getElementById("settings-preferred-ip");
   const ipSection = document.getElementById("settings-ip-mode-section");
+  const fixedTools = document.getElementById("settings-fixed-ip-tools");
   const fixedInput = document.getElementById("settings-fixed-ip");
+  const ipOptionTrigger = document.getElementById("settings-ip-option-trigger");
+  const ipOptionMenu = document.getElementById("settings-ip-option-menu");
+  const ipOptions = normalizeIPOptions(deps.ipOptions);
+  renderIPOptionDropdown({
+    options: ipOptions,
+    fixedIP: deps.fixedIP,
+    trigger: ipOptionTrigger,
+    menu: ipOptionMenu,
+    fixedInput,
+    SetWorkshopFixedIP: deps.SetWorkshopFixedIP,
+    getConfig: deps.getConfig,
+    saveConfig: deps.saveConfig,
+    showNotification: deps.showNotification,
+  });
+
   ipToggle?.addEventListener("change", async () => {
     ipSection.style.display = ipToggle.checked ? "block" : "none";
     await deps.SetWorkshopPreferredIP(ipToggle.checked);
@@ -243,7 +271,7 @@ function bindSettingsPage(deps) {
   document.querySelectorAll('input[name="settings-ip-mode"]').forEach((radio) => {
     radio.addEventListener("change", async () => {
       const useFixed = radio.value === "fixed" && radio.checked;
-      fixedInput.style.display = useFixed ? "block" : "none";
+      if (fixedTools) fixedTools.style.display = useFixed ? "" : "none";
       if (!useFixed) {
         await deps.SetWorkshopFixedIP("");
         const config = deps.getConfig();
@@ -259,6 +287,9 @@ function bindSettingsPage(deps) {
     const config = deps.getConfig();
     config.workshopFixedIP = fixedIP;
     deps.saveConfig(config);
+    updateIPOptionTrigger(ipOptionTrigger, ipOptions, fixedIP);
+    syncIPOptionMenuActive(ipOptionMenu, fixedIP);
+    updateFixedIPStatus(ipOptions, fixedIP);
     deps.showNotification("已更新固定 IP 设置", "success");
   });
 
@@ -398,6 +429,149 @@ function bindSettingsPage(deps) {
 
 }
 
+function renderIPOptionDropdown({
+  options,
+  fixedIP,
+  trigger,
+  menu,
+  fixedInput,
+  SetWorkshopFixedIP,
+  getConfig,
+  saveConfig,
+  showNotification,
+}) {
+  if (!trigger || !menu || !fixedInput) return;
+
+  const normalizedOptions = normalizeIPOptions(options);
+  updateIPOptionTrigger(trigger, normalizedOptions, fixedIP);
+  menu.textContent = "";
+
+  if (normalizedOptions.length === 0) {
+    trigger.classList.add("is-disabled");
+    trigger.disabled = true;
+    return;
+  }
+
+  const groupedOptions = groupIPOptions(normalizedOptions);
+  groupedOptions.forEach((group) => {
+    const header = document.createElement("div");
+    header.className = "settings-ip-category-header";
+    header.textContent = group.category;
+    menu.appendChild(header);
+
+    group.options.forEach((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "select-option settings-ip-option";
+      button.dataset.value = option.ip;
+
+      const content = document.createElement("span");
+      content.className = "settings-ip-option-main";
+
+      const category = document.createElement("span");
+      category.className = "settings-ip-option-category";
+      category.textContent = option.category;
+
+      const ip = document.createElement("span");
+      ip.className = "settings-ip-option-address";
+      ip.textContent = option.ip;
+
+      content.appendChild(category);
+      content.appendChild(ip);
+      button.appendChild(content);
+
+      if (option.ip === fixedIP) {
+        button.classList.add("active");
+      }
+
+      button.addEventListener("click", async () => {
+        fixedInput.value = option.ip;
+        await SetWorkshopFixedIP(option.ip);
+        const config = getConfig();
+        config.workshopFixedIP = option.ip;
+        saveConfig(config);
+        updateIPOptionTrigger(trigger, normalizedOptions, option.ip);
+        syncIPOptionMenuActive(menu, option.ip);
+        updateFixedIPStatus(normalizedOptions, option.ip);
+        menu.classList.add("hidden");
+        showNotification("已更新固定 IP 设置", "success");
+      });
+
+      menu.appendChild(button);
+    });
+  });
+
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    menu.classList.toggle("hidden");
+  });
+}
+
+function normalizeIPOptions(options = []) {
+  const seen = new Set();
+  const normalized = [];
+  options.forEach((option) => {
+    const ip = String(option?.ip || "").trim();
+    if (!ip || seen.has(ip)) return;
+    const category = String(option?.category || "未分类").trim() || "未分类";
+    normalized.push({ ip, category });
+    seen.add(ip);
+  });
+  return normalized;
+}
+
+function groupIPOptions(options) {
+  const groups = [];
+  const byCategory = new Map();
+  options.forEach((option) => {
+    if (!byCategory.has(option.category)) {
+      const group = { category: option.category, options: [] };
+      byCategory.set(option.category, group);
+      groups.push(group);
+    }
+    byCategory.get(option.category).options.push(option);
+  });
+  return groups;
+}
+
+function updateIPOptionTrigger(trigger, options, ip) {
+  if (!trigger) return;
+  const option = findIPOption(options, ip);
+  if (option) {
+    trigger.textContent = formatIPOptionLabel(option);
+  } else if (ip) {
+    trigger.textContent = formatIPOptionLabel({ ip, category: "自定义" });
+  } else if (options?.length) {
+    trigger.textContent = "选择推荐固定 IP";
+  } else {
+    trigger.textContent = "暂无候选 IP，可手动填写";
+  }
+}
+
+function syncIPOptionMenuActive(menu, ip) {
+  menu?.querySelectorAll(".settings-ip-option").forEach((button) => {
+    button.classList.toggle("active", button.dataset.value === ip);
+  });
+}
+
+function updateFixedIPStatus(options, ip) {
+  const status = document.querySelector("#settings-page-content .setting-row-status");
+  if (!status || !ip) return;
+  status.textContent = `当前固定 IP: ${formatIPOptionLabel(findIPOption(options, ip) || { ip, category: "自定义" })}`;
+}
+
+function findIPOption(options = [], ip) {
+  if (!ip) return null;
+  return options.find((option) => option.ip === ip) || null;
+}
+
+function formatIPOptionLabel(option) {
+  const ip = String(option?.ip || "").trim();
+  if (!ip) return "";
+  const category = String(option?.category || "").trim();
+  return category ? `${category} / ${ip}` : ip;
+}
+
 function enhanceSettingsNav() {
   const sidebar = document.querySelector("#settings-page-content .settings-sidebar");
   if (!sidebar) return;
@@ -462,4 +636,13 @@ function updateSettingsPanelDirection(nextItem) {
 
 function escapeAttr(value) {
   return String(value || "").replace(/"/g, "&quot;");
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

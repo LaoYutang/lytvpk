@@ -289,6 +289,83 @@ html.dark-mode .setting-indent {
   width: 100%;
 }
 
+.settings-fixed-ip-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.setting-indent .settings-fixed-ip-tools .form-input {
+  margin-top: 0;
+}
+
+.settings-ip-option-dropdown {
+  width: 100%;
+  flex: none;
+}
+
+.settings-ip-option-menu {
+  max-height: 15rem;
+}
+
+.settings-ip-category-header {
+  padding: 7px 9px 4px;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.settings-ip-category-header:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border-light);
+}
+
+.settings-ip-option {
+  min-height: 2.25rem;
+  padding: 5px 8px;
+}
+
+.settings-ip-option-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.settings-ip-option-category {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.settings-ip-option-address {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+html.dark-mode .settings-ip-option-category {
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--primary-light);
+}
+
 .trigger-check-btn {
   display: inline-flex;
   align-items: center;
