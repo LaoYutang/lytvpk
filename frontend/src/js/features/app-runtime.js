@@ -283,6 +283,7 @@ configureSettings({
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
   CheckModUpdates,
+  EventsOn,
   switchAppPage,
 });
 

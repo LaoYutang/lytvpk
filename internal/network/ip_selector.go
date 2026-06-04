@@ -120,12 +120,9 @@ func fetchRemoteIPs(domain string) ([]string, error) {
 }
 
 func GetSteamCDNIPOptions() []IPOption {
-	options, err := fetchRemoteIPOptions(steamCDNDomain)
-	if err != nil || len(options) == 0 {
-		options = defaultIPOptions()
-	}
-	GlobalIPSelector.SetIPOptions(options)
-	return options
+	return GlobalIPSelector.getIPOptions(func() ([]IPOption, error) {
+		return fetchRemoteIPOptions(steamCDNDomain)
+	})
 }
 
 type IPSelector struct {
@@ -136,6 +133,8 @@ type IPSelector struct {
 	isSelecting        bool
 	fixedIP            string
 	ipOptions          []IPOption
+	ipOptionsLoaded    bool
+	ipOptionsLoading   bool
 	ipCategories       map[string]string
 	mu                 sync.RWMutex
 }
@@ -227,8 +226,51 @@ func (s *IPSelector) GetCachedBestIPOption() IPOption {
 	return IPOption{IP: s.cachedBestIP, Category: category}
 }
 
+func (s *IPSelector) getIPOptions(fetcher func() ([]IPOption, error)) []IPOption {
+	s.mu.Lock()
+	if s.ipOptionsLoaded {
+		options := cloneIPOptions(s.ipOptions)
+		s.mu.Unlock()
+		return options
+	}
+	if s.ipOptionsLoading {
+		s.mu.Unlock()
+		for {
+			time.Sleep(50 * time.Millisecond)
+			s.mu.RLock()
+			loaded := s.ipOptionsLoaded
+			loading := s.ipOptionsLoading
+			options := cloneIPOptions(s.ipOptions)
+			s.mu.RUnlock()
+			if loaded {
+				return options
+			}
+			if !loading {
+				break
+			}
+		}
+		return s.getIPOptions(fetcher)
+	}
+	s.ipOptionsLoading = true
+	s.mu.Unlock()
+
+	options, err := fetcher()
+	options = normalizeIPOptions(options)
+	if err != nil || len(options) == 0 {
+		options = defaultIPOptions()
+	}
+
+	s.mu.Lock()
+	s.setIPOptionsLocked(options)
+	s.ipOptionsLoading = false
+	cached := cloneIPOptions(s.ipOptions)
+	s.mu.Unlock()
+	return cached
+}
+
 func (s *IPSelector) setIPOptionsLocked(options []IPOption) {
 	s.ipOptions = cloneIPOptions(options)
+	s.ipOptionsLoaded = len(options) > 0
 	s.ipCategories = make(map[string]string, len(options))
 	for _, option := range options {
 		if _, exists := s.ipCategories[option.IP]; !exists {
@@ -306,16 +348,10 @@ func (s *IPSelector) refreshBestIP(testUrl string) string {
 	}()
 
 	// Fetch remote IPs
-	var candidateOptions []IPOption
-	remoteOptions, err := fetchRemoteIPOptions(steamCDNDomain)
-	if err == nil && len(remoteOptions) > 0 {
-		fmt.Printf("[IPSelector] Fetched %d IPs from remote API\n", len(remoteOptions))
-		candidateOptions = remoteOptions
-	} else {
-		fmt.Printf("[IPSelector] Failed to fetch remote IPs (using built-in): %v\n", err)
-		candidateOptions = defaultIPOptions()
-	}
-	s.SetIPOptions(candidateOptions)
+	candidateOptions := s.getIPOptions(func() ([]IPOption, error) {
+		return fetchRemoteIPOptions(steamCDNDomain)
+	})
+	fmt.Printf("[IPSelector] Using %d candidate IPs\n", len(candidateOptions))
 
 	candidateIPs := ipOptionsToIPs(candidateOptions)
 	bestIP, speed := selectBestIP(candidateIPs, testUrl)

@@ -230,7 +230,6 @@
 
 .setting-row-status {
   font-size: 0.85rem;
-  margin-top: 8px;
   display: inline-block;
   padding: 4px 10px;
   background: rgba(16, 185, 129, 0.08);
@@ -240,6 +239,13 @@
 
 html.dark-mode .setting-row-status {
   background: rgba(16, 185, 129, 0.12);
+}
+
+.setting-row-status-line {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  max-width: 100%;
 }
 
 .setting-indent {
@@ -307,19 +313,6 @@ html.dark-mode .setting-indent {
 
 .settings-ip-option-menu {
   max-height: 15rem;
-}
-
-.settings-ip-category-header {
-  padding: 7px 9px 4px;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.settings-ip-category-header:not(:first-child) {
-  margin-top: 4px;
-  border-top: 1px solid var(--border-light);
 }
 
 .settings-ip-option {

@@ -21,10 +21,11 @@ let SetWorkshopMetaEnabled;
 let SetWorkshopUpdateCheckEnabled;
 let SetWorkshopBrowserTarget;
 let CheckModUpdates;
+let EventsOn;
 let switchAppPage;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, switchAppPage } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, EventsOn, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -57,6 +58,7 @@ export async function renderSettingsPageWithDeps() {
       SetWorkshopUpdateCheckEnabled,
       SetWorkshopBrowserTarget,
       CheckModUpdates,
+      EventsOn,
     });
   } catch (error) {
     console.error("设置页面渲染失败:", error);

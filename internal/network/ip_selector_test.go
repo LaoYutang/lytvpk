@@ -76,3 +76,25 @@ func TestDefaultIPOptionsUseBuiltinCategory(t *testing.T) {
 		}
 	}
 }
+
+func TestGetIPOptionsUsesProcessCache(t *testing.T) {
+	selector := &IPSelector{}
+	fetchCount := 0
+	fetcher := func() ([]IPOption, error) {
+		fetchCount++
+		return []IPOption{
+			{IP: "23.59.72.59", Category: "steam官方-韩国"},
+		}, nil
+	}
+
+	first := selector.getIPOptions(fetcher)
+	first[0].Category = "被外部修改"
+	second := selector.getIPOptions(fetcher)
+
+	if fetchCount != 1 {
+		t.Fatalf("expected fetcher to be called once, got %d", fetchCount)
+	}
+	if len(second) != 1 || second[0].Category != "steam官方-韩国" {
+		t.Fatalf("expected cached copy to remain intact, got %#v", second)
+	}
+}
