@@ -592,7 +592,7 @@ async function loadIPOptionsForDropdown({
     });
     await onStatusUpdate?.();
   } catch (error) {
-    trigger.textContent = "候选 IP 加载失败，可手动填写";
+    trigger.textContent = "候选 IP 加载失败，可自建服务器并填写 IP";
     trigger.classList.add("is-disabled");
     trigger.disabled = true;
   }
@@ -619,9 +619,9 @@ function updateIPOptionTrigger(trigger, options, ip) {
   } else if (ip) {
     trigger.textContent = formatIPOptionLabel({ ip, category: "自定义" });
   } else if (options?.length) {
-    trigger.textContent = "选择推荐固定 IP";
+    trigger.textContent = "选择优选 IP，也可自建服务器并填写 IP";
   } else {
-    trigger.textContent = "暂无候选 IP，可手动填写";
+    trigger.textContent = "暂无候选 IP，可自建服务器并填写 IP";
   }
 }
 
