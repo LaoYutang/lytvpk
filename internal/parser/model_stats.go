@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"git.lubar.me/ben/valve/vpk"
+	"l4d2-manager-next/pkg/valve/vpk"
 )
 
 const (

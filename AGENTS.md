@@ -2,7 +2,7 @@
 
 **Generated:** 2026-05-26
 **领域:** Windows 桌面端 VPK Mod 管理器（Left 4 Dead 2）
-**核心栈:** Go 1.24 + Wails v2.10.2 + Vite 3 + 原生 JavaScript/CSS
+**核心栈:** Go 1.25.x + Wails v2.10.2 + Vite 3 + 原生 JavaScript/CSS
 
 ## 概述
 
@@ -14,7 +14,7 @@
 .
 ├── main.go                    # Wails 入口：嵌入 frontend/dist、绑定 App、单例检测
 ├── wails.json                 # Wails 构建配置
-├── go.mod                     # Go 1.24，模块 vpk-manager
+├── go.mod                     # Go 1.25.x，模块 vpk-manager
 ├── internal/
 │   ├── app/                   # 后端业务层，208 个 Wails 导出方法
 │   │   └── AGENTS.md         # → 后端业务逻辑详细指南
@@ -46,7 +46,7 @@
 | 修改图片代理/IP 优选   | `internal/network/*.go`         | 本地 HTTP 服务器绕过 Steam CORS           |
 | 修改 Windows 平台集成  | `internal/platform/*.go`        | URL Protocol、注册表操作                  |
 | 修改构建配置           | `wails.json`                    | 前后端构建命令定义                        |
-| 修改 CI/发布流程       | `.github/workflows/release.yml` | windows-latest，Go 1.24，Node 20          |
+| 修改 CI/发布流程       | `.github/workflows/release.yml` | windows-latest，Go 1.25.x，Node 20        |
 
 ## 核心符号
 

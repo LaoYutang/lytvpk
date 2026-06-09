@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"git.lubar.me/ben/valve/vpk"
+	"l4d2-manager-next/pkg/valve/vpk"
 )
 
 // ParseVPKFile 解析VPK文件的主入口函数

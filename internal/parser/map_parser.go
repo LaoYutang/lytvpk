@@ -1,17 +1,13 @@
 package parser
 
 import (
-	"bufio"
 	"io"
 	"log"
-	"regexp"
 	"strings"
 
-	"git.lubar.me/ben/valve/vpk"
+	"l4d2-manager-next/pkg/valve/vpk"
+	"l4d2-manager-next/pkg/vpkmission"
 )
-
-// kvRegex 用于提取键值对的正则表达式
-var kvRegex = regexp.MustCompile(`"([^"]+)"\s+"([^"]+)"`)
 
 // ProcessMapVPK 处理地图类型VPK
 func ProcessMapVPK(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKFile, secondaryTags map[string]bool, chapters map[string]ChapterInfo) {
@@ -123,138 +119,58 @@ func ParseMissionFile(opener *vpk.Opener, file *vpk.File) *Campaign {
 
 // ParseMissionContent 解析mission文件内容
 func ParseMissionContent(reader io.Reader) *Campaign {
-	// 先读取全部内容用于调试
-	content, err := io.ReadAll(reader)
+	mission, err := vpkmission.ParseMission(reader)
 	if err != nil {
-		log.Printf("无法读取mission文件内容: %v", err)
+		log.Printf("mission文件解析错误: %v", err)
 		return nil
 	}
 
-	// 重新创建reader
-	reader = strings.NewReader(string(content))
-	scanner := bufio.NewScanner(reader)
-
-	campaign := &Campaign{
-		Chapters: make([]*Chapter, 0, 8), // 预分配容量
-	}
-
-	inGameModeSection := false
-	braceLevel := 0
-	var tempMapName string
-	var currentMode string
-	seenChapters := make(map[string]*Chapter) // 用于去重和追加模式
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		if len(line) == 0 {
-			continue
-		}
-
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "//") {
-			continue
-		}
-
-		// 状态机，用于进入/退出游戏模式部分
-		lowerLine := strings.ToLower(line)
-
-		// 移除行内注释（//之后的内容）
-		if commentIndex := strings.Index(lowerLine, "//"); commentIndex != -1 {
-			lowerLine = strings.TrimSpace(lowerLine[:commentIndex])
-		}
-
-		// 检测进入modes区域
-		if strings.Contains(lowerLine, `"modes"`) {
-			log.Printf("发现modes区域")
-			continue
-		}
-
-		// 检测具体的游戏模式
-		if !inGameModeSection && (lowerLine == `"coop"` || lowerLine == `"survival"` ||
-			lowerLine == `"halftank"` || lowerLine == `"brawler"` || lowerLine == `"versus"` ||
-			lowerLine == `"scavenge"` || lowerLine == `"realism"`) {
-			inGameModeSection = true
-			braceLevel = 0
-			// 提取模式名称，去除引号
-			currentMode = strings.Trim(lowerLine, `"`)
-			// 转换为中文模式名
-			currentMode = TranslateGameMode(currentMode)
-			log.Printf("进入游戏模式区域: %s", currentMode)
-			continue
-		}
-
-		if inGameModeSection {
-			for _, char := range line {
-				switch char {
-				case '{':
-					braceLevel++
-				case '}':
-					braceLevel--
-				}
-			}
-
-			// 如果 braceLevel 降为 0，说明已退出游戏模式部分
-			if braceLevel <= 0 {
-				inGameModeSection = false
-				currentMode = ""
-				continue
-			}
-		}
-
-		// 只在必要时使用正则表达式
-		if strings.Contains(line, `"`) {
-			matches := kvRegex.FindStringSubmatch(line)
-			if len(matches) == 3 {
-				key := strings.ToLower(matches[1])
-				value := matches[2]
-
-				// 始终在文件顶层查找战役标题
-				if key == "displaytitle" && campaign.Title == "" {
-					campaign.Title = value
-					log.Printf("找到战役标题: %s", value)
-				}
-
-				// 如果在游戏模式区域内
-				if inGameModeSection {
-					// 注意：实际的键名是"Map"和"DisplayName"（首字母大写）
-					if key == "map" {
-						tempMapName = value
-						log.Printf("找到Map: %s", value)
-					}
-
-					if key == "displayname" && tempMapName != "" {
-						log.Printf("找到章节: %s -> %s (模式: %s)", tempMapName, value, currentMode)
-						// 检查是否已经添加过这个章节
-						if chapter, exists := seenChapters[tempMapName]; exists {
-							// 已存在，添加模式到该章节
-							chapter.Modes = append(chapter.Modes, currentMode)
-							log.Printf("追加模式到现有章节")
-						} else {
-							// 不存在，创建新章节
-							chapter := &Chapter{
-								Code:  tempMapName,
-								Title: value,
-								Modes: []string{currentMode},
-							}
-							campaign.Chapters = append(campaign.Chapters, chapter)
-							seenChapters[tempMapName] = chapter
-							log.Printf("创建新章节: %+v", chapter)
-						}
-						tempMapName = "" // 重置
-					}
-				}
-			}
-		}
-	}
-
-	if scanner.Err() != nil {
-		log.Printf("mission文件扫描错误: %v", scanner.Err())
-		return nil
-	}
-
+	campaign := convertMissionCampaign(mission)
 	log.Printf("解析完成 - 战役: %s, 章节数: %d", campaign.Title, len(campaign.Chapters))
 	return campaign
+}
+
+func convertMissionCampaign(mission *vpkmission.Campaign) *Campaign {
+	if mission == nil {
+		return nil
+	}
+
+	campaign := &Campaign{
+		Title:    mission.Title,
+		Chapters: make([]*Chapter, 0, len(mission.Chapters)),
+	}
+
+	for _, missionChapter := range mission.Chapters {
+		if missionChapter == nil || missionChapter.Code == "" {
+			continue
+		}
+		campaign.Chapters = append(campaign.Chapters, &Chapter{
+			Code:  missionChapter.Code,
+			Title: missionChapter.Title,
+			Modes: translateGameModes(missionChapter.Modes),
+		})
+	}
+
+	return campaign
+}
+
+func translateGameModes(modes []string) []string {
+	translatedModes := make([]string, 0, len(modes))
+	seen := make(map[string]bool, len(modes))
+	for _, mode := range modes {
+		mode = strings.TrimSpace(mode)
+		if mode == "" {
+			continue
+		}
+
+		translated := TranslateGameMode(strings.ToLower(mode))
+		if seen[translated] {
+			continue
+		}
+		seen[translated] = true
+		translatedModes = append(translatedModes, translated)
+	}
+	return translatedModes
 }
 
 // TranslateGameMode 将英文游戏模式转换为中文

@@ -22,7 +22,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24" # 确保与你的开发环境一致
+          go-version: "1.25" # 使用 1.25 小版本线，满足 go.mod 和 l4d2-manager-next 的最低要求
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

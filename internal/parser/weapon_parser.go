@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"git.lubar.me/ben/valve/vpk"
+	"l4d2-manager-next/pkg/valve/vpk"
 )
 
 // ProcessWeaponVPK 处理武器类型VPK

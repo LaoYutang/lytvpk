@@ -3,7 +3,7 @@ package parser
 import (
 	"strings"
 
-	"git.lubar.me/ben/valve/vpk"
+	"l4d2-manager-next/pkg/valve/vpk"
 )
 
 // ProcessCharacterVPK 处理人物类型VPK

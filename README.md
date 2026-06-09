@@ -23,7 +23,7 @@
 
 ### 后端 (Go)
 - **框架**: Wails v2
-- **VPK解析**: 使用 `git.lubar.me/ben/valve/vpk` 库
+- **VPK解析**: 使用 `l4d2-manager-next/pkg/valve/vpk` 和 `l4d2-manager-next/pkg/vpkmission`
 - **并发处理**: `github.com/panjf2000/ants/v2` 协程池
 - **配置管理**: JSON 格式的持久化配置
 
@@ -52,5 +52,5 @@
 ## 🙏 致谢
 
 - [Wails](https://wails.io/) - 跨平台应用框架
-- [valve/vpk](https://git.lubar.me/ben/valve) - VPK 文件解析库
+- [l4d2-server-next](https://github.com/LaoYutang/l4d2-server-next/tree/master/backend/pkg) - VPK 与 mission 文件解析库
 - [ants](https://github.com/panjf2000/ants) - 高性能协程池

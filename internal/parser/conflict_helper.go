@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"git.lubar.me/ben/valve/vpk"
+	"l4d2-manager-next/pkg/valve/vpk"
 )
 
 // GetVPKFileList 获取VPK文件中的所有文件路径列表
