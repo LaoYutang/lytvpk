@@ -1406,19 +1406,107 @@ html.dark-mode .workshop-type-toggle-btn.active {
   background-size: 200% 100%;
 }
 
-.detail-description-box h3 {
-  margin-top: 0;
-  margin-bottom: 14px;
+.detail-description-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.detail-description-header h3 {
+  min-width: 0;
+  margin: 0;
   font-size: 1rem;
   color: var(--text-primary);
-  border-bottom: 1px solid var(--border-light);
-  padding-bottom: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.detail-translate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.detail-translate-btn .icon-svg,
+.detail-translate-btn .btn-spinner {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .detail-description-text {
   line-height: 1.7;
   color: var(--text-secondary);
   white-space: normal;
+}
+
+.detail-description-paragraph + .detail-description-paragraph {
+  margin-top: 24px;
+}
+
+.detail-description-original > :first-child {
+  margin-top: 0;
+}
+
+.detail-description-original > :last-child {
+  margin-bottom: 0;
+}
+
+.detail-paragraph-translation {
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-left: 3px solid rgba(79, 70, 229, 0.38);
+  border-radius: 6px;
+  background: rgba(79, 70, 229, 0.045);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.detail-paragraph-translation.hidden {
+  display: none;
+}
+
+.detail-paragraph-translation.is-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-tertiary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.detail-paragraph-translation.is-loading .btn-spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.detail-paragraph-translation.is-error {
+  border-left-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.06);
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.detail-paragraph-translation.detail-translation-enter {
+  animation: detailTranslationEnter var(--duration-300) var(--ease-out);
+}
+
+@keyframes detailTranslationEnter {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Custom Mirror Dropdown */

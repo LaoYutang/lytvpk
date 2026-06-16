@@ -230,6 +230,10 @@ export function GetWorkshopPreferredIP() {
   return window['go']['app']['App']['GetWorkshopPreferredIP']();
 }
 
+export function GetWorkshopTranslateProvider() {
+  return window['go']['app']['App']['GetWorkshopTranslateProvider']();
+}
+
 export function GetWorkshopUpdateCheckEnabled() {
   return window['go']['app']['App']['GetWorkshopUpdateCheckEnabled']();
 }
@@ -390,6 +394,10 @@ export function SetWorkshopPreferredIP(arg1) {
   return window['go']['app']['App']['SetWorkshopPreferredIP'](arg1);
 }
 
+export function SetWorkshopTranslateProvider(arg1) {
+  return window['go']['app']['App']['SetWorkshopTranslateProvider'](arg1);
+}
+
 export function SetWorkshopUpdateCheckEnabled(arg1) {
   return window['go']['app']['App']['SetWorkshopUpdateCheckEnabled'](arg1);
 }
@@ -424,6 +432,10 @@ export function ToggleVPKFile(arg1) {
 
 export function ToggleVPKVisibility(arg1) {
   return window['go']['app']['App']['ToggleVPKVisibility'](arg1);
+}
+
+export function TranslateWorkshopDescription(arg1) {
+  return window['go']['app']['App']['TranslateWorkshopDescription'](arg1);
 }
 
 export function ValidateDirectory(arg1) {

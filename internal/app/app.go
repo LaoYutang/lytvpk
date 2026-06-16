@@ -83,6 +83,7 @@ type App struct {
 	workshopMetaEnabled        bool
 	workshopUpdateCheckEnabled bool
 	workshopBrowserTarget      string
+	workshopTranslateProvider  string
 	migrationVersion           int
 	defaultDirectory           string
 	savedDirectories           []SavedDirectory
@@ -109,6 +110,7 @@ type ConfigFile struct {
 	WorkshopMetaEnabled        *bool            `json:"workshopMetaEnabled,omitempty"`
 	WorkshopUpdateCheckEnabled *bool            `json:"workshopUpdateCheckEnabled,omitempty"`
 	WorkshopBrowserTarget      *string          `json:"workshopBrowserTarget,omitempty"`
+	WorkshopTranslateProvider  *string          `json:"workshopTranslateProvider,omitempty"`
 	DefaultDirectory           string           `json:"defaultDirectory"`
 	SavedDirectories           []SavedDirectory `json:"savedDirectories"`
 	LastActiveDirectory        string           `json:"lastActiveDirectory"`
@@ -231,6 +233,7 @@ func NewApp() *App {
 		workshopPreferredIP:       true,     // 默认开启优选IP
 		workshopMetaEnabled:       true,     // 默认开启工坊meta信息存储
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站
+		workshopTranslateProvider: workshopTranslateProviderMicrosoft,
 		displayMode:               "list",
 		filterLayoutMode:          "compact",
 		boxSelectionEnabled:       true,

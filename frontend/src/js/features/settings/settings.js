@@ -12,6 +12,7 @@ let GetWorkshopIPOptions;
 let GetWorkshopMetaEnabled;
 let GetWorkshopUpdateCheckEnabled;
 let GetWorkshopBrowserTarget;
+let GetWorkshopTranslateProvider;
 let IsSelectingIP;
 let GetCurrentBestIP;
 let GetCurrentBestIPOption;
@@ -20,12 +21,13 @@ let SetWorkshopFixedIP;
 let SetWorkshopMetaEnabled;
 let SetWorkshopUpdateCheckEnabled;
 let SetWorkshopBrowserTarget;
+let SetWorkshopTranslateProvider;
 let CheckModUpdates;
 let EventsOn;
 let switchAppPage;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, CheckModUpdates, EventsOn, switchAppPage } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, CheckModUpdates, EventsOn, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -49,6 +51,7 @@ export async function renderSettingsPageWithDeps() {
       GetWorkshopMetaEnabled,
       GetWorkshopUpdateCheckEnabled,
       GetWorkshopBrowserTarget,
+      GetWorkshopTranslateProvider,
       IsSelectingIP,
       GetCurrentBestIP,
       GetCurrentBestIPOption,
@@ -57,6 +60,7 @@ export async function renderSettingsPageWithDeps() {
       SetWorkshopMetaEnabled,
       SetWorkshopUpdateCheckEnabled,
       SetWorkshopBrowserTarget,
+      SetWorkshopTranslateProvider,
       CheckModUpdates,
       EventsOn,
     });

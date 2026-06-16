@@ -90,6 +90,11 @@ func (a *App) loadConfig() {
 	if config.WorkshopBrowserTarget != nil {
 		a.workshopBrowserTarget = *config.WorkshopBrowserTarget
 	}
+	if config.WorkshopTranslateProvider != nil {
+		if provider, err := normalizeWorkshopTranslateProvider(*config.WorkshopTranslateProvider); err == nil {
+			a.workshopTranslateProvider = provider
+		}
+	}
 	a.defaultDirectory = config.DefaultDirectory
 	a.savedDirectories = cloneSavedDirectories(config.SavedDirectories)
 	a.lastActiveDirectory = config.LastActiveDirectory
@@ -129,6 +134,10 @@ func (a *App) snapshotConfig() ConfigFile {
 	metaEnabled := a.workshopMetaEnabled
 	updateCheckEnabled := a.workshopUpdateCheckEnabled
 	browserTarget := a.workshopBrowserTarget
+	translateProvider := a.workshopTranslateProvider
+	if translateProvider == "" {
+		translateProvider = workshopTranslateProviderMicrosoft
+	}
 	boxSelectionEnabled := a.boxSelectionEnabled
 	ctrlClickSelectionEnabled := a.ctrlClickSelectionEnabled
 
@@ -139,6 +148,7 @@ func (a *App) snapshotConfig() ConfigFile {
 		WorkshopMetaEnabled:        &metaEnabled,
 		WorkshopUpdateCheckEnabled: &updateCheckEnabled,
 		WorkshopBrowserTarget:      &browserTarget,
+		WorkshopTranslateProvider:  &translateProvider,
 		DefaultDirectory:           a.defaultDirectory,
 		SavedDirectories:           cloneSavedDirectories(a.savedDirectories),
 		LastActiveDirectory:        a.lastActiveDirectory,
@@ -194,6 +204,14 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.theme = config.Theme
 	a.ignoredVersion = config.IgnoredVersion
 	a.lastUpdateCheckTime = config.LastUpdateCheckTime
+	if config.WorkshopTranslateProvider != nil {
+		provider, err := normalizeWorkshopTranslateProvider(*config.WorkshopTranslateProvider)
+		if err != nil {
+			a.mu.Unlock()
+			return err
+		}
+		a.workshopTranslateProvider = provider
+	}
 	if config.MigrationVersion > a.migrationVersion {
 		a.migrationVersion = config.MigrationVersion
 	}

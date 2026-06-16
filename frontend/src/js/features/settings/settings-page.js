@@ -18,6 +18,7 @@ export async function renderSettingsPage({
   GetWorkshopMetaEnabled,
   GetWorkshopUpdateCheckEnabled,
   GetWorkshopBrowserTarget,
+  GetWorkshopTranslateProvider,
   IsSelectingIP,
   GetCurrentBestIP,
   GetCurrentBestIPOption,
@@ -26,6 +27,7 @@ export async function renderSettingsPage({
   SetWorkshopMetaEnabled,
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
+  SetWorkshopTranslateProvider,
   CheckModUpdates,
   EventsOn,
 }) {
@@ -38,6 +40,7 @@ export async function renderSettingsPage({
   const metaEnabled = await GetWorkshopMetaEnabled();
   const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
   const browserTarget = await GetWorkshopBrowserTarget();
+  const translateProvider = await GetWorkshopTranslateProvider();
   const isSelecting = enabled ? await IsSelectingIP() : false;
   const ipOptions = [];
   const bestIPOption = enabled && !isSelecting ? await GetCurrentBestIPOption() : null;
@@ -202,6 +205,25 @@ export async function renderSettingsPage({
               </div>
             </div>
           </div>
+          <div class="setting-card">
+            <div class="setting-card-title">描述翻译</div>
+            <div class="setting-row">
+              <div class="setting-row-info">
+                <div class="setting-row-label">翻译服务</div>
+                <div class="setting-row-desc">用于创意工坊详情页的描述翻译</div>
+              </div>
+              <div class="mode-toggle-group settings-translate-provider-toggle">
+                <label class="mode-option ${translateProvider !== "yandex" ? "active" : ""}">
+                  <input type="radio" name="settings-translate-provider" value="microsoft" ${translateProvider !== "yandex" ? "checked" : ""}>
+                  <span class="mode-text">微软</span>
+                </label>
+                <label class="mode-option ${translateProvider === "yandex" ? "active" : ""}">
+                  <input type="radio" name="settings-translate-provider" value="yandex" ${translateProvider === "yandex" ? "checked" : ""}>
+                  <span class="mode-text">Yandex</span>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         </div>
@@ -216,6 +238,7 @@ export async function renderSettingsPage({
     metaEnabled,
     updateCheckEnabled,
     browserTarget,
+    translateProvider,
     appState,
     getConfig,
     saveConfig,
@@ -232,6 +255,7 @@ export async function renderSettingsPage({
     SetWorkshopMetaEnabled,
     SetWorkshopUpdateCheckEnabled,
     SetWorkshopBrowserTarget,
+    SetWorkshopTranslateProvider,
     CheckModUpdates,
     EventsOn,
   });
@@ -477,6 +501,19 @@ function bindSettingsPage(deps) {
       config.workshopBrowserTarget = radio.value;
       deps.saveConfig(config);
       deps.showNotification(radio.value === "mirror" ? "已切换到镜像站" : "已切换到 Steam 官方", "success");
+    });
+  });
+
+  document.querySelectorAll('input[name="settings-translate-provider"]').forEach((radio) => {
+    radio.addEventListener("change", async () => {
+      if (!radio.checked) return;
+      await deps.SetWorkshopTranslateProvider(radio.value);
+      const config = deps.getConfig();
+      config.workshopTranslateProvider = radio.value;
+      deps.saveConfig(config);
+      radio.closest(".mode-toggle-group")?.querySelectorAll(".mode-option").forEach((option) => option.classList.remove("active"));
+      radio.closest(".mode-option")?.classList.add("active");
+      deps.showNotification(radio.value === "microsoft" ? "已切换到微软翻译" : "已切换到 Yandex 翻译", "success");
     });
   });
 

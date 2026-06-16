@@ -35,6 +35,7 @@ export namespace app {
 	    workshopMetaEnabled?: boolean;
 	    workshopUpdateCheckEnabled?: boolean;
 	    workshopBrowserTarget?: string;
+	    workshopTranslateProvider?: string;
 	    defaultDirectory: string;
 	    savedDirectories: SavedDirectory[];
 	    lastActiveDirectory: string;
@@ -59,6 +60,7 @@ export namespace app {
 	        this.workshopMetaEnabled = source["workshopMetaEnabled"];
 	        this.workshopUpdateCheckEnabled = source["workshopUpdateCheckEnabled"];
 	        this.workshopBrowserTarget = source["workshopBrowserTarget"];
+	        this.workshopTranslateProvider = source["workshopTranslateProvider"];
 	        this.defaultDirectory = source["defaultDirectory"];
 	        this.savedDirectories = this.convertValues(source["savedDirectories"], SavedDirectory);
 	        this.lastActiveDirectory = source["lastActiveDirectory"];
@@ -1053,6 +1055,20 @@ export namespace app {
 	        this.sort = source["sort"];
 	        this.tags = source["tags"];
 	        this.filetype = source["filetype"];
+	    }
+	}
+	export class WorkshopTranslationResult {
+	    provider: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkshopTranslationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.text = source["text"];
 	    }
 	}
 	export class WorkshopWatchLaterItem {

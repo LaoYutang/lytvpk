@@ -24,6 +24,7 @@ const DEFAULT_CONFIG = {
   workshopMetaEnabled: true,
   workshopUpdateCheckEnabled: false,
   workshopBrowserTarget: "mirror",
+  workshopTranslateProvider: "microsoft",
   defaultDirectory: "",
   savedDirectories: [],
   lastActiveDirectory: "",
@@ -119,6 +120,10 @@ function normalizeConfig(config = {}) {
     next.filterLayoutMode || DEFAULT_CONFIG.filterLayoutMode;
   next.workshopBrowserTarget =
     next.workshopBrowserTarget || DEFAULT_CONFIG.workshopBrowserTarget;
+  next.workshopTranslateProvider =
+    next.workshopTranslateProvider === "yandex"
+      ? "yandex"
+      : DEFAULT_CONFIG.workshopTranslateProvider;
   next.migrationVersion = Number(next.migrationVersion) || 0;
 
   return cloneConfig(next);

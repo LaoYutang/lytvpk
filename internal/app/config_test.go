@@ -22,6 +22,7 @@ func newConfigTestApp(t *testing.T) *App {
 		workshopPreferredIP:       true,
 		workshopMetaEnabled:       true,
 		workshopBrowserTarget:     "mirror",
+		workshopTranslateProvider: workshopTranslateProviderMicrosoft,
 		displayMode:               "list",
 		filterLayoutMode:          "compact",
 		boxSelectionEnabled:       true,
@@ -40,6 +41,9 @@ func TestConfigDefaultsWithoutFile(t *testing.T) {
 	}
 	if config.WorkshopBrowserTarget == nil || *config.WorkshopBrowserTarget != "mirror" {
 		t.Fatalf("expected browser target mirror, got %#v", config.WorkshopBrowserTarget)
+	}
+	if config.WorkshopTranslateProvider == nil || *config.WorkshopTranslateProvider != workshopTranslateProviderMicrosoft {
+		t.Fatalf("expected translate provider microsoft, got %#v", config.WorkshopTranslateProvider)
 	}
 	if config.WorkshopMetaEnabled == nil || !*config.WorkshopMetaEnabled {
 		t.Fatalf("expected workshop meta storage to default to true")

@@ -5,6 +5,8 @@ export const workshopDeps = {
   BrowserOpenURL: undefined,
   FetchWorkshopList: undefined,
   FetchWorkshopDetail: undefined,
+  TranslateWorkshopDescription: undefined,
+  GetWorkshopTranslateProvider: undefined,
   GetWorkshopBrowserTarget: undefined,
   IsSelectingIP: undefined,
   closeModal: undefined,
