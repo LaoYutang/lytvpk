@@ -13,6 +13,9 @@ let GetWorkshopMetaEnabled;
 let GetWorkshopUpdateCheckEnabled;
 let GetWorkshopBrowserTarget;
 let GetWorkshopTranslateProvider;
+let GetWorkshopTranslateCustomBaseURL;
+let GetWorkshopTranslateCustomModelId;
+let HasWorkshopTranslateCustomAPIKey;
 let IsSelectingIP;
 let GetCurrentBestIP;
 let GetCurrentBestIPOption;
@@ -22,12 +25,15 @@ let SetWorkshopMetaEnabled;
 let SetWorkshopUpdateCheckEnabled;
 let SetWorkshopBrowserTarget;
 let SetWorkshopTranslateProvider;
+let SetWorkshopTranslateCustomBaseURL;
+let SetWorkshopTranslateCustomModelId;
+let SetWorkshopTranslateCustomAPIKey;
 let CheckModUpdates;
 let EventsOn;
 let switchAppPage;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, CheckModUpdates, EventsOn, switchAppPage } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, GetWorkshopTranslateCustomBaseURL, GetWorkshopTranslateCustomModelId, HasWorkshopTranslateCustomAPIKey, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, SetWorkshopTranslateCustomBaseURL, SetWorkshopTranslateCustomModelId, SetWorkshopTranslateCustomAPIKey, CheckModUpdates, EventsOn, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -52,6 +58,9 @@ export async function renderSettingsPageWithDeps() {
       GetWorkshopUpdateCheckEnabled,
       GetWorkshopBrowserTarget,
       GetWorkshopTranslateProvider,
+      GetWorkshopTranslateCustomBaseURL,
+      GetWorkshopTranslateCustomModelId,
+      HasWorkshopTranslateCustomAPIKey,
       IsSelectingIP,
       GetCurrentBestIP,
       GetCurrentBestIPOption,
@@ -61,6 +70,9 @@ export async function renderSettingsPageWithDeps() {
       SetWorkshopUpdateCheckEnabled,
       SetWorkshopBrowserTarget,
       SetWorkshopTranslateProvider,
+      SetWorkshopTranslateCustomBaseURL,
+      SetWorkshopTranslateCustomModelId,
+      SetWorkshopTranslateCustomAPIKey,
       CheckModUpdates,
       EventsOn,
     });

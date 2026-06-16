@@ -230,6 +230,14 @@ export function GetWorkshopPreferredIP() {
   return window['go']['app']['App']['GetWorkshopPreferredIP']();
 }
 
+export function GetWorkshopTranslateCustomBaseURL() {
+  return window['go']['app']['App']['GetWorkshopTranslateCustomBaseURL']();
+}
+
+export function GetWorkshopTranslateCustomModelId() {
+  return window['go']['app']['App']['GetWorkshopTranslateCustomModelId']();
+}
+
 export function GetWorkshopTranslateProvider() {
   return window['go']['app']['App']['GetWorkshopTranslateProvider']();
 }
@@ -256,6 +264,10 @@ export function HasActiveDownloads() {
 
 export function HasActivePanelUploads() {
   return window['go']['app']['App']['HasActivePanelUploads']();
+}
+
+export function HasWorkshopTranslateCustomAPIKey() {
+  return window['go']['app']['App']['HasWorkshopTranslateCustomAPIKey']();
 }
 
 export function IsSelectingIP() {
@@ -392,6 +404,18 @@ export function SetWorkshopMetaEnabled(arg1) {
 
 export function SetWorkshopPreferredIP(arg1) {
   return window['go']['app']['App']['SetWorkshopPreferredIP'](arg1);
+}
+
+export function SetWorkshopTranslateCustomAPIKey(arg1) {
+  return window['go']['app']['App']['SetWorkshopTranslateCustomAPIKey'](arg1);
+}
+
+export function SetWorkshopTranslateCustomBaseURL(arg1) {
+  return window['go']['app']['App']['SetWorkshopTranslateCustomBaseURL'](arg1);
+}
+
+export function SetWorkshopTranslateCustomModelId(arg1) {
+  return window['go']['app']['App']['SetWorkshopTranslateCustomModelId'](arg1);
 }
 
 export function SetWorkshopTranslateProvider(arg1) {

@@ -19,6 +19,9 @@ export async function renderSettingsPage({
   GetWorkshopUpdateCheckEnabled,
   GetWorkshopBrowserTarget,
   GetWorkshopTranslateProvider,
+  GetWorkshopTranslateCustomBaseURL,
+  GetWorkshopTranslateCustomModelId,
+  HasWorkshopTranslateCustomAPIKey,
   IsSelectingIP,
   GetCurrentBestIP,
   GetCurrentBestIPOption,
@@ -28,6 +31,9 @@ export async function renderSettingsPage({
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
   SetWorkshopTranslateProvider,
+  SetWorkshopTranslateCustomBaseURL,
+  SetWorkshopTranslateCustomModelId,
+  SetWorkshopTranslateCustomAPIKey,
   CheckModUpdates,
   EventsOn,
 }) {
@@ -41,6 +47,9 @@ export async function renderSettingsPage({
   const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
   const browserTarget = await GetWorkshopBrowserTarget();
   const translateProvider = await GetWorkshopTranslateProvider();
+  const customBaseURL = await GetWorkshopTranslateCustomBaseURL();
+  const customModelId = await GetWorkshopTranslateCustomModelId();
+  const hasCustomAPIKey = await HasWorkshopTranslateCustomAPIKey();
   const isSelecting = enabled ? await IsSelectingIP() : false;
   const ipOptions = [];
   const bestIPOption = enabled && !isSelecting ? await GetCurrentBestIPOption() : null;
@@ -213,14 +222,26 @@ export async function renderSettingsPage({
                 <div class="setting-row-desc">用于创意工坊详情页的描述翻译</div>
               </div>
               <div class="mode-toggle-group settings-translate-provider-toggle">
-                <label class="mode-option ${translateProvider !== "yandex" ? "active" : ""}">
-                  <input type="radio" name="settings-translate-provider" value="microsoft" ${translateProvider !== "yandex" ? "checked" : ""}>
+                <label class="mode-option ${translateProvider === "microsoft" ? "active" : ""}">
+                  <input type="radio" name="settings-translate-provider" value="microsoft" ${translateProvider === "microsoft" ? "checked" : ""}>
                   <span class="mode-text">微软</span>
                 </label>
                 <label class="mode-option ${translateProvider === "yandex" ? "active" : ""}">
                   <input type="radio" name="settings-translate-provider" value="yandex" ${translateProvider === "yandex" ? "checked" : ""}>
                   <span class="mode-text">Yandex</span>
                 </label>
+                <label class="mode-option ${translateProvider === "custom" ? "active" : ""}">
+                  <input type="radio" name="settings-translate-provider" value="custom" ${translateProvider === "custom" ? "checked" : ""}>
+                  <span class="mode-text">自定义AI</span>
+                </label>
+              </div>
+            </div>
+            <div id="settings-translate-custom-section" class="setting-indent" style="${translateProvider === "custom" ? "" : "display:none"}">
+              <div class="setting-row-label" style="margin-bottom:8px">自定义AI配置</div>
+              <div class="setting-custom-input-group" style="display:flex;flex-direction:column;gap:8px">
+                <input type="text" id="settings-translate-custom-baseurl" class="form-input" value="${escapeAttr(customBaseURL)}" placeholder="Base URL，如 https://api.openai.com/v1">
+                <input type="password" id="settings-translate-custom-apikey" class="form-input" value="" placeholder="API Key${hasCustomAPIKey ? "（已设置）" : ""}">
+                <input type="text" id="settings-translate-custom-modelid" class="form-input" value="${escapeAttr(customModelId)}" placeholder="模型ID，如 gpt-4o">
               </div>
             </div>
           </div>
@@ -256,6 +277,9 @@ export async function renderSettingsPage({
     SetWorkshopUpdateCheckEnabled,
     SetWorkshopBrowserTarget,
     SetWorkshopTranslateProvider,
+    SetWorkshopTranslateCustomBaseURL,
+    SetWorkshopTranslateCustomModelId,
+    SetWorkshopTranslateCustomAPIKey,
     CheckModUpdates,
     EventsOn,
   });
@@ -504,6 +528,8 @@ function bindSettingsPage(deps) {
     });
   });
 
+  const customSection = document.getElementById("settings-translate-custom-section");
+
   document.querySelectorAll('input[name="settings-translate-provider"]').forEach((radio) => {
     radio.addEventListener("change", async () => {
       if (!radio.checked) return;
@@ -513,8 +539,52 @@ function bindSettingsPage(deps) {
       deps.saveConfig(config);
       radio.closest(".mode-toggle-group")?.querySelectorAll(".mode-option").forEach((option) => option.classList.remove("active"));
       radio.closest(".mode-option")?.classList.add("active");
-      deps.showNotification(radio.value === "microsoft" ? "已切换到微软翻译" : "已切换到 Yandex 翻译", "success");
+      if (customSection) {
+        customSection.style.display = radio.value === "custom" ? "" : "none";
+      }
+      const messages = {
+        microsoft: "已切换到微软翻译",
+        yandex: "已切换到 Yandex 翻译",
+        custom: "已切换到自定义AI翻译",
+      };
+      deps.showNotification(messages[radio.value] || "已切换翻译服务", "success");
     });
+  });
+
+  // 自定义AI配置输入框事件
+  const customBaseURLInput = document.getElementById("settings-translate-custom-baseurl");
+  const customAPIKeyInput = document.getElementById("settings-translate-custom-apikey");
+  const customModelIdInput = document.getElementById("settings-translate-custom-modelid");
+
+  customBaseURLInput?.addEventListener("change", async () => {
+    const url = customBaseURLInput.value.trim();
+    await deps.SetWorkshopTranslateCustomBaseURL(url);
+    const config = deps.getConfig();
+    config.workshopTranslateCustomBaseURL = url;
+    deps.saveConfig(config);
+    deps.showNotification("已更新自定义AI Base URL", "success");
+  });
+
+  customAPIKeyInput?.addEventListener("change", async () => {
+    const key = customAPIKeyInput.value.trim();
+    if (!key) return;
+    await deps.SetWorkshopTranslateCustomAPIKey(key);
+    const config = deps.getConfig();
+    config.workshopTranslateCustomAPIKey = "已设置";
+    deps.saveConfig(config);
+    customAPIKeyInput.value = "";
+    const newPlaceholder = customAPIKeyInput.getAttribute("placeholder")?.replace("（未设置）", "（已设置）").replace("API Key", "API Key（已设置）");
+    if (newPlaceholder) customAPIKeyInput.setAttribute("placeholder", newPlaceholder);
+    deps.showNotification("已更新自定义AI API Key", "success");
+  });
+
+  customModelIdInput?.addEventListener("change", async () => {
+    const modelId = customModelIdInput.value.trim();
+    await deps.SetWorkshopTranslateCustomModelId(modelId);
+    const config = deps.getConfig();
+    config.workshopTranslateCustomModelId = modelId;
+    deps.saveConfig(config);
+    deps.showNotification("已更新自定义AI模型ID", "success");
   });
 
 }

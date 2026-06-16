@@ -121,8 +121,8 @@ function normalizeConfig(config = {}) {
   next.workshopBrowserTarget =
     next.workshopBrowserTarget || DEFAULT_CONFIG.workshopBrowserTarget;
   next.workshopTranslateProvider =
-    next.workshopTranslateProvider === "yandex"
-      ? "yandex"
+    next.workshopTranslateProvider === "yandex" || next.workshopTranslateProvider === "custom"
+      ? next.workshopTranslateProvider
       : DEFAULT_CONFIG.workshopTranslateProvider;
   next.migrationVersion = Number(next.migrationVersion) || 0;
 

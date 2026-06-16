@@ -118,6 +118,10 @@ export function GetWorkshopMetaEnabled():Promise<boolean>;
 
 export function GetWorkshopPreferredIP():Promise<boolean>;
 
+export function GetWorkshopTranslateCustomBaseURL():Promise<string>;
+
+export function GetWorkshopTranslateCustomModelId():Promise<string>;
+
 export function GetWorkshopTranslateProvider():Promise<string>;
 
 export function GetWorkshopUpdateCheckEnabled():Promise<boolean>;
@@ -131,6 +135,8 @@ export function HandleProtocolURL(arg1:string):Promise<void>;
 export function HasActiveDownloads():Promise<boolean>;
 
 export function HasActivePanelUploads():Promise<boolean>;
+
+export function HasWorkshopTranslateCustomAPIKey():Promise<boolean>;
 
 export function IsSelectingIP():Promise<boolean>;
 
@@ -199,6 +205,12 @@ export function SetWorkshopFixedIP(arg1:string):Promise<void>;
 export function SetWorkshopMetaEnabled(arg1:boolean):Promise<void>;
 
 export function SetWorkshopPreferredIP(arg1:boolean):Promise<void>;
+
+export function SetWorkshopTranslateCustomAPIKey(arg1:string):Promise<void>;
+
+export function SetWorkshopTranslateCustomBaseURL(arg1:string):Promise<void>;
+
+export function SetWorkshopTranslateCustomModelId(arg1:string):Promise<void>;
 
 export function SetWorkshopTranslateProvider(arg1:string):Promise<void>;
 

@@ -95,6 +95,9 @@ func (a *App) loadConfig() {
 			a.workshopTranslateProvider = provider
 		}
 	}
+	a.workshopTranslateCustomBaseURL = config.WorkshopTranslateCustomBaseURL
+	a.workshopTranslateCustomAPIKey = config.WorkshopTranslateCustomAPIKey
+	a.workshopTranslateCustomModelId = config.WorkshopTranslateCustomModelId
 	a.defaultDirectory = config.DefaultDirectory
 	a.savedDirectories = cloneSavedDirectories(config.SavedDirectories)
 	a.lastActiveDirectory = config.LastActiveDirectory
@@ -142,24 +145,27 @@ func (a *App) snapshotConfig() ConfigFile {
 	ctrlClickSelectionEnabled := a.ctrlClickSelectionEnabled
 
 	return ConfigFile{
-		ModRotationConfig:          a.modRotationConfig,
-		WorkshopPreferredIP:        &preferredIP,
-		WorkshopFixedIP:            &fixedIP,
-		WorkshopMetaEnabled:        &metaEnabled,
-		WorkshopUpdateCheckEnabled: &updateCheckEnabled,
-		WorkshopBrowserTarget:      &browserTarget,
-		WorkshopTranslateProvider:  &translateProvider,
-		DefaultDirectory:           a.defaultDirectory,
-		SavedDirectories:           cloneSavedDirectories(a.savedDirectories),
-		LastActiveDirectory:        a.lastActiveDirectory,
-		DisplayMode:                defaultString(a.displayMode, "list"),
-		FilterLayoutMode:           defaultString(a.filterLayoutMode, "compact"),
-		BoxSelectionEnabled:        &boxSelectionEnabled,
-		CtrlClickSelectionEnabled:  &ctrlClickSelectionEnabled,
-		Theme:                      a.theme,
-		IgnoredVersion:             a.ignoredVersion,
-		LastUpdateCheckTime:        a.lastUpdateCheckTime,
-		MigrationVersion:           a.migrationVersion,
+		ModRotationConfig:              a.modRotationConfig,
+		WorkshopPreferredIP:            &preferredIP,
+		WorkshopFixedIP:                &fixedIP,
+		WorkshopMetaEnabled:            &metaEnabled,
+		WorkshopUpdateCheckEnabled:     &updateCheckEnabled,
+		WorkshopBrowserTarget:          &browserTarget,
+		WorkshopTranslateProvider:      &translateProvider,
+		WorkshopTranslateCustomBaseURL: a.workshopTranslateCustomBaseURL,
+		WorkshopTranslateCustomAPIKey:  a.workshopTranslateCustomAPIKey,
+		WorkshopTranslateCustomModelId: a.workshopTranslateCustomModelId,
+		DefaultDirectory:               a.defaultDirectory,
+		SavedDirectories:               cloneSavedDirectories(a.savedDirectories),
+		LastActiveDirectory:            a.lastActiveDirectory,
+		DisplayMode:                    defaultString(a.displayMode, "list"),
+		FilterLayoutMode:               defaultString(a.filterLayoutMode, "compact"),
+		BoxSelectionEnabled:            &boxSelectionEnabled,
+		CtrlClickSelectionEnabled:      &ctrlClickSelectionEnabled,
+		Theme:                          a.theme,
+		IgnoredVersion:                 a.ignoredVersion,
+		LastUpdateCheckTime:            a.lastUpdateCheckTime,
+		MigrationVersion:               a.migrationVersion,
 	}
 }
 
@@ -212,6 +218,8 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 		}
 		a.workshopTranslateProvider = provider
 	}
+	a.workshopTranslateCustomBaseURL = config.WorkshopTranslateCustomBaseURL
+	a.workshopTranslateCustomModelId = config.WorkshopTranslateCustomModelId
 	if config.MigrationVersion > a.migrationVersion {
 		a.migrationVersion = config.MigrationVersion
 	}

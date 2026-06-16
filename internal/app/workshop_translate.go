@@ -19,6 +19,7 @@ import (
 const (
 	workshopTranslateProviderYandex    = "yandex"
 	workshopTranslateProviderMicrosoft = "microsoft"
+	workshopTranslateProviderCustom    = "custom"
 	workshopTranslateTargetYandex      = "zh"
 	workshopTranslateTargetMicrosoft   = "zh-Hans"
 	yandexTranslateUserAgent           = "ru.yandex.translate/3.20.2024"
@@ -41,6 +42,8 @@ func normalizeWorkshopTranslateProvider(provider string) (string, error) {
 		return workshopTranslateProviderMicrosoft, nil
 	case workshopTranslateProviderYandex:
 		return workshopTranslateProviderYandex, nil
+	case workshopTranslateProviderCustom:
+		return workshopTranslateProviderCustom, nil
 	default:
 		return "", fmt.Errorf("不支持的翻译类型: %s", provider)
 	}
@@ -83,6 +86,12 @@ func (a *App) TranslateWorkshopDescription(text string) (WorkshopTranslationResu
 			return WorkshopTranslationResult{}, err
 		}
 		return WorkshopTranslationResult{Provider: workshopTranslateProviderYandex, Text: translated}, nil
+	case workshopTranslateProviderCustom:
+		translated, err := a.translateWorkshopDescriptionWithCustom(text)
+		if err != nil {
+			return WorkshopTranslationResult{}, err
+		}
+		return WorkshopTranslationResult{Provider: workshopTranslateProviderCustom, Text: translated}, nil
 	default:
 		translated, err := translateWorkshopDescriptionWithMicrosoft(text)
 		if err != nil {
@@ -307,4 +316,136 @@ var microsoftTranslatePrivateKey = []byte{
 	0x6e, 0x4d, 0xaa, 0xc9, 0xa3, 0x70, 0x12, 0x35,
 	0xc7, 0xeb, 0x12, 0xf6, 0xe8, 0x23, 0x07, 0x9e,
 	0x47, 0x10, 0x95, 0x91, 0x88, 0x55, 0xd8, 0x17,
+}
+
+// --- 自定义AI翻译 ---
+
+type openAIChatResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+	Error *struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+	} `json:"error,omitempty"`
+}
+
+func (a *App) translateWorkshopDescriptionWithCustom(text string) (string, error) {
+	a.mu.RLock()
+	baseURL := a.workshopTranslateCustomBaseURL
+	encryptedAPIKey := a.workshopTranslateCustomAPIKey
+	modelID := a.workshopTranslateCustomModelId
+	a.mu.RUnlock()
+
+	if baseURL == "" {
+		return "", fmt.Errorf("自定义AI翻译Base URL未设置")
+	}
+	if encryptedAPIKey == "" {
+		return "", fmt.Errorf("自定义AI翻译API Key未设置")
+	}
+	if modelID == "" {
+		return "", fmt.Errorf("自定义AI翻译模型ID未设置")
+	}
+
+	apiKey, err := unprotectSecret(encryptedAPIKey)
+	if err != nil {
+		return "", fmt.Errorf("解密自定义AI翻译API Key失败: %w", err)
+	}
+
+	endpoint := strings.TrimRight(baseURL, "/") + "/chat/completions"
+
+	payload, err := json.Marshal(map[string]interface{}{
+		"model": modelID,
+		"messages": []map[string]string{
+			{
+				"role":    "system",
+				"content": "你是一位专业的翻译助手。请将以下英文内容翻译成中文，保持语义准确、语言自然流畅。直接返回翻译结果，不要添加解释或额外内容。",
+			},
+			{
+				"role":    "user",
+				"content": "请翻译：" + text,
+			},
+		},
+		"temperature": 0.3,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", translateHTTPError(resp)
+	}
+
+	var result openAIChatResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if result.Error != nil && result.Error.Message != "" {
+		return "", fmt.Errorf("自定义AI翻译失败: %s", result.Error.Message)
+	}
+	if len(result.Choices) == 0 || strings.TrimSpace(result.Choices[0].Message.Content) == "" {
+		return "", fmt.Errorf("自定义AI翻译没有返回结果")
+	}
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+}
+
+func (a *App) GetWorkshopTranslateCustomBaseURL() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopTranslateCustomBaseURL
+}
+
+func (a *App) SetWorkshopTranslateCustomBaseURL(url string) {
+	a.mu.Lock()
+	a.workshopTranslateCustomBaseURL = strings.TrimSpace(url)
+	a.mu.Unlock()
+	a.saveConfig()
+}
+
+func (a *App) GetWorkshopTranslateCustomModelId() string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopTranslateCustomModelId
+}
+
+func (a *App) SetWorkshopTranslateCustomModelId(modelID string) {
+	a.mu.Lock()
+	a.workshopTranslateCustomModelId = strings.TrimSpace(modelID)
+	a.mu.Unlock()
+	a.saveConfig()
+}
+
+func (a *App) SetWorkshopTranslateCustomAPIKey(key string) error {
+	encrypted, err := protectSecret(strings.TrimSpace(key))
+	if err != nil {
+		return err
+	}
+	a.mu.Lock()
+	a.workshopTranslateCustomAPIKey = encrypted
+	a.mu.Unlock()
+	a.saveConfig()
+	return nil
+}
+
+func (a *App) HasWorkshopTranslateCustomAPIKey() bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.workshopTranslateCustomAPIKey != ""
 }

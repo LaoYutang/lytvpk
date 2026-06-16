@@ -36,6 +36,9 @@ export namespace app {
 	    workshopUpdateCheckEnabled?: boolean;
 	    workshopBrowserTarget?: string;
 	    workshopTranslateProvider?: string;
+	    workshopTranslateCustomBaseURL?: string;
+	    workshopTranslateCustomAPIKey?: string;
+	    workshopTranslateCustomModelId?: string;
 	    defaultDirectory: string;
 	    savedDirectories: SavedDirectory[];
 	    lastActiveDirectory: string;
@@ -61,6 +64,9 @@ export namespace app {
 	        this.workshopUpdateCheckEnabled = source["workshopUpdateCheckEnabled"];
 	        this.workshopBrowserTarget = source["workshopBrowserTarget"];
 	        this.workshopTranslateProvider = source["workshopTranslateProvider"];
+	        this.workshopTranslateCustomBaseURL = source["workshopTranslateCustomBaseURL"];
+	        this.workshopTranslateCustomAPIKey = source["workshopTranslateCustomAPIKey"];
+	        this.workshopTranslateCustomModelId = source["workshopTranslateCustomModelId"];
 	        this.defaultDirectory = source["defaultDirectory"];
 	        this.savedDirectories = this.convertValues(source["savedDirectories"], SavedDirectory);
 	        this.lastActiveDirectory = source["lastActiveDirectory"];

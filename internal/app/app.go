@@ -77,50 +77,56 @@ type App struct {
 	singletonMgr           *SingletonManager // 单例管理器
 
 	// 配置项
-	modRotationConfig          RotationConfig
-	workshopPreferredIP        bool
-	workshopFixedIP            string
-	workshopMetaEnabled        bool
-	workshopUpdateCheckEnabled bool
-	workshopBrowserTarget      string
-	workshopTranslateProvider  string
-	migrationVersion           int
-	defaultDirectory           string
-	savedDirectories           []SavedDirectory
-	lastActiveDirectory        string
-	displayMode                string
-	filterLayoutMode           string
-	boxSelectionEnabled        bool
-	ctrlClickSelectionEnabled  bool
-	theme                      string
-	ignoredVersion             string
-	lastUpdateCheckTime        string
-	configDir                  string
-	configPath                 string
-	serversPath                string
-	workshopWatchLaterPath     string
-	problemScanPath            string
+	modRotationConfig              RotationConfig
+	workshopPreferredIP            bool
+	workshopFixedIP                string
+	workshopMetaEnabled            bool
+	workshopUpdateCheckEnabled     bool
+	workshopBrowserTarget          string
+	workshopTranslateProvider      string
+	workshopTranslateCustomBaseURL string
+	workshopTranslateCustomAPIKey  string
+	workshopTranslateCustomModelId string
+	migrationVersion               int
+	defaultDirectory               string
+	savedDirectories               []SavedDirectory
+	lastActiveDirectory            string
+	displayMode                    string
+	filterLayoutMode               string
+	boxSelectionEnabled            bool
+	ctrlClickSelectionEnabled      bool
+	theme                          string
+	ignoredVersion                 string
+	lastUpdateCheckTime            string
+	configDir                      string
+	configPath                     string
+	serversPath                    string
+	workshopWatchLaterPath         string
+	problemScanPath                string
 }
 
 // ConfigFile 定义配置文件结构
 type ConfigFile struct {
-	ModRotationConfig          RotationConfig   `json:"modRotationConfig"`
-	WorkshopPreferredIP        *bool            `json:"workshopPreferredIP,omitempty"`
-	WorkshopFixedIP            *string          `json:"workshopFixedIP,omitempty"`
-	WorkshopMetaEnabled        *bool            `json:"workshopMetaEnabled,omitempty"`
-	WorkshopUpdateCheckEnabled *bool            `json:"workshopUpdateCheckEnabled,omitempty"`
-	WorkshopBrowserTarget      *string          `json:"workshopBrowserTarget,omitempty"`
-	WorkshopTranslateProvider  *string          `json:"workshopTranslateProvider,omitempty"`
-	DefaultDirectory           string           `json:"defaultDirectory"`
-	SavedDirectories           []SavedDirectory `json:"savedDirectories"`
-	LastActiveDirectory        string           `json:"lastActiveDirectory"`
-	DisplayMode                string           `json:"displayMode"`
-	FilterLayoutMode           string           `json:"filterLayoutMode"`
-	BoxSelectionEnabled        *bool            `json:"boxSelectionEnabled,omitempty"`
-	CtrlClickSelectionEnabled  *bool            `json:"ctrlClickSelectionEnabled,omitempty"`
-	Theme                      string           `json:"theme"`
-	IgnoredVersion             string           `json:"ignoredVersion"`
-	LastUpdateCheckTime        string           `json:"lastUpdateCheckTime"`
+	ModRotationConfig              RotationConfig   `json:"modRotationConfig"`
+	WorkshopPreferredIP            *bool            `json:"workshopPreferredIP,omitempty"`
+	WorkshopFixedIP                *string          `json:"workshopFixedIP,omitempty"`
+	WorkshopMetaEnabled            *bool            `json:"workshopMetaEnabled,omitempty"`
+	WorkshopUpdateCheckEnabled     *bool            `json:"workshopUpdateCheckEnabled,omitempty"`
+	WorkshopBrowserTarget          *string          `json:"workshopBrowserTarget,omitempty"`
+	WorkshopTranslateProvider      *string          `json:"workshopTranslateProvider,omitempty"`
+	WorkshopTranslateCustomBaseURL string           `json:"workshopTranslateCustomBaseURL,omitempty"`
+	WorkshopTranslateCustomAPIKey  string           `json:"workshopTranslateCustomAPIKey,omitempty"`
+	WorkshopTranslateCustomModelId string           `json:"workshopTranslateCustomModelId,omitempty"`
+	DefaultDirectory               string           `json:"defaultDirectory"`
+	SavedDirectories               []SavedDirectory `json:"savedDirectories"`
+	LastActiveDirectory            string           `json:"lastActiveDirectory"`
+	DisplayMode                    string           `json:"displayMode"`
+	FilterLayoutMode               string           `json:"filterLayoutMode"`
+	BoxSelectionEnabled            *bool            `json:"boxSelectionEnabled,omitempty"`
+	CtrlClickSelectionEnabled      *bool            `json:"ctrlClickSelectionEnabled,omitempty"`
+	Theme                          string           `json:"theme"`
+	IgnoredVersion                 string           `json:"ignoredVersion"`
+	LastUpdateCheckTime            string           `json:"lastUpdateCheckTime"`
 	// migrationVersion=2 表示前端 localStorage 配置已迁移到配置目录。
 	MigrationVersion int `json:"migrationVersion"`
 }
