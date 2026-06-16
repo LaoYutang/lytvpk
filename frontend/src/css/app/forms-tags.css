@@ -260,7 +260,48 @@
   padding: 8px 20px;
 }
 
-/* Rename modal */
+.rename-field-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+
+.rename-field-header .input-label {
+  margin-bottom: 0;
+}
+
+.rename-title-btn {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: var(--leading-tight);
+  cursor: pointer;
+  transition: color var(--duration-150) var(--ease-out);
+}
+
+.rename-title-btn:hover {
+  color: var(--primary-light);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rename-title-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.rename-title-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .input-with-suffix-group {
   display: flex;
   align-items: center;

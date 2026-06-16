@@ -72,6 +72,21 @@ export async function toggleFileVisibility(filePath) {
   }
 }
 
+function sanitizeRenameTitle(title) {
+  const cleaned = String(title || "")
+    .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, " ")
+    .replace(/\.vpk$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(cleaned)) {
+    return `_${cleaned}`;
+  }
+
+  return cleaned;
+}
+
 export async function renameFile(filePath) {
   const file = appState.vpkFiles.find((f) => f.path === filePath);
   if (!file) return;
@@ -94,11 +109,19 @@ export async function renameFile(filePath) {
 
   const modal = document.getElementById("rename-modal");
   const input = document.getElementById("rename-input");
+  const fillFromTitleBtn = document.getElementById("fill-rename-from-title-btn");
   const confirmBtn = document.getElementById("confirm-rename-btn");
   const cancelBtn = document.getElementById("cancel-rename-btn");
   const closeBtn = document.getElementById("close-rename-modal-btn");
+  const modTitle = sanitizeRenameTitle(file.title);
 
   input.value = editName;
+  if (fillFromTitleBtn) {
+    fillFromTitleBtn.disabled = !modTitle;
+    fillFromTitleBtn.title = modTitle
+      ? "使用 addoninfo 中的 Mod 名称"
+      : "未解析到 Mod 名称";
+  }
   modal.classList.remove("hidden");
   input.focus();
   input.select();
@@ -108,7 +131,21 @@ export async function renameFile(filePath) {
     confirmBtn.onclick = null;
     cancelBtn.onclick = null;
     closeBtn.onclick = null;
+    if (fillFromTitleBtn) {
+      fillFromTitleBtn.onclick = null;
+    }
     input.onkeydown = null;
+  };
+
+  const fillFromTitle = () => {
+    if (!modTitle) {
+      showError("未解析到 Mod 名称");
+      return;
+    }
+
+    input.value = modTitle;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   };
 
   const doRename = async () => {
@@ -142,6 +179,9 @@ export async function renameFile(filePath) {
     }
   };
 
+  if (fillFromTitleBtn) {
+    fillFromTitleBtn.onclick = fillFromTitle;
+  }
   confirmBtn.onclick = doRename;
   cancelBtn.onclick = cleanup;
   closeBtn.onclick = cleanup;
