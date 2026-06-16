@@ -316,7 +316,7 @@ func (a *App) compressVPKForUpload(ctx context.Context, vpkPath string) (string,
 		return "", 0, ctx.Err()
 	}
 
-	if err := addFileToZip(zipWriter, vpkPath); err != nil {
+	if err := addFileToZip(zipWriter, vpkPath, ""); err != nil {
 		zipWriter.Close()
 		zipFile.Close()
 		os.Remove(zipPath)

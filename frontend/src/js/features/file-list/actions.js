@@ -194,10 +194,14 @@ export async function exportZipSelected() {
 
   const confirmMessage = `
     <div style="display: flex; flex-direction: column; gap: 12px;">
-      <p>共选择了 ${selectedFiles.length} 个文件，是否同时包含以下附加文件？</p>
+      <p>共选择了 ${selectedFiles.length} 个文件</p>
       <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
         <input type="checkbox" id="export-include-extra" class="file-checkbox" checked>
         <span>缩略图与工坊信息(.meta)文件</span>
+      </label>
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" id="export-rename-to-title" class="file-checkbox">
+        <span>自动重命名为 mod 名称</span>
       </label>
     </div>
   `;
@@ -209,6 +213,7 @@ export async function exportZipSelected() {
       document.getElementById("confirm-modal").classList.add("hidden");
 
       const includeExtra = document.getElementById("export-include-extra").checked;
+      const renameToTitle = document.getElementById("export-rename-to-title").checked;
 
       const cleanup = EventsOn("export-progress", (progress) => {
         updateLoadingMessage(`${progress.message} (${progress.current}/${progress.total})`);
@@ -218,7 +223,11 @@ export async function exportZipSelected() {
       updateLoadingMessage("正在准备导出...");
 
       try {
-        const result = await ExportVPKFilesToZip(selectedFiles, includeExtra);
+        const result = await ExportVPKFilesToZip(
+          selectedFiles,
+          includeExtra,
+          renameToTitle
+        );
         if (result === "cancelled") return;
         showSuccess(result);
       } catch (error) {

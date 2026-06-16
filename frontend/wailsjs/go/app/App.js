@@ -66,8 +66,8 @@ export function ExportServersToFile(arg1) {
   return window['go']['app']['App']['ExportServersToFile'](arg1);
 }
 
-export function ExportVPKFilesToZip(arg1, arg2) {
-  return window['go']['app']['App']['ExportVPKFilesToZip'](arg1, arg2);
+export function ExportVPKFilesToZip(arg1, arg2, arg3) {
+  return window['go']['app']['App']['ExportVPKFilesToZip'](arg1, arg2, arg3);
 }
 
 export function ExtractVPKFrom7z(arg1, arg2) {
