@@ -130,7 +130,7 @@ func (a *App) ForceExit() {
 }
 
 // beforeClose is called when the application is about to close
-func (a *App) beforeClose(ctx context.Context) (prevent bool) {
+func (a *App) beforeClose() (prevent bool) {
 	if a.forceClose {
 		// 关闭单例监听器
 		if a.singletonMgr != nil {
@@ -152,7 +152,7 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) {
 }
 
 func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
-	return a.beforeClose(ctx)
+	return a.beforeClose()
 }
 
 // SetRootDirectory 设置根目录
