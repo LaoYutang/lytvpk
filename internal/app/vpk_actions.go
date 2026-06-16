@@ -5,9 +5,38 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"unicode/utf16"
 	"vpk-manager/internal/parser"
 )
+
+const (
+	windowsMaxPathLength     = 260
+	windowsMaxFilenameLength = 255
+)
+
+func windowsPathLength(value string) int {
+	return len(utf16.Encode([]rune(value)))
+}
+
+func validateWindowsRenamePath(path string, filename string) error {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	filenameLength := windowsPathLength(filename)
+	if filenameLength > windowsMaxFilenameLength {
+		return fmt.Errorf("文件名过长: %d/%d，请缩短名称", filenameLength, windowsMaxFilenameLength)
+	}
+
+	pathLength := windowsPathLength(path)
+	if pathLength > windowsMaxPathLength {
+		return fmt.Errorf("完整路径过长: %d/%d，请缩短名称或移动 Mod 目录", pathLength, windowsMaxPathLength)
+	}
+
+	return nil
+}
 
 func (a *App) GetVPKPreviewImage(filePath string) string {
 	if cached, ok := a.vpkCache.Load(filePath); ok {
@@ -292,6 +321,10 @@ func (a *App) RenameVPKFile(filePath string, newFilename string) (string, error)
 	}
 
 	newPath := filepath.Join(dir, finalFilename)
+
+	if err := validateWindowsRenamePath(newPath, finalFilename); err != nil {
+		return "", err
+	}
 
 	// Check if target exists
 	if _, err := os.Stat(newPath); err == nil {

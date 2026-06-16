@@ -302,6 +302,21 @@
   cursor: not-allowed;
 }
 
+.rename-length-hint {
+  margin-top: var(--spacing-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+}
+
+.rename-length-hint.is-warning {
+  color: var(--warning);
+}
+
+.rename-length-hint.is-error {
+  color: var(--danger);
+}
+
 .input-with-suffix-group {
   display: flex;
   align-items: center;
