@@ -732,6 +732,26 @@ export namespace app {
 	        this.error = source["error"];
 	    }
 	}
+	export class VPKPackResult {
+	    sourceDir: string;
+	    outputPath: string;
+	    totalFiles: number;
+	    packedFiles: number;
+	    outputIsAddons: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new VPKPackResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceDir = source["sourceDir"];
+	        this.outputPath = source["outputPath"];
+	        this.totalFiles = source["totalFiles"];
+	        this.packedFiles = source["packedFiles"];
+	        this.outputIsAddons = source["outputIsAddons"];
+	    }
+	}
 	export class VPKUnpackResult {
 	    sourcePath: string;
 	    outputDir: string;

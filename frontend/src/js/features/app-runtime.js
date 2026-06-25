@@ -14,6 +14,7 @@ import { renderAboutPage } from "./about/about.js";
 import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
 import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
 import { openMDMPReportTool } from "./diagnostics/mdmp-report.js";
+import { openVPKPackTool } from "./diagnostics/vpk-pack.js";
 import {
   configureModelStatsScan,
   openModelStatsScanModal,
@@ -47,7 +48,11 @@ import {
   hideConflictModal,
   startConflictCheck,
 } from "./conflicts/conflicts.js";
-import { configureSettings, showGlobalSettings, renderSettingsPageWithDeps } from "./settings/settings.js";
+import {
+  configureSettings,
+  showGlobalSettings,
+  renderSettingsPageWithDeps,
+} from "./settings/settings.js";
 import {
   initProblemModScanAutoRestore,
   openProblemModScanIntro,
@@ -361,19 +366,22 @@ async function initUpdateCheck() {
 
     // 每小时检查一次是否超过24小时
     if (_updateCheckTimer) clearInterval(_updateCheckTimer);
-    _updateCheckTimer = setInterval(async () => {
-      const last = getConfig().lastUpdateCheckTime;
-      if (!last || Date.now() - Number(last) >= UPDATE_CHECK_INTERVAL) {
-        try {
-          await CheckModUpdates();
-          const nextConfig = getConfig();
-          nextConfig.lastUpdateCheckTime = String(Date.now());
-          saveConfig(nextConfig);
-        } catch (err) {
-          console.warn("定时更新检测失败:", err);
+    _updateCheckTimer = setInterval(
+      async () => {
+        const last = getConfig().lastUpdateCheckTime;
+        if (!last || Date.now() - Number(last) >= UPDATE_CHECK_INTERVAL) {
+          try {
+            await CheckModUpdates();
+            const nextConfig = getConfig();
+            nextConfig.lastUpdateCheckTime = String(Date.now());
+            saveConfig(nextConfig);
+          } catch (err) {
+            console.warn("定时更新检测失败:", err);
+          }
         }
-      }
-    }, 60 * 60 * 1000);
+      },
+      60 * 60 * 1000
+    );
   } catch (err) {
     console.warn("更新检测初始化失败:", err);
   }
@@ -450,6 +458,8 @@ function setupSettingsAndAboutListeners() {
         showConflictModal,
         openVPKUnpackTool,
         openMDMPReportTool,
+        openVPKPackTool,
+        refreshFilesKeepFilter,
       });
     } else if (page === "about") {
       renderAboutPage({
@@ -609,7 +619,9 @@ function setupBatchActionEvents() {
         }
       });
 
-      const dropdown = document.getElementById("batch-disable-dropdown-content");
+      const dropdown = document.getElementById(
+        "batch-disable-dropdown-content"
+      );
       if (dropdown) {
         const willOpen = dropdown.classList.contains("hidden");
         dropdown.classList.toggle("hidden");
@@ -641,7 +653,9 @@ function setupBatchActionEvents() {
 
       const batchUploadBtn = document.getElementById("batch-upload-server-btn");
       if (batchUploadBtn) {
-        const hasServers = getServers().some((s) => s.panelUrl && s.panelPasswordSet);
+        const hasServers = getServers().some(
+          (s) => s.panelUrl && s.panelPasswordSet
+        );
         batchUploadBtn.style.display = hasServers ? "" : "none";
       }
 
@@ -710,7 +724,9 @@ function setupBatchActionEvents() {
     });
   }
 
-  const batchUploadServerBtn = document.getElementById("batch-upload-server-btn");
+  const batchUploadServerBtn = document.getElementById(
+    "batch-upload-server-btn"
+  );
   if (batchUploadServerBtn) {
     batchUploadServerBtn.addEventListener("click", () => {
       const filePaths = Array.from(appState.selectedFiles);
