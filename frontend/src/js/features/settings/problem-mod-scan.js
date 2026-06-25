@@ -4,6 +4,7 @@ import {
   RestoreProblemModScan,
   StartProblemModScan,
   SubmitProblemModScanResult,
+  ToggleVPKFile,
 } from "../../../../wailsjs/go/app/App";
 import { showError, showNotification } from "../../core/toast.js";
 import { refreshFilesKeepFilter } from "../file-list/filters.js";
@@ -199,9 +200,33 @@ function renderFoundSession(session) {
       <p>已恢复查找开始前的启用列表。这个结果基于单个 Mod 导致问题的假设；如果问题仍不稳定，可能是组合冲突或非 Mod 原因。</p>
     </div>
   `;
-  getFooter().innerHTML = `<button type="button" class="btn btn-primary" id="problem-scan-finish">完成</button>`;
+  renderFoundFooter(suspect);
   document.getElementById("problem-scan-finish")?.addEventListener("click", hideModal);
+  document.getElementById("problem-scan-disable-suspect")?.addEventListener("click", (event) => {
+    disableSuspiciousMod(suspect, event.currentTarget);
+  });
   getModal().classList.remove("hidden");
+}
+
+function renderFoundFooter(suspect) {
+  const footer = getFooter();
+  footer.replaceChildren();
+
+  if (suspect?.path) {
+    const disableBtn = document.createElement("button");
+    disableBtn.type = "button";
+    disableBtn.className = "btn btn-danger";
+    disableBtn.id = "problem-scan-disable-suspect";
+    disableBtn.textContent = "禁用问题 Mod";
+    footer.appendChild(disableBtn);
+  }
+
+  const finishBtn = document.createElement("button");
+  finishBtn.type = "button";
+  finishBtn.className = "btn btn-primary";
+  finishBtn.id = "problem-scan-finish";
+  finishBtn.textContent = "完成";
+  footer.appendChild(finishBtn);
 }
 
 function toggleProblemScanCandidateList(session, disabledNames) {
@@ -286,6 +311,39 @@ async function submitProblemScanResult(result, button) {
   } catch (error) {
     showError("提交结果失败: " + error);
     renderActiveSession(activeSession);
+  }
+}
+
+async function disableSuspiciousMod(suspect, button) {
+  if (!suspect?.path) {
+    showError("找不到问题 Mod 文件路径，请刷新后手动禁用");
+    return;
+  }
+
+  setButtonPending(button, "正在禁用...");
+  try {
+    await ToggleVPKFile(suspect.path);
+    await safeRefreshFiles();
+
+    if (button) {
+      button.classList.remove("btn-danger");
+      button.classList.add("btn-secondary");
+      button.textContent = "已禁用问题 Mod";
+      button.disabled = true;
+    }
+
+    const foundBody = document.querySelector(".problem-scan-found");
+    if (foundBody && !foundBody.querySelector(".problem-scan-found-status")) {
+      const status = document.createElement("p");
+      status.className = "problem-scan-found-status";
+      status.textContent = "该 Mod 已移动到 disabled 目录。";
+      foundBody.appendChild(status);
+    }
+
+    showNotification("已禁用问题 Mod", "success");
+  } catch (error) {
+    showError("禁用问题 Mod 失败: " + error);
+    setButtonReady(button, "禁用问题 Mod");
   }
 }
 

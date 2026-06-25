@@ -352,6 +352,10 @@
   width: 28px;
   height: 28px;
 }
+.problem-scan-found-status {
+  color: var(--success) !important;
+  font-weight: 600;
+}
 
 .problem-scan-modal .btn-spinner {
   width: 14px;
