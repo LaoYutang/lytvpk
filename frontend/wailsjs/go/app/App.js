@@ -306,6 +306,10 @@ export function OpenFileLocation(arg1) {
   return window['go']['app']['App']['OpenFileLocation'](arg1);
 }
 
+export function ParseMDMPFile(arg1) {
+  return window['go']['app']['App']['ParseMDMPFile'](arg1);
+}
+
 export function ParseWorkshopID(arg1) {
   return window['go']['app']['App']['ParseWorkshopID'](arg1);
 }
@@ -364,6 +368,10 @@ export function SelectDirectory() {
 
 export function SelectFiles() {
   return window['go']['app']['App']['SelectFiles']();
+}
+
+export function SelectMDMPFile() {
+  return window['go']['app']['App']['SelectMDMPFile']();
 }
 
 export function SelectPanelMapUploadFiles() {

@@ -4,6 +4,7 @@ export async function renderDiagnosticsPage({
   openModelStatsScanModal,
   showConflictModal,
   openVPKUnpackTool,
+  openMDMPReportTool,
 } = {}) {
   const container = document.getElementById("diagnostics-page-content");
   if (!container) return;
@@ -107,6 +108,8 @@ export async function renderDiagnosticsPage({
     </div>
   `;
 
+  appendMDMPReportTool(container, openMDMPReportTool);
+
   document.getElementById("diagnostics-problem-scan-btn")?.addEventListener("click", () => {
     openProblemModScanIntro?.();
   });
@@ -138,4 +141,62 @@ function modelIcon() {
 
 function unpackIcon() {
   return `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
+}
+function appendMDMPReportTool(container, openMDMPReportTool) {
+  const grids = container.querySelectorAll(".diagnostics-tool-grid");
+  const generalGrid = grids[grids.length - 1];
+  if (!generalGrid) return;
+
+  const card = document.createElement("section");
+  card.className = "diagnostics-tool-card";
+
+  const icon = document.createElement("div");
+  icon.className = "diagnostics-tool-icon is-general";
+  icon.appendChild(createDumpIcon());
+
+  const main = document.createElement("div");
+  main.className = "diagnostics-tool-main";
+  const row = document.createElement("div");
+  row.className = "diagnostics-tool-title-row";
+  const title = document.createElement("h3");
+  title.textContent = "崩溃转储查看器";
+  const status = document.createElement("span");
+  status.className = "diagnostics-status";
+  status.textContent = "可解析";
+  row.append(title, status);
+  const desc = document.createElement("p");
+  desc.textContent = "选择 .mdmp 或 .dmp 文件，查看异常、线程、模块、内存范围和原始 stream 信息。";
+  main.append(row, desc);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn btn-primary diagnostics-tool-action";
+  button.textContent = "选择并查看";
+  button.addEventListener("click", () => openMDMPReportTool?.());
+
+  card.append(icon, main, button);
+  generalGrid.appendChild(card);
+}
+
+function createDumpIcon() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon-svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2.3");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  [
+    ["path", { d: "M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" }],
+    ["path", { d: "M14 2v5h5" }],
+    ["path", { d: "M8 13h8" }],
+    ["path", { d: "M8 17h5" }],
+    ["path", { d: "M9 9h1" }],
+  ].forEach(([tag, attrs]) => {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+    svg.appendChild(node);
+  });
+  return svg;
 }

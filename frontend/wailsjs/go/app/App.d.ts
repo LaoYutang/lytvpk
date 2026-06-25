@@ -3,6 +3,7 @@
 import {app} from '../models';
 import {network} from '../models';
 import {parser} from '../models';
+import {minidump} from '../models';
 
 export function AutoDiscoverAddons():Promise<string>;
 
@@ -156,6 +157,8 @@ export function MoveWorkshopToAddons(arg1:string):Promise<void>;
 
 export function OpenFileLocation(arg1:string):Promise<void>;
 
+export function ParseMDMPFile(arg1:string):Promise<minidump.Report>;
+
 export function ParseWorkshopID(arg1:string):Promise<string>;
 
 export function RenameVPKFile(arg1:string,arg2:string):Promise<string>;
@@ -185,6 +188,8 @@ export function SearchVPKFiles(arg1:string,arg2:string,arg3:Array<string>):Promi
 export function SelectDirectory():Promise<string>;
 
 export function SelectFiles():Promise<Array<string>>;
+
+export function SelectMDMPFile():Promise<string>;
 
 export function SelectPanelMapUploadFiles():Promise<Array<string>>;
 

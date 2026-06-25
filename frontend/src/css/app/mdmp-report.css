@@ -1,0 +1,384 @@
+.mdmp-report-modal-content {
+  width: min(1180px, 95vw);
+  max-width: 95vw;
+  height: min(860px, 94vh);
+  max-height: 94vh;
+}
+
+.mdmp-report-header {
+  align-items: flex-start;
+}
+
+.mdmp-report-header,
+.mdmp-report-footer {
+  flex-shrink: 0;
+}
+
+.mdmp-report-title h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.18rem;
+}
+
+.mdmp-report-title p {
+  margin: 4px 0 0;
+  color: var(--text-tertiary);
+  font-size: 0.84rem;
+}
+
+#mdmp-report-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mdmp-report-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mdmp-report-summary {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mdmp-report-metric {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.mdmp-report-metric span {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.mdmp-report-metric strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdmp-report-tabs {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
+.mdmp-report-tab {
+  flex: 0 0 auto;
+  min-width: 72px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mdmp-report-tab:hover,
+.mdmp-report-tab.is-active {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-surface));
+}
+
+.mdmp-report-view {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.mdmp-report-section,
+.mdmp-report-table-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.mdmp-report-section h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.96rem;
+}
+
+.mdmp-report-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mdmp-report-detail {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--bg-app);
+}
+
+.mdmp-report-detail span,
+.mdmp-report-register span {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.mdmp-report-detail strong,
+.mdmp-report-register strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.mdmp-report-register-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mdmp-report-register {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--bg-app);
+}
+
+.mdmp-report-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mdmp-report-search {
+  width: min(320px, 100%);
+}
+
+.mdmp-report-table-toolbar span,
+.mdmp-report-pagination {
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+}
+
+.mdmp-report-table {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-app);
+}
+
+.mdmp-report-table-row {
+  min-width: 760px;
+  display: grid;
+  gap: 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mdmp-report-table-row:last-child {
+  border-bottom: 0;
+}
+
+.mdmp-report-table-row.is-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  font-weight: 800;
+}
+
+.mdmp-report-table-row span {
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  border-right: 1px solid var(--border-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mdmp-report-table-row span:last-child {
+  border-right: 0;
+}
+
+.mdmp-report-pagination {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mdmp-report-page-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mdmp-report-page-btn:hover:not(:disabled) {
+  color: var(--primary);
+  border-color: rgba(79, 70, 229, 0.22);
+}
+
+.mdmp-report-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mdmp-report-hex,
+.mdmp-report-raw {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e5e7eb;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow: auto;
+}
+
+.mdmp-report-raw {
+  max-height: 58vh;
+}
+
+.mdmp-report-warning-list {
+  display: grid;
+  gap: 6px;
+}
+
+.mdmp-report-warning-list div {
+  padding: 8px 10px;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  border-radius: 7px;
+  background: rgba(245, 158, 11, 0.08);
+  color: color-mix(in srgb, var(--warning) 70%, var(--text-primary));
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.mdmp-report-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mdmp-report-loading,
+.mdmp-report-error {
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.mdmp-report-loading h3,
+.mdmp-report-error h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.mdmp-report-loading p,
+.mdmp-report-error p,
+.mdmp-report-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.mdmp-report-spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--primary) 16%, transparent);
+  border-top-color: var(--primary);
+  animation: mdmp-report-spin 0.9s linear infinite;
+}
+
+.mdmp-report-error-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+  font-weight: 800;
+}
+
+@keyframes mdmp-report-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 860px) {
+  .mdmp-report-summary,
+  .mdmp-report-detail-grid,
+  .mdmp-report-register-grid,
+  .mdmp-report-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .mdmp-report-table-toolbar,
+  .mdmp-report-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mdmp-report-search {
+    width: 100%;
+  }
+}

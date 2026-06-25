@@ -13,6 +13,7 @@ import { initTheme, setupThemeToggle } from "../core/theme.js";
 import { renderAboutPage } from "./about/about.js";
 import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
 import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
+import { openMDMPReportTool } from "./diagnostics/mdmp-report.js";
 import {
   configureModelStatsScan,
   openModelStatsScanModal,
@@ -448,6 +449,7 @@ function setupSettingsAndAboutListeners() {
         openModelStatsScanModal,
         showConflictModal,
         openVPKUnpackTool,
+        openMDMPReportTool,
       });
     } else if (page === "about") {
       renderAboutPage({
