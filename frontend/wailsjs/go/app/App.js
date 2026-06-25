@@ -370,6 +370,14 @@ export function SelectPanelMapUploadFiles() {
   return window['go']['app']['App']['SelectPanelMapUploadFiles']();
 }
 
+export function SelectVPKFile() {
+  return window['go']['app']['App']['SelectVPKFile']();
+}
+
+export function SelectVPKUnpackOutputDirectory() {
+  return window['go']['app']['App']['SelectVPKUnpackOutputDirectory']();
+}
+
 export function SendPanelRconCommand(arg1, arg2) {
   return window['go']['app']['App']['SendPanelRconCommand'](arg1, arg2);
 }
@@ -460,6 +468,10 @@ export function ToggleVPKVisibility(arg1) {
 
 export function TranslateWorkshopDescription(arg1) {
   return window['go']['app']['App']['TranslateWorkshopDescription'](arg1);
+}
+
+export function UnpackVPKFile(arg1, arg2) {
+  return window['go']['app']['App']['UnpackVPKFile'](arg1, arg2);
 }
 
 export function ValidateDirectory(arg1) {

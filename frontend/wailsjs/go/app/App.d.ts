@@ -188,6 +188,10 @@ export function SelectFiles():Promise<Array<string>>;
 
 export function SelectPanelMapUploadFiles():Promise<Array<string>>;
 
+export function SelectVPKFile():Promise<string>;
+
+export function SelectVPKUnpackOutputDirectory():Promise<string>;
+
 export function SendPanelRconCommand(arg1:string,arg2:string):Promise<string>;
 
 export function SetModRotation(arg1:app.RotationConfig):Promise<void>;
@@ -233,5 +237,7 @@ export function ToggleVPKFile(arg1:string):Promise<void>;
 export function ToggleVPKVisibility(arg1:string):Promise<string>;
 
 export function TranslateWorkshopDescription(arg1:string):Promise<app.WorkshopTranslationResult>;
+
+export function UnpackVPKFile(arg1:string,arg2:string):Promise<app.VPKUnpackResult>;
 
 export function ValidateDirectory(arg1:string):Promise<void>;

@@ -7,6 +7,7 @@ import {
   moveFileToAddons,
   deleteFile,
   renameFile,
+  unpackFile,
 } from "./operations.js";
 import { openSetTagsModal } from "./tags.js";
 import { openLoadOrderModal } from "../modals/load-order.js";
@@ -289,6 +290,16 @@ export function setupFileListEventDelegation() {
         e.stopPropagation();
         closeAllDropdowns();
         openLoadOrderModal(filePath);
+      }
+    }
+    const unpackBtn = e.target.closest('.unpack-btn[data-action="unpack"]');
+    if (unpackBtn) {
+      const filePath = unpackBtn.getAttribute("data-file-path");
+      if (filePath) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAllDropdowns();
+        unpackFile(filePath);
       }
     }
 

@@ -1,5 +1,6 @@
 import { appState } from "../state.js";
 import { showError, showNotification } from "../../core/toast.js";
+import { unpackVPKFromPath } from "../diagnostics/vpk-unpack.js";
 import { showConfirmModal } from "../modals/confirm.js";
 import { refreshFilesKeepFilter } from "./filters.js";
 import {
@@ -60,6 +61,9 @@ export async function openFileLocation(filePath) {
   }
 }
 
+export async function unpackFile(filePath) {
+  await unpackVPKFromPath(filePath);
+}
 export async function toggleFileVisibility(filePath) {
   try {
     console.log("切换文件隐藏状态:", filePath);

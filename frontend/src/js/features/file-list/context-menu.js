@@ -9,6 +9,7 @@ import {
   moveFileToAddons,
   deleteFile,
   renameFile,
+  unpackFile,
 } from "./operations.js";
 import { openSetTagsModal } from "./tags.js";
 import { openBatchSetTagsModal } from "./batch-tags.js";
@@ -199,6 +200,8 @@ function buildSingleMenu(menu, file) {
 
   menu.appendChild(createMenuItem("重命名", iconSvg("edit"), () => renameFile(file.path)));
   menu.appendChild(createMenuItem("加载顺序", loadOrderIconSvg, () => openLoadOrderModal(file.path)));
+  menu.appendChild(createMenuItem("解包", iconSvg("package"), () => unpackFile(file.path)));
+
   menu.appendChild(createMenuItem("打开位置", iconSvg("folderOpen"), () => openFileLocation(file.path)));
 
   const isHidden = file.name.startsWith("_");
@@ -270,12 +273,14 @@ export function showContextMenu(event, filePath) {
   const menu = document.createElement("div");
   menu.className = "context-menu";
 
-  const hasSelection = appState.selectedFiles.size > 0;
+  const selectedPaths = Array.from(appState.selectedFiles);
+  const shouldShowBatchMenu =
+    selectedPaths.length > 1 || (selectedPaths.length === 1 && selectedPaths[0] !== file.path);
 
-  if (!hasSelection) {
-    buildSingleMenu(menu, file);
-  } else {
+  if (shouldShowBatchMenu) {
     buildBatchMenu(menu);
+  } else {
+    buildSingleMenu(menu, file);
   }
 
   document.body.appendChild(menu);

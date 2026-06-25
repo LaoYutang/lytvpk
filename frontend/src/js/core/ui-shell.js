@@ -13,7 +13,7 @@ const MENU_ITEMS = [
   { page: "workshop", sourceId: "browser-btn", label: "创意工坊", icon: NAV_ICONS.workshop },
   { page: "downloads", sourceId: "workshop-btn", label: "下载与解析", icon: NAV_ICONS.downloads },
   { page: "servers", sourceId: "server-favorites-btn", label: "收藏服务器", icon: NAV_ICONS.servers },
-  { page: "diagnostics", id: "app-nav-diagnostics", label: "诊断工具", icon: NAV_ICONS.diagnostics },
+  { page: "diagnostics", id: "app-nav-diagnostics", label: "工具箱", icon: NAV_ICONS.diagnostics },
   { page: "settings", sourceId: "global-settings-btn", label: "设置", icon: NAV_ICONS.settings },
   { page: "about", sourceId: "info-btn", label: "关于", icon: NAV_ICONS.about },
 ];

@@ -112,6 +112,9 @@ export function createFileItem(file) {
             </svg>
           </span> 加载顺序
         </button>
+        <button class="dropdown-item unpack-btn" data-file-path="${file.path}" data-action="unpack">
+          <span class="btn-icon">${iconSvg("package")}</span> 解包
+        </button>
         <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
           <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
         </button>
@@ -306,6 +309,9 @@ export function createFileCard(file) {
               <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
             </svg>
           </span> 加载顺序
+        </button>
+        <button class="dropdown-item unpack-btn" data-file-path="${file.path}" data-action="unpack">
+          <span class="btn-icon">${iconSvg("package")}</span> 解包
         </button>
         <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
           <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
