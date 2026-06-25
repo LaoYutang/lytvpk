@@ -1,4 +1,5 @@
 import { showNotification } from "../../core/toast.js";
+import { refreshFilesKeepFilter } from "../file-list/filters.js";
 
 let EventsOn;
 let showError;
@@ -335,9 +336,8 @@ function createPaginationButton(label, title, disabled, onClick) {
 }
 
 function createModResultRow(item, rankNumber) {
-  const wrapper = createEl("section", "model-stats-mod");
-  const header = createEl("button", "model-stats-mod-header");
-  header.type = "button";
+  const wrapper = createEl("section", `model-stats-mod${isModDisabled(item) ? " is-disabled" : ""}`);
+  const header = createEl("div", "model-stats-mod-header");
   header.setAttribute("aria-expanded", "false");
 
   const rank = createEl("span", "model-stats-rank", String(rankNumber));
@@ -355,11 +355,12 @@ function createModResultRow(item, rankNumber) {
     createTableMetric("Strip Group", getModStripGroupCount(item)),
     createTableMetric("顶点", item.totalVertices || 0),
     createTableMetric("三角形", item.totalTriangles || 0),
+    createDisableAction(item),
     chevron,
   );
 
   const details = createEl("div", "model-stats-model-list hidden");
-  header.addEventListener("click", () => {
+  bindExpandableHeader(header, () => {
     const expanded = header.getAttribute("aria-expanded") === "true";
     if (expanded) {
       header.setAttribute("aria-expanded", "false");
@@ -380,9 +381,8 @@ function createModResultRow(item, rankNumber) {
 }
 
 function createModelResultRow(row, rankNumber) {
-  const wrapper = createEl("section", "model-stats-mod model-stats-model-result");
-  const content = createEl("button", "model-stats-mod-header");
-  content.type = "button";
+  const wrapper = createEl("section", `model-stats-mod model-stats-model-result${isModDisabled(row.mod) ? " is-disabled" : ""}`);
+  const content = createEl("div", "model-stats-mod-header");
   content.setAttribute("aria-expanded", "false");
   const rank = createEl("span", "model-stats-rank", String(rankNumber));
   const modRef = createEl("div", "model-stats-row-mod-ref");
@@ -403,11 +403,12 @@ function createModelResultRow(row, rankNumber) {
     createTableMetric("Strip Group", row.model.stripGroupCount || getStripGroups(row.model).length),
     createTableMetric("顶点", row.model.vertices || 0),
     createTableMetric("三角形", row.model.triangles || 0, row.model.triangleStripEstimated ? "估算" : ""),
+    createDisableAction(row.mod),
     chevron,
   );
 
   const details = createEl("div", "model-stats-strip-grid hidden");
-  content.addEventListener("click", () => {
+  bindExpandableHeader(content, () => {
     const expanded = content.getAttribute("aria-expanded") === "true";
     if (expanded) {
       content.setAttribute("aria-expanded", "false");
@@ -428,7 +429,7 @@ function createModelResultRow(row, rankNumber) {
 }
 
 function createStripGroupResultRow(row, rankNumber) {
-  const wrapper = createEl("section", "model-stats-mod model-stats-strip-result");
+  const wrapper = createEl("section", `model-stats-mod model-stats-strip-result${isModDisabled(row.mod) ? " is-disabled" : ""}`);
   const content = createEl("div", "model-stats-mod-header is-static");
   const rank = createEl("span", "model-stats-rank", String(rankNumber));
   const main = createEl("div", "model-stats-mod-main");
@@ -455,10 +456,111 @@ function createStripGroupResultRow(row, rankNumber) {
     groupRef,
     createTableMetric("顶点", row.group.vertices || 0),
     createTableMetric("索引", row.group.indices || 0),
+    createDisableAction(row.mod),
     spacer,
   );
   wrapper.appendChild(content);
   return wrapper;
+}
+
+function bindExpandableHeader(header, onToggle) {
+  header.tabIndex = 0;
+  header.setAttribute("role", "button");
+  header.addEventListener("click", onToggle);
+  header.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onToggle();
+  });
+}
+
+function createDisableAction(mod) {
+  const action = createEl("span", "model-stats-row-action");
+  action.addEventListener("click", (event) => event.stopPropagation());
+
+  const button = createEl("button", "model-stats-disable-btn", getDisableButtonText(mod));
+  button.type = "button";
+  button.disabled = !canDisableMod(mod);
+  button.title = getDisableButtonTitle(mod);
+  button.setAttribute("aria-label", `${getDisableButtonText(mod)} ${mod?.title || mod?.name || "Mod"}`);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    disableModelStatsMod(mod, button);
+  });
+  action.appendChild(button);
+  return action;
+}
+
+function canDisableMod(mod) {
+  return Boolean(mod?.path) && mod.location === "root" && !isModDisabled(mod);
+}
+
+function isModDisabled(mod) {
+  return mod?.location === "disabled" || mod?.disabledByModelStats === true;
+}
+
+function getDisableButtonText(mod) {
+  if (isModDisabled(mod)) return "已禁用";
+  return "禁用";
+}
+
+function getDisableButtonTitle(mod) {
+  if (isModDisabled(mod)) return "这个 Mod 已移动到 disabled 目录";
+  if (!mod?.path) return "缺少文件路径，无法禁用";
+  if (mod.location !== "root") return "只能直接禁用 addons 根目录中的 Mod";
+  return "将这个 Mod 移动到 disabled 目录";
+}
+
+async function disableModelStatsMod(mod, button) {
+  if (!canDisableMod(mod)) return;
+
+  setDisableButtonPending(button);
+  try {
+    await callApp("ToggleVPKFile", mod.path);
+    markModDisabled(mod);
+    await refreshFilesAfterDisable();
+    showNotification(`已禁用 ${mod.title || mod.name || "Mod"}`, "success");
+    renderResults(currentResult);
+  } catch (error) {
+    showError?.("禁用 Mod 失败: " + error);
+    setDisableButtonReady(button, mod);
+  }
+}
+
+function markModDisabled(mod) {
+  const key = getModIdentity(mod);
+  (currentResult?.items || []).forEach((item) => {
+    if (getModIdentity(item) === key) {
+      item.location = "disabled";
+      item.disabledByModelStats = true;
+    }
+  });
+}
+
+function getModIdentity(mod) {
+  return String(mod?.path || mod?.name || "").toLowerCase();
+}
+
+async function refreshFilesAfterDisable() {
+  try {
+    await refreshFilesKeepFilter();
+  } catch (error) {
+    console.warn("刷新文件列表失败:", error);
+  }
+}
+
+function setDisableButtonPending(button) {
+  if (!button) return;
+  button.disabled = true;
+  button.dataset.originalText = button.textContent;
+  button.textContent = "禁用中";
+}
+
+function setDisableButtonReady(button, mod) {
+  if (!button) return;
+  button.disabled = !canDisableMod(mod);
+  button.textContent = getDisableButtonText(mod);
+  button.title = getDisableButtonTitle(mod);
 }
 
 function renderModelDetails(container, item) {
