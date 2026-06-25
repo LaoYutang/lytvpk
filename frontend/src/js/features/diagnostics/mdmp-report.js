@@ -395,11 +395,7 @@ function createRawFieldSection(title, stream = {}) {
 
 function createDataTable(key, rows, columns) {
   const state = getTableState(key);
-  const filtered = filterRows(rows, state.query);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  state.page = Math.min(Math.max(1, state.page), totalPages);
-  const start = (state.page - 1) * PAGE_SIZE;
-  const pageRows = filtered.slice(start, start + PAGE_SIZE);
+  const gridTemplate = `repeat(${columns.length}, minmax(9rem, 1fr))`;
 
   const wrap = createEl("section", "mdmp-report-table-section");
   const toolbar = createEl("div", "mdmp-report-table-toolbar");
@@ -407,48 +403,62 @@ function createDataTable(key, rows, columns) {
   input.type = "search";
   input.placeholder = "搜索当前表格";
   input.value = state.query;
-  input.addEventListener("input", () => {
-    state.query = input.value;
-    state.page = 1;
-    renderReport();
-  });
-  toolbar.append(input, createEl("span", "", `共 ${formatNumber(filtered.length)} 条`));
+  const countLabel = createEl("span", "", "");
+  toolbar.append(input, countLabel);
   wrap.appendChild(toolbar);
 
   const table = createEl("div", "mdmp-report-table");
-  const header = createEl("div", "mdmp-report-table-row is-header");
-  header.style.gridTemplateColumns = `repeat(${columns.length}, minmax(9rem, 1fr))`;
-  columns.forEach(([label]) => header.appendChild(createEl("span", "", label)));
-  table.appendChild(header);
-
-  if (pageRows.length === 0) {
-    table.appendChild(createEmptyState("没有可展示的数据"));
-  } else {
-    pageRows.forEach((row) => {
-      const line = createEl("div", "mdmp-report-table-row");
-      line.style.gridTemplateColumns = header.style.gridTemplateColumns;
-      columns.forEach(([, getValue]) => line.appendChild(createTextWithTitle("span", "", formatValue(getValue(row)))));
-      table.appendChild(line);
-    });
-  }
-  wrap.appendChild(table);
-  wrap.appendChild(createPagination(key, state.page, totalPages, filtered.length));
-  return wrap;
-}
-
-function createPagination(key, page, totalPages, totalRows) {
-  const state = getTableState(key);
   const pager = createEl("div", "mdmp-report-pagination");
-  const prev = createPagerButton("‹", "上一页", page <= 1, () => {
-    state.page = Math.max(1, state.page - 1);
-    renderReport();
+  wrap.append(table, pager);
+
+  // 只重建表格行/计数/分页，保留 input 自身，避免输入时丢失焦点。
+  function render() {
+    const filtered = filterRows(rows, state.query);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    state.page = Math.min(Math.max(1, state.page), totalPages);
+    const start = (state.page - 1) * PAGE_SIZE;
+    const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+    countLabel.textContent = `共 ${formatNumber(filtered.length)} 条`;
+
+    table.replaceChildren();
+    const header = createEl("div", "mdmp-report-table-row is-header");
+    header.style.gridTemplateColumns = gridTemplate;
+    columns.forEach(([label]) => header.appendChild(createEl("span", "", label)));
+    table.appendChild(header);
+
+    if (pageRows.length === 0) {
+      table.appendChild(createEmptyState("没有可展示的数据"));
+    } else {
+      pageRows.forEach((row) => {
+        const line = createEl("div", "mdmp-report-table-row");
+        line.style.gridTemplateColumns = gridTemplate;
+        columns.forEach(([, getValue]) => line.appendChild(createTextWithTitle("span", "", formatValue(getValue(row)))));
+        table.appendChild(line);
+      });
+    }
+
+    pager.replaceChildren(
+      createPagerButton("‹", "上一页", state.page <= 1, () => {
+        state.page = Math.max(1, state.page - 1);
+        render();
+      }),
+      createEl("span", "", `第 ${state.page} / ${totalPages} 页 · ${formatNumber(filtered.length)} 条`),
+      createPagerButton("›", "下一页", state.page >= totalPages, () => {
+        state.page = Math.min(totalPages, state.page + 1);
+        render();
+      }),
+    );
+  }
+
+  input.addEventListener("input", () => {
+    state.query = input.value;
+    state.page = 1;
+    render();
   });
-  const next = createPagerButton("›", "下一页", page >= totalPages, () => {
-    state.page = Math.min(totalPages, state.page + 1);
-    renderReport();
-  });
-  pager.append(prev, createEl("span", "", `第 ${page} / ${totalPages} 页 · ${formatNumber(totalRows)} 条`), next);
-  return pager;
+
+  render();
+  return wrap;
 }
 
 function createPagerButton(label, title, disabled, onClick) {

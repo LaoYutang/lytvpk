@@ -177,14 +177,14 @@ function unpackIcon() {
 
 function appendMDMPReportTool(container, openMDMPReportTool) {
   const grids = container.querySelectorAll(".diagnostics-tool-grid");
-  const generalGrid = grids[grids.length - 1];
-  if (!generalGrid) return;
+  const diagnosticsGrid = grids[0];
+  if (!diagnosticsGrid) return;
 
   const card = document.createElement("section");
   card.className = "diagnostics-tool-card";
 
   const icon = document.createElement("div");
-  icon.className = "diagnostics-tool-icon is-general";
+  icon.className = "diagnostics-tool-icon is-dump";
   icon.appendChild(createDumpIcon());
 
   const main = document.createElement("div");
@@ -209,7 +209,7 @@ function appendMDMPReportTool(container, openMDMPReportTool) {
   button.addEventListener("click", () => openMDMPReportTool?.());
 
   card.append(icon, main, button);
-  generalGrid.appendChild(card);
+  diagnosticsGrid.appendChild(card);
 }
 
 function createDumpIcon() {

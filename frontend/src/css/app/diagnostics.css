@@ -69,6 +69,11 @@
   background: rgba(16, 185, 129, 0.12);
 }
 
+.diagnostics-tool-icon.is-dump {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 .diagnostics-tool-icon .icon-svg {
   width: 1.35rem;
   height: 1.35rem;
