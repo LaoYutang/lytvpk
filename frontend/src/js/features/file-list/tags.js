@@ -2,9 +2,11 @@ import { appState } from "../state.js";
 import { showError, showNotification } from "../../core/toast.js";
 import { SetVPKTags } from "../../../../wailsjs/go/app/App";
 import { refreshFilesKeepFilter } from "./filters.js";
+import { createSecondaryTagPicker } from "./tag-suggestions.js";
 
 let currentEditingTagsFile = null;
 let currentSecondaryTags = [];
+let secondaryTagPicker = null;
 
 const PRIMARY_TAG_FALLBACK_LABEL = "无";
 
@@ -109,6 +111,7 @@ export function openSetTagsModal(filePath) {
   setPrimaryTagValue(file.primaryTag || "");
   renderEditTagsList();
   if (input) input.value = "";
+  secondaryTagPicker?.close();
 
   if (modal) modal.classList.remove("hidden");
 }
@@ -116,21 +119,47 @@ export function openSetTagsModal(filePath) {
 export function renderEditTagsList() {
   const container = document.getElementById("secondary-tags-list");
   if (!container) return;
-  container.innerHTML = "";
+  container.replaceChildren();
 
   currentSecondaryTags.forEach((tag, index) => {
     const tagEl = document.createElement("span");
     tagEl.className = "tag-badge";
-    tagEl.innerHTML = `
-      ${tag}
-      <span class="tag-remove-btn" title="删除">&times;</span>
-    `;
-    tagEl.querySelector(".tag-remove-btn").addEventListener("click", () => {
+
+    const tagText = document.createElement("span");
+    tagText.textContent = tag;
+
+    const removeBtn = document.createElement("span");
+    removeBtn.className = "tag-remove-btn";
+    removeBtn.title = "删除";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
       currentSecondaryTags.splice(index, 1);
       renderEditTagsList();
     });
+
+    tagEl.appendChild(tagText);
+    tagEl.appendChild(removeBtn);
     container.appendChild(tagEl);
   });
+
+  secondaryTagPicker?.refresh();
+}
+
+function addSecondaryTag(tag) {
+  const val = String(tag || "").trim();
+  if (!val || currentSecondaryTags.includes(val)) return false;
+
+  currentSecondaryTags.push(val);
+  renderEditTagsList();
+  return true;
+}
+
+function addSecondaryTagFromInput(input) {
+  if (!input) return;
+  if (addSecondaryTag(input.value)) {
+    input.value = "";
+    secondaryTagPicker?.refresh();
+  }
 }
 
 export function setupTagModalListeners() {
@@ -149,25 +178,23 @@ export function setupTagModalListeners() {
   if (addTagBtn) {
     addTagBtn.addEventListener("click", () => {
       const input = document.getElementById("new-secondary-tag-input");
-      const val = input.value.trim();
-      if (val && !currentSecondaryTags.includes(val)) {
-        currentSecondaryTags.push(val);
-        input.value = "";
-        renderEditTagsList();
-      }
+      addSecondaryTagFromInput(input);
     });
   }
 
   const newTagInput = document.getElementById("new-secondary-tag-input");
   if (newTagInput) {
+    secondaryTagPicker = createSecondaryTagPicker({
+      input: newTagInput,
+      menu: document.getElementById("secondary-tag-suggestions"),
+      getSelectedTags: () => currentSecondaryTags,
+      addTag: addSecondaryTag,
+    });
+
     newTagInput.addEventListener("keydown", (e) => {
+      if (e.defaultPrevented) return;
       if (e.key === "Enter") {
-        const val = e.target.value.trim();
-        if (val && !currentSecondaryTags.includes(val)) {
-          currentSecondaryTags.push(val);
-          e.target.value = "";
-          renderEditTagsList();
-        }
+        addSecondaryTagFromInput(e.target);
       }
     });
   }
@@ -184,6 +211,7 @@ export function setupTagModalListeners() {
       try {
         await SetVPKTags(currentEditingTagsFile, pTag, sTags);
         modal.classList.add("hidden");
+        secondaryTagPicker?.close();
         showNotification("标签已更新", "success");
         await refreshFilesKeepFilter();
       } catch (err) {
@@ -198,6 +226,7 @@ export function setupTagModalListeners() {
     if (btn) {
       btn.addEventListener("click", () => {
         document.getElementById("set-tags-modal").classList.add("hidden");
+        secondaryTagPicker?.close();
       });
     }
   });

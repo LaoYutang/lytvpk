@@ -8,11 +8,13 @@ import { showError, showNotification } from "../../core/toast.js";
 import { SetVPKTags } from "../../../../wailsjs/go/app/App";
 import { refreshFilesKeepFilter } from "./filters.js";
 import { deselectAll } from "./actions.js";
+import { createSecondaryTagPicker } from "./tag-suggestions.js";
 
 let primaryMode = "keep";
 let secondaryMode = "keep";
 let batchPrimaryTag = "";
 let batchSecondaryTags = [];
+let batchSecondaryTagPicker = null;
 
 const PRIMARY_FALLBACK_LABEL = "无";
 
@@ -111,23 +113,32 @@ function setupPrimaryDropdown() {
 function renderSecondaryList() {
   const container = document.getElementById("batch-secondary-tags-list");
   if (!container) return;
-  container.innerHTML = "";
+  container.replaceChildren();
 
   batchSecondaryTags.forEach((tag, index) => {
     const tagEl = document.createElement("span");
     tagEl.className = "tag-badge";
-    tagEl.innerHTML = `
-      ${tag}
-      <span class="tag-remove-btn" title="删除">&times;</span>
-    `;
-    tagEl.querySelector(".tag-remove-btn").addEventListener("click", () => {
+
+    const tagText = document.createElement("span");
+    tagText.textContent = tag;
+
+    const removeBtn = document.createElement("span");
+    removeBtn.className = "tag-remove-btn";
+    removeBtn.title = "删除";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => {
       batchSecondaryTags.splice(index, 1);
       renderSecondaryList();
       updateSecondaryHint();
       updateSaveButtonState();
     });
+
+    tagEl.appendChild(tagText);
+    tagEl.appendChild(removeBtn);
     container.appendChild(tagEl);
   });
+
+  batchSecondaryTagPicker?.refresh();
 }
 
 function getSelectedFileCount() {
@@ -158,6 +169,7 @@ function updateActionAreasVisibility() {
   if (secondaryArea) {
     const visible = secondaryMode === "append" || secondaryMode === "set";
     secondaryArea.classList.toggle("hidden", !visible);
+    if (!visible) batchSecondaryTagPicker?.close();
   }
 }
 
@@ -267,6 +279,7 @@ async function saveBatchTags() {
   }
 
   if (modal) modal.classList.add("hidden");
+  batchSecondaryTagPicker?.close();
   await refreshFilesKeepFilter();
   showMainScreen();
   deselectAll();
@@ -298,6 +311,7 @@ export function openBatchSetTagsModal() {
 
   const input = document.getElementById("batch-new-secondary-tag-input");
   if (input) input.value = "";
+  batchSecondaryTagPicker?.close();
 
   updateModeButtonStates();
   updateActionAreasVisibility();
@@ -314,16 +328,25 @@ export function openBatchSetTagsModal() {
   });
 }
 
-function addSecondaryTagFromInput() {
-  const input = document.getElementById("batch-new-secondary-tag-input");
-  if (!input) return;
-  const val = input.value.trim();
+function addSecondaryTag(tag) {
+  const val = String(tag || "").trim();
   if (val && !batchSecondaryTags.includes(val)) {
     batchSecondaryTags.push(val);
-    input.value = "";
     renderSecondaryList();
     updateSecondaryHint();
     updateSaveButtonState();
+    return true;
+  }
+  return false;
+}
+
+function addSecondaryTagFromInput(
+  input = document.getElementById("batch-new-secondary-tag-input"),
+) {
+  if (!input) return;
+  if (addSecondaryTag(input.value)) {
+    input.value = "";
+    batchSecondaryTagPicker?.refresh();
   }
 }
 
@@ -338,6 +361,7 @@ function resetBatchTags() {
   renderSecondaryList();
   updateSecondaryHint();
   updateSaveButtonState();
+  batchSecondaryTagPicker?.close();
 }
 
 export function setupBatchTagsModalListeners() {
@@ -370,9 +394,17 @@ export function setupBatchTagsModalListeners() {
 
   const input = document.getElementById("batch-new-secondary-tag-input");
   if (input) {
+    batchSecondaryTagPicker = createSecondaryTagPicker({
+      input,
+      menu: document.getElementById("batch-secondary-tag-suggestions"),
+      getSelectedTags: () => batchSecondaryTags,
+      addTag: addSecondaryTag,
+    });
+
     input.addEventListener("keydown", (e) => {
+      if (e.defaultPrevented) return;
       if (e.key === "Enter") {
-        addSecondaryTagFromInput();
+        addSecondaryTagFromInput(e.target);
       }
     });
   }
@@ -406,6 +438,7 @@ export function setupBatchTagsModalListeners() {
         document
           .getElementById("batch-set-tags-modal")
           ?.classList.add("hidden");
+        batchSecondaryTagPicker?.close();
       });
     }
   });

@@ -1888,19 +1888,30 @@
             <div id="secondary-tags-list" class="tags-container">
               <!-- Tags will be injected here -->
             </div>
-            <div class="input-group input-group-flex">
-              <input
-                type="text"
-                id="new-secondary-tag-input"
-                class="form-input flex-1"
-                placeholder="输入标签按回车添加"
-              />
-              <button
-                id="add-secondary-tag-btn"
-                class="btn btn-small btn-primary ml-8"
-              >
-                添加
-              </button>
+            <div class="tag-input-picker">
+              <div class="input-group input-group-flex">
+                <input
+                  type="text"
+                  id="new-secondary-tag-input"
+                  class="form-input flex-1"
+                  placeholder="输入或选择标签"
+                  autocomplete="off"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="secondary-tag-suggestions"
+                />
+                <button
+                  id="add-secondary-tag-btn"
+                  class="btn btn-small btn-primary ml-8"
+                >
+                  添加
+                </button>
+              </div>
+              <div
+                id="secondary-tag-suggestions"
+                class="tag-suggestions-menu hidden"
+                role="listbox"
+              ></div>
             </div>
           </div>
         </div>
@@ -2039,19 +2050,30 @@
                 id="batch-secondary-tags-list"
                 class="tags-container"
               ></div>
-              <div class="input-group input-group-flex">
-                <input
-                  type="text"
-                  id="batch-new-secondary-tag-input"
-                  class="form-input flex-1"
-                  placeholder="输入标签按回车添加"
-                />
-                <button
-                  id="batch-add-secondary-tag-btn"
-                  class="btn btn-small btn-primary ml-8"
-                >
-                  添加
-                </button>
+              <div class="tag-input-picker">
+                <div class="input-group input-group-flex">
+                  <input
+                    type="text"
+                    id="batch-new-secondary-tag-input"
+                    class="form-input flex-1"
+                    placeholder="输入或选择标签"
+                    autocomplete="off"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="batch-secondary-tag-suggestions"
+                  />
+                  <button
+                    id="batch-add-secondary-tag-btn"
+                    class="btn btn-small btn-primary ml-8"
+                  >
+                    添加
+                  </button>
+                </div>
+                <div
+                  id="batch-secondary-tag-suggestions"
+                  class="tag-suggestions-menu hidden"
+                  role="listbox"
+                ></div>
               </div>
               <p class="batch-tags-hint" id="batch-secondary-hint"></p>
             </div>
