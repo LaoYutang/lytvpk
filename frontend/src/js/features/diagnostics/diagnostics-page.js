@@ -4,6 +4,8 @@ export async function renderDiagnosticsPage({
   openModelStatsScanModal,
   showConflictModal,
   openVPKUnpackTool,
+  openVPKPackTool,
+  refreshFilesKeepFilter,
 } = {}) {
   const container = document.getElementById("diagnostics-page-content");
   if (!container) return;
@@ -102,6 +104,20 @@ export async function renderDiagnosticsPage({
               选择并解包
             </button>
           </section>
+
+          <section class="diagnostics-tool-card">
+            <div class="diagnostics-tool-icon is-general">${packIcon()}</div>
+            <div class="diagnostics-tool-main">
+              <div class="diagnostics-tool-title-row">
+                <h3>VPK 打包</h3>
+                <span class="diagnostics-status">可使用</span>
+              </div>
+              <p>选择一个目录（VPK 根目录，即 materials/scripts 等的父目录），打包为 .vpk 文件，可放入 addons 或自选位置。</p>
+            </div>
+            <button type="button" class="btn btn-primary diagnostics-tool-action" id="toolbox-vpk-pack-btn">
+              选择并打包
+            </button>
+          </section>
         </div>
       </section>
     </div>
@@ -122,6 +138,10 @@ export async function renderDiagnosticsPage({
   document.getElementById("toolbox-vpk-unpack-btn")?.addEventListener("click", () => {
     openVPKUnpackTool?.();
   });
+
+  document.getElementById("toolbox-vpk-pack-btn")?.addEventListener("click", () => {
+    openVPKPackTool?.({ refreshFilesKeepFilter });
+  });
 }
 
 function boltIcon() {
@@ -138,4 +158,8 @@ function modelIcon() {
 
 function unpackIcon() {
   return `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`;
+}
+
+function packIcon() {
+  return `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8"/><path d="m9 7 3 3 3-3"/><path d="M3 14h18"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>`;
 }

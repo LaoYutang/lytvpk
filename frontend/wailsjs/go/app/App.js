@@ -306,6 +306,10 @@ export function OpenFileLocation(arg1) {
   return window['go']['app']['App']['OpenFileLocation'](arg1);
 }
 
+export function PackVPKDirectory(arg1, arg2, arg3) {
+  return window['go']['app']['App']['PackVPKDirectory'](arg1, arg2, arg3);
+}
+
 export function ParseWorkshopID(arg1) {
   return window['go']['app']['App']['ParseWorkshopID'](arg1);
 }
@@ -372,6 +376,10 @@ export function SelectPanelMapUploadFiles() {
 
 export function SelectVPKFile() {
   return window['go']['app']['App']['SelectVPKFile']();
+}
+
+export function SelectVPKPackSourceDirectory() {
+  return window['go']['app']['App']['SelectVPKPackSourceDirectory']();
 }
 
 export function SelectVPKUnpackOutputDirectory() {

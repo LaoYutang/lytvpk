@@ -156,6 +156,8 @@ export function MoveWorkshopToAddons(arg1:string):Promise<void>;
 
 export function OpenFileLocation(arg1:string):Promise<void>;
 
+export function PackVPKDirectory(arg1:string,arg2:string,arg3:boolean):Promise<app.VPKPackResult>;
+
 export function ParseWorkshopID(arg1:string):Promise<string>;
 
 export function RenameVPKFile(arg1:string,arg2:string):Promise<string>;
@@ -189,6 +191,8 @@ export function SelectFiles():Promise<Array<string>>;
 export function SelectPanelMapUploadFiles():Promise<Array<string>>;
 
 export function SelectVPKFile():Promise<string>;
+
+export function SelectVPKPackSourceDirectory():Promise<string>;
 
 export function SelectVPKUnpackOutputDirectory():Promise<string>;
 
