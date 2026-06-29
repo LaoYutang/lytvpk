@@ -48,10 +48,15 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 }
 
 func (a *App) packVPKDirectoryWithProgress(sourceDir string, outputDir string, outputIsAddons bool, progress vpkPackProgressFunc) (VPKPackResult, error) {
+	return a.packVPKDirectoryWithOptions(sourceDir, outputDir, outputIsAddons, "", progress)
+}
+
+func (a *App) packVPKDirectoryWithOptions(sourceDir string, outputDir string, outputIsAddons bool, outputBaseName string, progress vpkPackProgressFunc) (VPKPackResult, error) {
 	result := VPKPackResult{OutputIsAddons: outputIsAddons}
 
 	sourceDir = strings.TrimSpace(sourceDir)
 	outputDir = strings.TrimSpace(outputDir)
+	outputBaseName = sanitizeVPKOutputDirName(outputBaseName)
 	result.SourceDir = sourceDir
 	if sourceDir == "" {
 		return result, fmt.Errorf("打包目录不能为空")
@@ -206,7 +211,7 @@ func (a *App) packVPKDirectoryWithProgress(sourceDir string, outputDir string, o
 		return result, fmt.Errorf("写入 VPK 目录失败: %v", err)
 	}
 
-	outputPath, err := createUniqueVPKOutputFile(outputDir, sourceDir)
+	outputPath, err := createUniqueVPKOutputFileWithBaseName(outputDir, sourceDir, outputBaseName)
 	if err != nil {
 		return result, err
 	}
@@ -254,7 +259,14 @@ func (a *App) packVPKDirectoryWithProgress(sourceDir string, outputDir string, o
 }
 
 func createUniqueVPKOutputFile(outputDir string, sourceDir string) (string, error) {
-	baseName := sanitizeVPKOutputDirName(filepath.Base(filepath.Clean(sourceDir)))
+	return createUniqueVPKOutputFileWithBaseName(outputDir, sourceDir, "")
+}
+
+func createUniqueVPKOutputFileWithBaseName(outputDir string, sourceDir string, outputBaseName string) (string, error) {
+	baseName := sanitizeVPKOutputDirName(outputBaseName)
+	if baseName == "" {
+		baseName = sanitizeVPKOutputDirName(filepath.Base(filepath.Clean(sourceDir)))
+	}
 	if baseName == "" {
 		baseName = "vpk_packed"
 	}

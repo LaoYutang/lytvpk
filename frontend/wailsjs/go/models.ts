@@ -756,6 +756,172 @@ export namespace app {
 		    return a;
 		}
 	}
+	export class SprayFilePayload {
+	    name: string;
+	    vtfBase64: string;
+	    vmtText: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayFilePayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.vtfBase64 = source["vtfBase64"];
+	        this.vmtText = source["vmtText"];
+	    }
+	}
+	export class SprayExportRequest {
+	    files: SprayFilePayload[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayExportRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = this.convertValues(source["files"], SprayFilePayload);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SprayOutputFile {
+	    name: string;
+	    vtfPath: string;
+	    vmtPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayOutputFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.vtfPath = source["vtfPath"];
+	        this.vmtPath = source["vmtPath"];
+	    }
+	}
+	export class SprayExportResult {
+	    outputDir: string;
+	    files: SprayOutputFile[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.outputDir = source["outputDir"];
+	        this.files = this.convertValues(source["files"], SprayOutputFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class SprayInstallRequest {
+	    packageName: string;
+	    files: SprayFilePayload[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayInstallRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.packageName = source["packageName"];
+	        this.files = this.convertValues(source["files"], SprayFilePayload);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SprayInstallResult {
+	    packageName: string;
+	    outputPath: string;
+	    files: SprayOutputFile[];
+	    totalFiles: number;
+	    packedFiles: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayInstallResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.packageName = source["packageName"];
+	        this.outputPath = source["outputPath"];
+	        this.files = this.convertValues(source["files"], SprayOutputFile);
+	        this.totalFiles = source["totalFiles"];
+	        this.packedFiles = source["packedFiles"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class UpdateCheckResult {
 	    total_updates: number;
 	    new_detected: number;

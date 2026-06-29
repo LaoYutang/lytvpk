@@ -37,6 +37,8 @@ export function DoUpdate(arg1:string):Promise<string>;
 
 export function ExportServersToFile(arg1:string):Promise<string>;
 
+export function ExportSprayFiles(arg1:app.SprayExportRequest):Promise<app.SprayExportResult>;
+
 export function ExportVPKFilesToZip(arg1:Array<string>,arg2:boolean,arg3:boolean):Promise<string>;
 
 export function ExtractVPKFrom7z(arg1:string,arg2:string):Promise<void>;
@@ -138,6 +140,8 @@ export function HasActiveDownloads():Promise<boolean>;
 export function HasActivePanelUploads():Promise<boolean>;
 
 export function HasWorkshopTranslateCustomAPIKey():Promise<boolean>;
+
+export function InstallSprayVPK(arg1:app.SprayInstallRequest):Promise<app.SprayInstallResult>;
 
 export function IsSelectingIP():Promise<boolean>;
 

@@ -6,6 +6,7 @@ export async function renderDiagnosticsPage({
   openVPKUnpackTool,
   openMDMPReportTool,
   openVPKPackTool,
+  openSprayTool,
   refreshFilesKeepFilter,
 } = {}) {
   const container = document.getElementById("diagnostics-page-content");
@@ -127,6 +128,7 @@ export async function renderDiagnosticsPage({
   `;
 
   appendMDMPReportTool(container, openMDMPReportTool);
+  appendSprayTool(container, openSprayTool, refreshFilesKeepFilter);
 
   document
     .getElementById("diagnostics-problem-scan-btn")
@@ -212,6 +214,44 @@ function appendMDMPReportTool(container, openMDMPReportTool) {
   diagnosticsGrid.appendChild(card);
 }
 
+function appendSprayTool(container, openSprayTool, refreshFilesKeepFilter) {
+  const grids = container.querySelectorAll(".diagnostics-tool-grid");
+  const generalGrid = grids[1];
+  if (!generalGrid) return;
+
+  const card = document.createElement("section");
+  card.className = "diagnostics-tool-card";
+
+  const icon = document.createElement("div");
+  icon.className = "diagnostics-tool-icon is-spray";
+  icon.appendChild(createSprayIcon());
+
+  const main = document.createElement("div");
+  main.className = "diagnostics-tool-main";
+  const row = document.createElement("div");
+  row.className = "diagnostics-tool-title-row";
+  const title = document.createElement("h3");
+  title.textContent = "喷漆制作";
+  const status = document.createElement("span");
+  status.className = "diagnostics-status";
+  status.textContent = "可制作";
+  row.append(title, status);
+  const desc = document.createElement("p");
+  desc.textContent = "导入图片、GIF 或视频，预览并生成 VTF/VMT，或直接打包安装为喷漆 VPK。";
+  main.append(row, desc);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn btn-primary diagnostics-tool-action";
+  button.textContent = "打开制作工具";
+  button.addEventListener("click", () =>
+    openSprayTool?.({ refreshFilesKeepFilter })
+  );
+
+  card.append(icon, main, button);
+  generalGrid.appendChild(card);
+}
+
 function createDumpIcon() {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "icon-svg");
@@ -230,6 +270,31 @@ function createDumpIcon() {
     ["path", { d: "M8 13h8" }],
     ["path", { d: "M8 17h5" }],
     ["path", { d: "M9 9h1" }],
+  ].forEach(([tag, attrs]) => {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attrs).forEach(([key, value]) =>
+      node.setAttribute(key, value)
+    );
+    svg.appendChild(node);
+  });
+  return svg;
+}
+
+function createSprayIcon() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon-svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2.3");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  [
+    ["path", { d: "M7 3h7l3 3v5H7z" }],
+    ["path", { d: "M9 11v3" }],
+    ["path", { d: "M15 11v3" }],
+    ["path", { d: "M8 14h8v7H8z" }],
+    ["path", { d: "M10 18h4" }],
   ].forEach(([tag, attrs]) => {
     const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
     Object.entries(attrs).forEach(([key, value]) =>

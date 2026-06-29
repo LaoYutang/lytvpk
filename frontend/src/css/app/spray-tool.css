@@ -1,0 +1,590 @@
+.spray-tool-content {
+  width: min(1280px, calc(100vw - 40px));
+  max-width: min(1280px, calc(100vw - 40px));
+  height: min(860px, calc(100vh - 40px));
+  max-height: min(860px, calc(100vh - 40px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.spray-tool-header {
+  align-items: flex-start;
+}
+
+.spray-tool-title-wrap h3,
+.spray-tool-title-wrap p {
+  margin: 0;
+}
+
+.spray-tool-title-wrap p {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.spray-tool-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(430px, 1fr) minmax(300px, 340px);
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+.spray-panel {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.spray-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+}
+
+.spray-panel-header h4,
+.spray-panel-header p {
+  margin: 0;
+}
+
+.spray-panel-header h4 {
+  color: var(--text-primary);
+  font-size: 0.98rem;
+}
+
+.spray-panel-header p {
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.spray-import-buttons,
+.spray-mipmap-actions,
+.spray-tool-footer-actions,
+.spray-playback-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.spray-import-buttons .btn {
+  flex: 1 1 120px;
+}
+
+.spray-project-list {
+  min-height: 0;
+  display: grid;
+  gap: var(--spacing-2);
+  overflow-y: auto;
+}
+
+.spray-project-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.spray-project-row.is-active {
+  border-color: var(--primary);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.spray-project-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.spray-project-row-main strong,
+.spray-project-row-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spray-project-row-main span {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.spray-project-remove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.spray-project-remove:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.spray-empty-state {
+  padding: var(--spacing-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  background: var(--bg-app);
+  font-size: 0.88rem;
+}
+
+.spray-preview-panel {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+}
+
+.spray-preview-stage {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--spacing-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background-color: #f8fafc;
+  background-image:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.25) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(148, 163, 184, 0.25) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, 0.25) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, 0.25) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  overflow: hidden;
+}
+
+#spray-preview-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  image-rendering: auto;
+  box-shadow: var(--shadow-md);
+}
+
+.spray-preview-meta {
+  flex-shrink: 0;
+  padding: 0.24rem 0.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: var(--bg-app);
+  border: 1px solid var(--border-light);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.spray-frame-label {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.spray-frame-strip {
+  display: flex;
+  gap: var(--spacing-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.spray-frame-thumb {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-app);
+  cursor: pointer;
+}
+
+.spray-frame-thumb.is-active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
+}
+
+.spray-frame-thumb canvas {
+  max-width: 44px;
+  max-height: 44px;
+}
+
+.spray-settings-panel {
+  overflow-y: auto;
+  padding-right: calc(var(--spacing-4) - 2px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.spray-settings-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.spray-settings-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.spray-settings-panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  background: rgba(148, 163, 184, 0.45);
+  background-clip: padding-box;
+}
+
+.spray-settings-form {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.spray-control {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.spray-control label,
+.spray-checkbox {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.spray-control > label {
+  justify-self: start;
+}
+
+.spray-control-inline {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.spray-control .textInput {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.48rem 0.68rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background-color: var(--bg-app);
+  box-shadow: var(--shadow-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-align: left;
+  transition:
+    border-color var(--duration-150) var(--ease-out),
+    box-shadow var(--duration-150) var(--ease-out),
+    background var(--duration-150) var(--ease-out);
+}
+
+.spray-select-dropdown,
+.spray-combo-field {
+  position: relative;
+  min-width: 0;
+}
+
+.spray-select-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding-right: 2.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spray-select-trigger::after,
+.spray-combo-toggle::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.7px solid currentColor;
+  border-bottom: 1.7px solid currentColor;
+  opacity: 0.58;
+  transform: rotate(45deg) translateY(-2px);
+  flex: 0 0 auto;
+}
+
+.spray-select-trigger::after {
+  position: absolute;
+  right: 0.78rem;
+}
+
+.spray-combo-input {
+  padding-right: 2.35rem;
+}
+
+.spray-combo-toggle {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  width: 2.1rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--border-default);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.spray-combo-toggle:hover {
+  color: var(--primary);
+  background: var(--primary-50);
+}
+
+.spray-select-menu {
+  top: calc(100% + 0.35rem);
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  padding: 0.35rem;
+  border: 1px solid var(--border-light);
+  border-radius: 0.85rem;
+  background: var(--bg-app);
+  box-shadow:
+    0 18px 50px rgba(15, 23, 42, 0.14),
+    0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.spray-floating-menu {
+  z-index: 10050;
+  min-width: 10rem;
+  max-width: calc(100vw - 16px);
+}
+
+.spray-select-option {
+  min-height: 2rem;
+  border-radius: 0.55rem;
+  color: var(--text-secondary);
+  transition:
+    background var(--duration-150) var(--ease-out),
+    color var(--duration-150) var(--ease-out);
+}
+
+.spray-select-option:hover,
+.spray-select-option.active {
+  background: var(--primary-50);
+  color: var(--primary);
+}
+
+.spray-control input[type="number"].textInput {
+  -moz-appearance: textfield;
+}
+
+.spray-control input[type="number"].textInput::-webkit-outer-spin-button,
+.spray-control input[type="number"].textInput::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.spray-control .textInput:hover:not(:disabled) {
+  border-color: rgba(79, 70, 229, 0.3);
+  background-color: var(--bg-app);
+}
+
+.spray-control .textInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 3px rgba(79, 70, 229, 0.12),
+    var(--shadow-xs);
+}
+
+.spray-control .textInput:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  color: var(--text-muted);
+  background-color: var(--bg-surface);
+  box-shadow: none;
+}
+
+.spray-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: 2rem;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.spray-checkbox input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: grid;
+  place-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-app);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition:
+    background var(--duration-150) var(--ease-out),
+    border-color var(--duration-150) var(--ease-out),
+    box-shadow var(--duration-150) var(--ease-out);
+}
+
+.spray-checkbox input::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  clip-path: polygon(14% 44%, 0 61%, 40% 100%, 100% 18%, 84% 4%, 37% 68%);
+  background: var(--text-inverse);
+  transform: scale(0);
+  transition: transform var(--duration-100) var(--ease-out);
+}
+
+.spray-checkbox input:hover {
+  border-color: var(--primary);
+}
+
+.spray-checkbox input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+
+.spray-checkbox input:checked {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+}
+
+.spray-checkbox input:checked::before {
+  transform: scale(1);
+}
+
+.spray-checkbox input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: var(--bg-surface);
+}
+
+.spray-checkbox input:disabled + span {
+  opacity: 0.65;
+}
+
+.spray-mipmap-controls {
+  display: grid;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.spray-size-note {
+  padding: var(--spacing-3);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--bg-app);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.spray-size-note[hidden] {
+  display: none;
+}
+
+.spray-size-note.is-warning {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.spray-tool-footer {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+}
+
+.spray-tool-footer-status {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.spray-clip-content {
+  width: min(420px, calc(100vw - 48px));
+}
+
+.spray-clip-body {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.spray-clip-file {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  word-break: break-all;
+}
+
+@media (max-width: 1040px) {
+  .spray-tool-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .spray-tool-content {
+    height: min(900px, calc(100vh - 32px));
+  }
+
+  .spray-preview-stage {
+    min-height: 360px;
+  }
+}
+
+@media (max-width: 640px) {
+  .spray-tool-content {
+    width: calc(100vw - 20px);
+    height: calc(100vh - 20px);
+  }
+
+  .spray-tool-body {
+    padding: var(--spacing-3);
+  }
+
+  .spray-tool-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .spray-tool-footer-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+html.dark-mode .spray-preview-stage {
+  background-color: #111827;
+  background-image:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.18) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(148, 163, 184, 0.18) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, 0.18) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, 0.18) 75%);
+}

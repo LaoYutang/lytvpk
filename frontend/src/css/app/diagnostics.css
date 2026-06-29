@@ -191,6 +191,11 @@
   background: rgba(79, 70, 229, 0.08);
 }
 
+.diagnostics-tool-icon.is-spray {
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.1);
+}
+
 .vpk-unpack-result {
   display: grid;
   gap: var(--spacing-3);
