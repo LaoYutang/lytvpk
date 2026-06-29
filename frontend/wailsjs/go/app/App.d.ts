@@ -149,6 +149,8 @@ export function LaunchL4D2():Promise<void>;
 
 export function LaunchL4D2ForProblemScan():Promise<void>;
 
+export function LoadSprayImportFiles(arg1:Array<string>):Promise<Array<app.SprayImportFilePayload>>;
+
 export function LogError(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function ManualRotateMods(arg1:app.RotationConfig):Promise<void>;

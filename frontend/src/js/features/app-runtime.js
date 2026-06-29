@@ -15,7 +15,11 @@ import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
 import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
 import { openMDMPReportTool } from "./diagnostics/mdmp-report.js";
 import { openVPKPackTool } from "./diagnostics/vpk-pack.js";
-import { openSprayTool } from "./spray/spray-tool.js";
+import {
+  importSprayPaths,
+  isSprayImportPath,
+  openSprayTool,
+} from "./spray/spray-tool.js";
 import {
   configureDropImport,
   handleDropImportPaths,
@@ -1003,9 +1007,16 @@ function setupWailsEvents() {
     showExitModal();
   });
 
-  OnFileDrop((x, y, paths) => {
+  OnFileDrop(async (x, y, paths) => {
     if (paths && paths.length > 0) {
-      handleDropImportPaths(paths, { source: "drop" });
+      const sprayPaths = paths.filter(isSprayImportPath);
+      const otherPaths = paths.filter((path) => !isSprayImportPath(path));
+      if (sprayPaths.length > 0) {
+        await importSprayPaths(sprayPaths, { refreshFilesKeepFilter });
+      }
+      if (otherPaths.length > 0) {
+        handleDropImportPaths(otherPaths, { source: "drop" });
+      }
     }
   }, true);
 

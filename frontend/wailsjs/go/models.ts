@@ -851,6 +851,22 @@ export namespace app {
 		}
 	}
 	
+	export class SprayImportFilePayload {
+	    name: string;
+	    type: string;
+	    base64: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SprayImportFilePayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.base64 = source["base64"];
+	    }
+	}
 	export class SprayInstallRequest {
 	    packageName: string;
 	    files: SprayFilePayload[];

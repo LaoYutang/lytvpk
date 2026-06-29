@@ -102,3 +102,27 @@ func TestInstallSprayVPKRequiresRootDir(t *testing.T) {
 		t.Fatal("expected missing root dir error")
 	}
 }
+
+func TestLoadSprayImportFilesReadsSupportedMedia(t *testing.T) {
+	tempDir := t.TempDir()
+	imagePath := filepath.Join(tempDir, "logo.png")
+	data := []byte{0x89, 'P', 'N', 'G'}
+	if err := os.WriteFile(imagePath, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	app := &App{}
+	files, err := app.LoadSprayImportFiles([]string{imagePath})
+	if err != nil {
+		t.Fatalf("load spray import files: %v", err)
+	}
+	if len(files) != 1 {
+		t.Fatalf("expected one file, got %d", len(files))
+	}
+	if files[0].Name != "logo.png" || files[0].Type != "image/png" {
+		t.Fatalf("unexpected payload metadata: %+v", files[0])
+	}
+	if files[0].Base64 != base64.StdEncoding.EncodeToString(data) {
+		t.Fatalf("unexpected base64 payload: %q", files[0].Base64)
+	}
+}

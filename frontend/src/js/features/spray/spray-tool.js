@@ -16,6 +16,24 @@ import {
 
 const RESOLUTION_PRESETS = [1024, 768, 720, 512, 256, 128, 64, 32, 16, 8, 4];
 const ACCEPTED_FILES = "image/*,.tga,video/*";
+const SPRAY_IMPORT_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".bmp",
+  ".gif",
+  ".tga",
+  ".mp4",
+  ".webm",
+  ".ogv",
+  ".ogg",
+  ".mov",
+  ".m4v",
+  ".avi",
+  ".mkv",
+  ".wmv",
+]);
 
 const state = {
   projects: [],
@@ -37,6 +55,30 @@ export function openSprayTool({ refreshFilesKeepFilter } = {}) {
   refs.modal.classList.remove("hidden");
   renderAll();
   updatePreview();
+}
+
+export function isSprayImportPath(path) {
+  const ext = getPathExtension(path);
+  return SPRAY_IMPORT_EXTENSIONS.has(ext);
+}
+
+export async function importSprayPaths(paths = [], { refreshFilesKeepFilter } = {}) {
+  const sprayPaths = Array.from(paths || []).filter(isSprayImportPath);
+  if (!sprayPaths.length) return false;
+
+  openSprayTool({ refreshFilesKeepFilter });
+  setBusy(true, "正在读取拖入素材...");
+  try {
+    const payloads = await callApp("LoadSprayImportFiles", sprayPaths);
+    const files = sprayPayloadsToFiles(payloads || []);
+    await importPrimaryFiles(files);
+    return true;
+  } catch (error) {
+    showError("导入喷漆素材失败: " + formatError(error));
+    return false;
+  } finally {
+    setBusy(false);
+  }
 }
 
 function ensureSprayModal() {
@@ -1088,6 +1130,40 @@ function input(type, id) {
   control.type = type;
   if (id) control.id = id;
   return control;
+}
+
+function sprayPayloadsToFiles(payloads) {
+  return payloads.map((payload) => {
+    const bytes = base64ToUint8Array(payload.base64 || "");
+    return new File([bytes], payload.name || "spray", {
+      type: payload.type || inferMimeType(payload.name || ""),
+    });
+  });
+}
+
+function base64ToUint8Array(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function inferMimeType(name) {
+  const ext = getPathExtension(name);
+  if (ext === ".gif") return "image/gif";
+  if (ext === ".tga") return "image/x-tga";
+  if ([".png", ".jpg", ".jpeg", ".webp", ".bmp"].includes(ext)) {
+    return `image/${ext === ".jpg" ? "jpeg" : ext.slice(1)}`;
+  }
+  return "video/mp4";
+}
+
+function getPathExtension(path) {
+  const clean = String(path || "").toLowerCase().split(/[\\/]/).pop() || "";
+  const index = clean.lastIndexOf(".");
+  return index >= 0 ? clean.slice(index) : "";
 }
 
 function button(id, className, text) {

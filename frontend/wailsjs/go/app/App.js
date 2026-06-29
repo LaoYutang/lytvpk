@@ -290,6 +290,10 @@ export function LaunchL4D2ForProblemScan() {
   return window['go']['app']['App']['LaunchL4D2ForProblemScan']();
 }
 
+export function LoadSprayImportFiles(arg1) {
+  return window['go']['app']['App']['LoadSprayImportFiles'](arg1);
+}
+
 export function LogError(arg1, arg2, arg3) {
   return window['go']['app']['App']['LogError'](arg1, arg2, arg3);
 }

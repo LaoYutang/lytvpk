@@ -16,6 +16,12 @@ type SprayFilePayload struct {
 	VMTText   string `json:"vmtText"`
 }
 
+type SprayImportFilePayload struct {
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Base64 string `json:"base64"`
+}
+
 type SprayExportRequest struct {
 	Files []SprayFilePayload `json:"files"`
 }
@@ -42,6 +48,51 @@ type SprayInstallResult struct {
 	Files       []SprayOutputFile `json:"files"`
 	TotalFiles  int               `json:"totalFiles"`
 	PackedFiles int               `json:"packedFiles"`
+}
+
+func (a *App) LoadSprayImportFiles(paths []string) ([]SprayImportFilePayload, error) {
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("没有可导入的喷漆素材")
+	}
+
+	files := make([]SprayImportFilePayload, 0, len(paths))
+	for _, rawPath := range paths {
+		targetPath := strings.TrimSpace(rawPath)
+		if targetPath == "" {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(targetPath))
+		if !isSupportedSprayImportExt(ext) {
+			return nil, fmt.Errorf("不支持的喷漆素材格式: %s", filepath.Base(targetPath))
+		}
+		info, err := os.Stat(targetPath)
+		if err != nil {
+			return nil, fmt.Errorf("无法访问素材 %s: %v", filepath.Base(targetPath), err)
+		}
+		if info.IsDir() {
+			return nil, fmt.Errorf("喷漆素材不能是文件夹: %s", filepath.Base(targetPath))
+		}
+
+		data, err := os.ReadFile(targetPath)
+		if err != nil {
+			return nil, fmt.Errorf("读取素材 %s 失败: %v", filepath.Base(targetPath), err)
+		}
+		if len(data) == 0 {
+			return nil, fmt.Errorf("素材为空: %s", filepath.Base(targetPath))
+		}
+
+		files = append(files, SprayImportFilePayload{
+			Name:   filepath.Base(targetPath),
+			Type:   sprayImportMimeType(ext),
+			Base64: base64.StdEncoding.EncodeToString(data),
+		})
+	}
+
+	if len(files) == 0 {
+		return nil, fmt.Errorf("没有可导入的喷漆素材")
+	}
+	return files, nil
 }
 
 func (a *App) ExportSprayFiles(request SprayExportRequest) (SprayExportResult, error) {
@@ -241,4 +292,47 @@ func buildSprayVMTText(name string) string {
 		name = "spray"
 	}
 	return fmt.Sprintf("\"UnlitGeneric\"\n{\n\t\"$basetexture\" \"vgui/logos/%s\"\n\t\"$translucent\" \"1\"\n\t\"$ignorez\" \"1\"\n\t\"$vertexcolor\" \"1\"\n\t\"$vertexalpha\" \"1\"\n}\n", name)
+}
+
+func isSupportedSprayImportExt(ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tga",
+		".mp4", ".webm", ".ogv", ".ogg", ".mov", ".m4v", ".avi", ".mkv", ".wmv":
+		return true
+	default:
+		return false
+	}
+}
+
+func sprayImportMimeType(ext string) string {
+	switch strings.ToLower(ext) {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".bmp":
+		return "image/bmp"
+	case ".gif":
+		return "image/gif"
+	case ".tga":
+		return "image/x-tga"
+	case ".webm":
+		return "video/webm"
+	case ".ogv", ".ogg":
+		return "video/ogg"
+	case ".mov":
+		return "video/quicktime"
+	case ".m4v":
+		return "video/x-m4v"
+	case ".avi":
+		return "video/x-msvideo"
+	case ".mkv":
+		return "video/x-matroska"
+	case ".wmv":
+		return "video/x-ms-wmv"
+	default:
+		return "video/mp4"
+	}
 }
