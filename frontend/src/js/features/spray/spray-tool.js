@@ -62,6 +62,21 @@ export function isSprayImportPath(path) {
   return SPRAY_IMPORT_EXTENSIONS.has(ext);
 }
 
+export function isSprayImportFile(file) {
+  if (!file) return false;
+  const type = String(file.type || "").toLowerCase();
+  return type.startsWith("image/") || type.startsWith("video/") || isSprayImportPath(file.name);
+}
+
+export async function importSprayFiles(files = [], { refreshFilesKeepFilter } = {}) {
+  const sprayFiles = Array.from(files || []).filter(isSprayImportFile);
+  if (!sprayFiles.length) return false;
+
+  openSprayTool({ refreshFilesKeepFilter });
+  await importPrimaryFiles(sprayFiles);
+  return true;
+}
+
 export async function importSprayPaths(paths = [], { refreshFilesKeepFilter } = {}) {
   const sprayPaths = Array.from(paths || []).filter(isSprayImportPath);
   if (!sprayPaths.length) return false;

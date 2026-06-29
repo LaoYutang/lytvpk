@@ -291,7 +291,7 @@ async function decodeVideoFile(file, { requestClipOptions } = {}) {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
-  video.preload = "metadata";
+  video.preload = "auto";
   video.src = URL.createObjectURL(file);
 
   try {
@@ -299,6 +299,7 @@ async function decodeVideoFile(file, { requestClipOptions } = {}) {
     if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
       await waitForEvent(video, "loadeddata");
     }
+    await waitForVideoFrame(video);
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     const opts = await getClipOptions(requestClipOptions, file, {
       type: "video",
@@ -319,14 +320,12 @@ async function decodeVideoFile(file, { requestClipOptions } = {}) {
       time += interval
     ) {
       const targetTime = Math.min(time, duration || time);
-      if (Math.abs(video.currentTime - targetTime) > 0.001) {
-        video.currentTime = targetTime;
-        await waitForEvent(video, "seeked");
-      }
+      await seekVideoTo(video, targetTime);
       frames.push(videoFrameToCanvas(video));
     }
 
-    return frameResult(file, frames.length ? frames : [videoFrameToCanvas(video)]);
+    const cleanedFrames = trimLeadingBlankVideoFrames(frames);
+    return frameResult(file, cleanedFrames.length ? cleanedFrames : [videoFrameToCanvas(video)]);
   } finally {
     URL.revokeObjectURL(video.src);
   }
@@ -403,6 +402,76 @@ function videoFrameToCanvas(video) {
   canvas.height = video.videoHeight || 1;
   canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
   return canvas;
+}
+
+async function seekVideoTo(video, targetTime) {
+  if (Math.abs(video.currentTime - targetTime) > 0.001) {
+    video.currentTime = targetTime;
+    await waitForEvent(video, "seeked");
+  }
+  await waitForVideoFrame(video);
+}
+
+function waitForVideoFrame(video) {
+  return new Promise((resolve) => {
+    let done = false;
+    let callbackHandle = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (
+        callbackHandle != null &&
+        typeof video.cancelVideoFrameCallback === "function"
+      ) {
+        video.cancelVideoFrameCallback(callbackHandle);
+      }
+      resolve();
+    };
+    const timer = setTimeout(finish, 90);
+
+    if (typeof video.requestVideoFrameCallback === "function") {
+      callbackHandle = video.requestVideoFrameCallback(finish);
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+    }
+  });
+}
+
+function trimLeadingBlankVideoFrames(frames) {
+  if (frames.length <= 1) return frames;
+
+  let firstContentIndex = -1;
+  for (let i = 0; i < frames.length; i += 1) {
+    if (!isNearBlankCanvas(frames[i])) {
+      firstContentIndex = i;
+      break;
+    }
+  }
+
+  if (firstContentIndex > 0 && firstContentIndex <= 2) {
+    return frames.slice(firstContentIndex);
+  }
+  return frames;
+}
+
+function isNearBlankCanvas(canvas) {
+  const sampleSize = 32;
+  const sample = document.createElement("canvas");
+  sample.width = sampleSize;
+  sample.height = sampleSize;
+  const ctx = sample.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(canvas, 0, 0, sampleSize, sampleSize);
+  const data = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
+  let visiblePixels = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3];
+    const brightness = data[i] + data[i + 1] + data[i + 2];
+    if (alpha > 12 && brightness > 30) {
+      visiblePixels += 1;
+    }
+  }
+  return visiblePixels / (data.length / 4) < 0.01;
 }
 
 function waitForEvent(target, eventName) {

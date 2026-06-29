@@ -16,7 +16,9 @@ import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
 import { openMDMPReportTool } from "./diagnostics/mdmp-report.js";
 import { openVPKPackTool } from "./diagnostics/vpk-pack.js";
 import {
+  importSprayFiles,
   importSprayPaths,
+  isSprayImportFile,
   isSprayImportPath,
   openSprayTool,
 } from "./spray/spray-tool.js";
@@ -823,6 +825,35 @@ function setupBatchActionEvents() {
     });
   });
 
+  let suppressSprayPathDropUntil = 0;
+  const getDroppedFiles = (event) => Array.from(event.dataTransfer?.files || []);
+  const hasDroppedFiles = (event) => getDroppedFiles(event).length > 0;
+
+  window.addEventListener(
+    "dragover",
+    (event) => {
+      if (!hasDroppedFiles(event)) return;
+      event.preventDefault();
+      if (getDroppedFiles(event).some(isSprayImportFile)) {
+        event.dataTransfer.dropEffect = "copy";
+      }
+    },
+    true
+  );
+  window.addEventListener(
+    "drop",
+    async (event) => {
+      const files = getDroppedFiles(event);
+      if (!files.length) return;
+      const sprayFiles = files.filter(isSprayImportFile);
+      if (!sprayFiles.length) return;
+      event.preventDefault();
+      suppressSprayPathDropUntil = Date.now() + 1200;
+      await importSprayFiles(sprayFiles, { refreshFilesKeepFilter });
+    },
+    true
+  );
+
   // 阻止浏览器默认的拖拽行为
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => e.preventDefault());
@@ -1011,7 +1042,7 @@ function setupWailsEvents() {
     if (paths && paths.length > 0) {
       const sprayPaths = paths.filter(isSprayImportPath);
       const otherPaths = paths.filter((path) => !isSprayImportPath(path));
-      if (sprayPaths.length > 0) {
+      if (sprayPaths.length > 0 && Date.now() > suppressSprayPathDropUntil) {
         await importSprayPaths(sprayPaths, { refreshFilesKeepFilter });
       }
       if (otherPaths.length > 0) {
