@@ -6,6 +6,7 @@
 ![LytVPK](https://img.shields.io/badge/Platform-Windows-blue)
 ![Build](https://img.shields.io/badge/Build-Wails_v2-green)
 ![Language](https://img.shields.io/badge/Language-Go_+_JavaScript-orange)
+![License](https://img.shields.io/badge/License-GPL--3.0--only-blue)
 
 ## 🚀 功能特性
 
@@ -54,3 +55,9 @@
 - [Wails](https://wails.io/) - 跨平台应用框架
 - [l4d2-server-next](https://github.com/LaoYutang/l4d2-server-next/tree/master/backend/pkg) - VPK 与 mission 文件解析库
 - [ants](https://github.com/panjf2000/ants) - 高性能协程池
+
+## 📄 开源协议
+
+本项目自 2026-06-29 起以 [GNU General Public License v3.0 only](./LICENSE) 授权发布。
+
+分发二进制、修改版或衍生版本时，请遵守 GPLv3 关于对应源码、版权声明、许可证文本和修改说明等要求。第三方依赖与资源遵循各自许可证。

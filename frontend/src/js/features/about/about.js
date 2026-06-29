@@ -2,7 +2,7 @@ import logoUrl from "../../../assets/images/logo.png";
 
 const ABOUT_LINKS = {
   repo: "https://github.com/LaoYutang/lytvpk",
-  license: "https://github.com/LaoYutang/lytvpk?tab=Apache-2.0-1-ov-file",
+  license: "https://github.com/LaoYutang/lytvpk/blob/master/LICENSE",
   issue: "https://github.com/LaoYutang/lytvpk/issues/new",
 };
 
@@ -38,7 +38,7 @@ export async function renderAboutPage({
             </div>
             <div>
               <dt>开源协议</dt>
-              <dd>Apache-2.0</dd>
+              <dd>GPL-3.0-only</dd>
             </div>
             <div>
               <dt>项目仓库</dt>
