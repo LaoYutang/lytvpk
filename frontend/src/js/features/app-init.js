@@ -21,6 +21,7 @@ import { applySort } from "./file-list/sorting.js";
 import { refreshTaskList } from "./downloads/task-list.js";
 import { renderServers, refreshAllServers } from "./servers/servers.js";
 import { renderWorkshopSidebar, browserState, loadWorkshopList } from "./workshop/workshop-browser.js";
+import { handleDropImportPaths } from "./drop-import.js";
 import {
   GetRootDirectory,
   ValidateDirectory,
@@ -32,7 +33,6 @@ import {
   GetVPKFiles,
   GetPrimaryTags,
   LaunchL4D2,
-  HandleFileDrop,
   SetWorkshopPreferredIP,
 } from "../../../wailsjs/go/app/App";
 
@@ -144,17 +144,7 @@ export async function handleUpload() {
   try {
     const paths = await SelectFiles();
     if (paths && paths.length > 0) {
-      updateLoadingMessage("正在处理选中的文件...");
-      showLoadingScreen();
-      try {
-        await HandleFileDrop(paths);
-        setTimeout(() => {
-          showMainScreen();
-        }, 1000);
-      } catch (err) {
-        showError("处理文件失败: " + err);
-        showMainScreen();
-      }
+      await handleDropImportPaths(paths, { source: "select" });
     }
   } catch (err) {
     console.error("选择文件失败:", err);

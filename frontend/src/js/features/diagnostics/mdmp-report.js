@@ -18,10 +18,19 @@ let tableState = {};
 let closeBound = false;
 
 export async function openMDMPReportTool() {
+  let filePath = "";
   try {
-    const filePath = await callApp("SelectMDMPFile");
-    if (!filePath) return;
+    filePath = await callApp("SelectMDMPFile");
+  } catch (error) {
+    showError("选择崩溃转储失败: " + formatError(error));
+    return;
+  }
+  if (!filePath) return;
+  await openMDMPReportFromPath(filePath);
+}
 
+export async function openMDMPReportFromPath(filePath) {
+  try {
     currentReport = null;
     activeTab = "overview";
     tableState = {};

@@ -16,6 +16,10 @@ import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
 import { openMDMPReportTool } from "./diagnostics/mdmp-report.js";
 import { openVPKPackTool } from "./diagnostics/vpk-pack.js";
 import {
+  configureDropImport,
+  handleDropImportPaths,
+} from "./drop-import.js";
+import {
   configureModelStatsScan,
   openModelStatsScanModal,
 } from "./diagnostics/model-stats-scan.js";
@@ -273,6 +277,11 @@ configureConflicts({
 configureModelStatsScan({
   EventsOn,
   showError,
+});
+
+configureDropImport({
+  EventsOn,
+  HandleFileDrop,
 });
 
 configureSettings({
@@ -993,28 +1002,8 @@ function setupWailsEvents() {
   });
 
   OnFileDrop((x, y, paths) => {
-    console.log("OnFileDrop检测到文件拖拽:", paths);
     if (paths && paths.length > 0) {
-      const loadingMsg = document.getElementById("loading-message");
-      if (loadingMsg) loadingMsg.textContent = "正在处理拖入的文件...";
-      const loadingScreen = document.getElementById("loading-screen");
-      const mainScreen = document.getElementById("main-screen");
-      if (loadingScreen && mainScreen) {
-        loadingScreen.classList.remove("hidden");
-        mainScreen.classList.add("hidden");
-      }
-      HandleFileDrop(paths)
-        .then(() => {
-          setTimeout(() => {
-            if (loadingScreen) loadingScreen.classList.add("hidden");
-            if (mainScreen) mainScreen.classList.remove("hidden");
-          }, 1000);
-        })
-        .catch((err) => {
-          showError("处理文件失败: " + err);
-          if (loadingScreen) loadingScreen.classList.add("hidden");
-          if (mainScreen) mainScreen.classList.remove("hidden");
-        });
+      handleDropImportPaths(paths, { source: "drop" });
     }
   }, true);
 

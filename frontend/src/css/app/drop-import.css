@@ -1,0 +1,322 @@
+.drop-import-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20020;
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(76vh, 560px);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+}
+
+.drop-import-header {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+}
+
+.drop-import-state-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.drop-import-panel.is-running .drop-import-state-icon {
+  border: 3px solid #dbeafe;
+  border-top-color: #2563eb;
+  background: #ffffff;
+  animation: drop-import-spin 0.9s linear infinite;
+}
+
+.drop-import-panel.is-complete .drop-import-state-icon {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+}
+
+.drop-import-panel.is-complete .drop-import-state-icon::before {
+  content: "✓";
+  font-size: 1.38rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.drop-import-panel.is-error .drop-import-state-icon {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+}
+
+.drop-import-panel.is-error .drop-import-state-icon::before {
+  content: "!";
+  font-size: 1.38rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.drop-import-title-wrap {
+  min-width: 0;
+}
+
+.drop-import-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.drop-import-summary {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.drop-import-phase {
+  min-width: 3rem;
+  padding: 5px 9px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.drop-import-progress-section {
+  display: grid;
+  gap: 8px;
+}
+
+.drop-import-file {
+  min-width: 0;
+  display: block;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drop-import-current {
+  min-height: 1.2em;
+  margin: -2px 0 0;
+  color: #475569;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.drop-import-active-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 72px;
+  overflow: auto;
+}
+
+.drop-import-active-list:empty {
+  display: none;
+}
+
+.drop-import-active-item {
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #1e40af;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drop-import-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.4rem;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.drop-import-progress-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.drop-import-progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #0891b2, #10b981);
+  transition: width var(--duration-150) var(--ease-out);
+}
+
+.drop-import-progress-meta {
+  color: #059669;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.drop-import-results {
+  max-height: 220px;
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+}
+
+.drop-import-results:empty {
+  display: none;
+}
+
+.drop-import-result {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.drop-import-result::before {
+  content: "✓";
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #059669;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.drop-import-result.is-failed::before {
+  content: "!";
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.drop-import-result-status {
+  justify-self: end;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #047857;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.drop-import-result.is-failed .drop-import-result-status {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.drop-import-panel.is-error .drop-import-progress-meta,
+.drop-import-panel.is-error .drop-import-phase {
+  color: #dc2626;
+}
+
+.drop-import-panel.is-error .drop-import-phase {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.drop-import-panel.is-error .drop-import-progress-fill {
+  background: #dc2626;
+}
+
+.drop-import-result-body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.drop-import-result-body strong,
+.drop-import-result-body span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.drop-import-result-body strong {
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.drop-import-result-body span {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.drop-import-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.drop-import-panel.is-running .drop-import-footer {
+  display: none;
+}
+
+.drop-import-action {
+  min-width: 104px;
+  justify-content: center;
+}
+
+@keyframes drop-import-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 520px) {
+  .drop-import-panel {
+    right: 10px;
+    bottom: 10px;
+    width: calc(100vw - 20px);
+    padding: 14px;
+  }
+
+  .drop-import-result {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .drop-import-result-status {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .drop-import-action {
+    width: 100%;
+  }
+}

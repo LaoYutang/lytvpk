@@ -129,7 +129,7 @@ export function GetWorkshopUpdateCheckEnabled():Promise<boolean>;
 
 export function GetWorkshopWatchLaterStorage():Promise<app.WorkshopWatchLaterStorage>;
 
-export function HandleFileDrop(arg1:Array<string>):Promise<void>;
+export function HandleFileDrop(arg1:Array<string>):Promise<app.DropImportResult>;
 
 export function HandleProtocolURL(arg1:string):Promise<void>;
 

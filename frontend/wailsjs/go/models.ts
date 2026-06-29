@@ -227,6 +227,66 @@ export namespace app {
 	        this.created_at = source["created_at"];
 	    }
 	}
+	export class DropImportItemResult {
+	    path: string;
+	    name: string;
+	    kind: string;
+	    success: boolean;
+	    message: string;
+	    outputPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DropImportItemResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.outputPath = source["outputPath"];
+	    }
+	}
+	export class DropImportResult {
+	    total: number;
+	    succeeded: number;
+	    failed: number;
+	    items: DropImportItemResult[];
+	    hasInstallChanges: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DropImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.succeeded = source["succeeded"];
+	        this.failed = source["failed"];
+	        this.items = this.convertValues(source["items"], DropImportItemResult);
+	        this.hasInstallChanges = source["hasInstallChanges"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class LocalStorageMigrationPayload {
 	    config: string;
 	    theme: string;

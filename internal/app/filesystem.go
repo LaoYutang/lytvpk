@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	rt "runtime"
 	"strings"
-	"sync"
 )
 
 func (a *App) SelectDirectory() (string, error) {
@@ -175,11 +174,11 @@ func copyAndDelete(src, dst string) error {
 // SelectFiles 选择文件对话框 (支持多选)
 func (a *App) SelectFiles() ([]string, error) {
 	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "选择文件 (VPK, ZIP, RAR, 7Z)",
+		Title: "选择文件 (VPK, ZIP, RAR, 7Z, DMP)",
 		Filters: []runtime.FileFilter{
 			{
-				DisplayName: "支持的文件 (*.vpk;*.zip;*.rar;*.7z)",
-				Pattern:     "*.vpk;*.zip;*.rar;*.7z",
+				DisplayName: "支持的文件 (*.vpk;*.zip;*.rar;*.7z;*.mdmp;*.dmp)",
+				Pattern:     "*.vpk;*.zip;*.rar;*.7z;*.mdmp;*.dmp",
 			},
 			{
 				DisplayName: "VPK 文件 (*.vpk)",
@@ -188,6 +187,10 @@ func (a *App) SelectFiles() ([]string, error) {
 			{
 				DisplayName: "压缩包 (*.zip;*.rar;*.7z)",
 				Pattern:     "*.zip;*.rar;*.7z",
+			},
+			{
+				DisplayName: "崩溃转储文件 (*.mdmp;*.dmp)",
+				Pattern:     "*.mdmp;*.dmp",
 			},
 			{
 				DisplayName: "所有文件 (*.*)",
@@ -388,95 +391,7 @@ func (a *App) DeleteVPKFiles(filePaths []string) error {
 	return nil
 }
 
-func (a *App) HandleFileDrop(paths []string) {
-	if a.rootDir == "" {
-		a.LogError("拖拽安装", "请先设置游戏根目录", "")
-		return
-	}
-
-	successCount := 0
-	failCount := 0
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, path := range paths {
-		wg.Add(1)
-		go func(p string) {
-			defer wg.Done()
-
-			lowerPath := strings.ToLower(p)
-			var err error
-			success := false
-
-			if strings.HasSuffix(lowerPath, ".vpk") {
-				// Copy VPK to rootDir
-				err = a.installVPKFile(p)
-				if err != nil {
-					a.LogError("安装VPK失败", err.Error(), filepath.Base(p))
-				} else {
-					success = true
-				}
-			} else if strings.HasSuffix(lowerPath, ".zip") || strings.HasSuffix(lowerPath, ".rar") || strings.HasSuffix(lowerPath, ".7z") {
-				// Extract Archive to rootDir
-				err = a.ExtractVPKFromArchive(p, a.rootDir)
-				if err != nil {
-					a.LogError("解压压缩包失败", err.Error(), filepath.Base(p))
-				} else {
-					success = true
-				}
-			} else {
-				a.LogError("不支持的文件格式", "仅支持 .vpk, .zip, .rar, .7z 文件", filepath.Base(p))
-			}
-
-			mu.Lock()
-			if success {
-				successCount++
-			} else {
-				failCount++
-			}
-			mu.Unlock()
-		}(path)
-	}
-
-	wg.Wait()
-
-	if successCount > 0 {
-		// 刷新文件列表
-		runtime.EventsEmit(a.ctx, "refresh_files", nil)
-
-		msg := fmt.Sprintf("成功处理 %d 个文件", successCount)
-		if failCount > 0 {
-			msg += fmt.Sprintf("，失败 %d 个", failCount)
-		}
-		runtime.EventsEmit(a.ctx, "show_toast", map[string]string{"type": "success", "message": msg})
-	}
-}
-
 // queryA2S 使用 UDP 协议直接查询 Source 引擎服务器信息
-
-func (a *App) installVPKFile(srcPath string) error {
-	src, err := os.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	defer src.Close()
-
-	destPath := filepath.Join(a.rootDir, filepath.Base(srcPath))
-
-	dst, err := os.Create(destPath)
-	if err != nil {
-		return err
-	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("已安装: %s -> %s", srcPath, destPath)
-	return nil
-}
 
 func (a *App) RestartApplication() error {
 	self, err := os.Executable()

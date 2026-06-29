@@ -12,6 +12,7 @@
 @import "./app/mdmp-report.css";
 @import "./app/problem-scan.css";
 @import "./app/model-stats-scan.css";
+@import "./app/drop-import.css";
 @import "./dark-mode.css";
 @import "./titlebar.css";
 @import "./rotation.css";

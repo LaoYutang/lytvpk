@@ -26,6 +26,8 @@ type VPKPackResult struct {
 	OutputIsAddons bool   `json:"outputIsAddons"`
 }
 
+type vpkPackProgressFunc = func(percent int, message string)
+
 // SelectVPKPackSourceDirectory opens a directory picker for the VPK root to pack.
 func (a *App) SelectVPKPackSourceDirectory() (string, error) {
 	directory, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
@@ -42,6 +44,10 @@ func (a *App) SelectVPKPackSourceDirectory() (string, error) {
 // PackVPKDirectory packs all regular files under sourceDir into a single-file v1 VPK
 // written to outputDir, named after the source directory.
 func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddons bool) (VPKPackResult, error) {
+	return a.packVPKDirectoryWithProgress(sourceDir, outputDir, outputIsAddons, nil)
+}
+
+func (a *App) packVPKDirectoryWithProgress(sourceDir string, outputDir string, outputIsAddons bool, progress vpkPackProgressFunc) (VPKPackResult, error) {
 	result := VPKPackResult{OutputIsAddons: outputIsAddons}
 
 	sourceDir = strings.TrimSpace(sourceDir)
@@ -76,6 +82,13 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 		return result, fmt.Errorf("输出位置不是文件夹: %s", outputDir)
 	}
 
+	emitVPKPackProgress(progress, 2, "正在检查打包目录...")
+
+	type sourceFile struct {
+		fullPath       string
+		dir, base, ext string
+		size           int64
+	}
 	type packEntry struct {
 		fullPath       string
 		dir, base, ext string
@@ -83,7 +96,8 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 		size           uint32
 	}
 
-	var entries []packEntry
+	var sourceFiles []sourceFile
+	var totalBytes int64
 	err = filepath.WalkDir(sourceDir, func(p string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -101,28 +115,55 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 		}
 		rel = filepath.ToSlash(rel)
 
-		dir, base, ext := splitVPKPackPath(rel)
-		crc, size, crcErr := computeFileCRC32(p)
-		if crcErr != nil {
-			return fmt.Errorf("读取文件 %s 失败: %v", p, crcErr)
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return fmt.Errorf("无法读取文件信息 %s: %v", p, infoErr)
 		}
-
-		entries = append(entries, packEntry{
+		dir, base, ext := splitVPKPackPath(rel)
+		sourceFiles = append(sourceFiles, sourceFile{
 			fullPath: p,
 			dir:      dir,
 			base:     base,
 			ext:      ext,
-			crc:      crc,
-			size:     uint32(size),
+			size:     info.Size(),
 		})
+		totalBytes += info.Size()
 		return nil
 	})
 	if err != nil {
 		return result, fmt.Errorf("遍历打包目录失败: %v", err)
 	}
 
-	if len(entries) == 0 {
+	if len(sourceFiles) == 0 {
 		return result, fmt.Errorf("打包目录为空，未发现可打包文件: %s", sourceDir)
+	}
+
+	emitVPKPackProgress(progress, 8, fmt.Sprintf("发现 %d 个可打包文件", len(sourceFiles)))
+
+	var entries []packEntry
+	var hashedBytes int64
+	for i, file := range sourceFiles {
+		crc, size, crcErr := computeFileCRC32WithProgress(file.fullPath, func(delta int64) {
+			hashedBytes += delta
+			percent := scaledProgressPercent(8, 48, hashedBytes, totalBytes)
+			emitVPKPackProgress(progress, percent, fmt.Sprintf("正在计算校验: %s", filepath.Base(file.fullPath)))
+		})
+		if crcErr != nil {
+			return result, fmt.Errorf("读取文件 %s 失败: %v", file.fullPath, crcErr)
+		}
+		if totalBytes <= 0 {
+			percent := 8 + ((i + 1) * 40 / len(sourceFiles))
+			emitVPKPackProgress(progress, percent, fmt.Sprintf("正在计算校验: %s", filepath.Base(file.fullPath)))
+		}
+
+		entries = append(entries, packEntry{
+			fullPath: file.fullPath,
+			dir:      file.dir,
+			base:     file.base,
+			ext:      file.ext,
+			crc:      crc,
+			size:     uint32(size),
+		})
 	}
 
 	// WriteDirectory requires entries sorted by ext, then dir, then base.
@@ -160,6 +201,7 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 	}
 
 	var buffer bytes.Buffer
+	emitVPKPackProgress(progress, 52, "正在写入 VPK 目录...")
 	if err := vpk.WriteDirectory(&buffer, archive); err != nil {
 		return result, fmt.Errorf("写入 VPK 目录失败: %v", err)
 	}
@@ -186,11 +228,20 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 		return abort(fmt.Errorf("写入 VPK 目录失败: %v", err))
 	}
 
+	var writtenBytes int64
 	for _, e := range entries {
-		if err := appendVPKFileData(out, e.fullPath); err != nil {
+		if err := appendVPKFileDataWithProgress(out, e.fullPath, func(delta int64) {
+			writtenBytes += delta
+			percent := scaledProgressPercent(58, 98, writtenBytes, totalBytes)
+			emitVPKPackProgress(progress, percent, fmt.Sprintf("正在写入: %s", filepath.Base(e.fullPath)))
+		}); err != nil {
 			return abort(fmt.Errorf("写入文件 %s 数据失败: %v", e.fullPath, err))
 		}
 		result.PackedFiles++
+		if totalBytes <= 0 {
+			percent := 58 + (result.PackedFiles * 40 / len(entries))
+			emitVPKPackProgress(progress, percent, fmt.Sprintf("正在写入: %s", filepath.Base(e.fullPath)))
+		}
 	}
 
 	if err := out.Close(); err != nil {
@@ -198,6 +249,7 @@ func (a *App) PackVPKDirectory(sourceDir string, outputDir string, outputIsAddon
 		return result, fmt.Errorf("关闭 VPK 文件失败: %v", err)
 	}
 
+	emitVPKPackProgress(progress, 100, fmt.Sprintf("已打包: %s", filepath.Base(outputPath)))
 	return result, nil
 }
 
@@ -242,6 +294,10 @@ func splitVPKPackPath(relPath string) (dir, base, ext string) {
 }
 
 func computeFileCRC32(filePath string) (uint32, int64, error) {
+	return computeFileCRC32WithProgress(filePath, nil)
+}
+
+func computeFileCRC32WithProgress(filePath string, onDelta func(int64)) (uint32, int64, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return 0, 0, err
@@ -249,22 +305,64 @@ func computeFileCRC32(filePath string) (uint32, int64, error) {
 	defer file.Close()
 
 	hasher := crc32.NewIEEE()
-	written, err := io.Copy(hasher, file)
-	if err != nil {
-		return 0, 0, err
+	buffer := make([]byte, 1024*1024)
+	var written int64
+	for {
+		n, readErr := file.Read(buffer)
+		if n > 0 {
+			if _, writeErr := hasher.Write(buffer[:n]); writeErr != nil {
+				return 0, written, writeErr
+			}
+			written += int64(n)
+			if onDelta != nil {
+				onDelta(int64(n))
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return 0, written, readErr
+		}
 	}
 	return hasher.Sum32(), written, nil
 }
 
 func appendVPKFileData(out *os.File, filePath string) error {
+	return appendVPKFileDataWithProgress(out, filePath, nil)
+}
+
+func appendVPKFileDataWithProgress(out *os.File, filePath string, onDelta func(int64)) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	if _, err := io.Copy(out, file); err != nil {
-		return err
+	buffer := make([]byte, 1024*1024)
+	for {
+		n, readErr := file.Read(buffer)
+		if n > 0 {
+			if _, writeErr := out.Write(buffer[:n]); writeErr != nil {
+				return writeErr
+			}
+			if onDelta != nil {
+				onDelta(int64(n))
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return readErr
+		}
 	}
 	return nil
+}
+
+func emitVPKPackProgress(progress vpkPackProgressFunc, percent int, message string) {
+	if progress == nil {
+		return
+	}
+	progress(normalizeProgressPercent(percent), message)
 }
