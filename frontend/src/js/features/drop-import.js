@@ -85,7 +85,7 @@ function showDropImportPanel(title) {
   panel.querySelector(".drop-import-phase").textContent = "准备";
   panel.querySelector(".drop-import-summary").textContent = "总进度 0%";
   panel.querySelector(".drop-import-file").textContent = "等待文件";
-  panel.querySelector(".drop-import-current").textContent = "准备处理...";
+  setDropImportCurrent(panel, "准备处理...");
   panel.querySelector(".drop-import-active-list").replaceChildren();
   panel.querySelector(".drop-import-progress-fill").style.width = "0%";
   panel.querySelector(".drop-import-progress-meta").textContent = "0%";
@@ -114,11 +114,11 @@ function renderDropImportProgress(progress = {}) {
   if (activeNames.length > 0) {
     panel.querySelector(".drop-import-file").textContent = "正在并行解压 VPK";
     panel.querySelector(".drop-import-file").title = activeNames.join(", ");
-    panel.querySelector(".drop-import-current").textContent = message;
+    setDropImportCurrent(panel, "", true);
   } else {
     panel.querySelector(".drop-import-file").textContent = name || "当前文件";
     panel.querySelector(".drop-import-file").title = progress.path || name || "";
-    panel.querySelector(".drop-import-current").textContent = message;
+    setDropImportCurrent(panel, message);
   }
   renderActiveNames(panel.querySelector(".drop-import-active-list"), activeNames);
   panel.querySelector(".drop-import-progress-fill").style.width = `${percent}%`;
@@ -138,7 +138,7 @@ function renderDropImportResult(result = {}) {
   panel.querySelector(".drop-import-phase").textContent = failed > 0 ? "完成" : "完成";
   panel.querySelector(".drop-import-summary").textContent = `成功 ${succeeded} / ${total}，失败 ${failed}`;
   panel.querySelector(".drop-import-file").textContent = failed > 0 ? "查看处理结果" : "全部处理完成";
-  panel.querySelector(".drop-import-current").textContent = failed > 0 ? "部分项目未处理成功" : "全部处理完成";
+  setDropImportCurrent(panel, failed > 0 ? "部分项目未处理成功" : "全部处理完成");
   panel.querySelector(".drop-import-active-list").replaceChildren();
   panel.querySelector(".drop-import-progress-fill").style.width = "100%";
   panel.querySelector(".drop-import-progress-meta").textContent = "100%";
@@ -158,7 +158,7 @@ function renderDropImportError(message) {
   panel.querySelector(".drop-import-phase").textContent = "失败";
   panel.querySelector(".drop-import-summary").textContent = message || "处理文件失败";
   panel.querySelector(".drop-import-file").textContent = "处理失败";
-  panel.querySelector(".drop-import-current").textContent = "请查看错误信息后重试";
+  setDropImportCurrent(panel, "请查看错误信息后重试");
   panel.querySelector(".drop-import-active-list").replaceChildren();
   panel.querySelector(".drop-import-progress-fill").style.width = "100%";
   panel.querySelector(".drop-import-progress-meta").textContent = "失败";
@@ -169,10 +169,6 @@ function renderDropImportError(message) {
 function createResultRow(item = {}) {
   const row = document.createElement("div");
   row.className = `drop-import-result ${item.success ? "is-success" : "is-failed"}`;
-
-  const status = document.createElement("span");
-  status.className = "drop-import-result-status";
-  status.textContent = item.success ? "完成" : "失败";
 
   const body = document.createElement("div");
   body.className = "drop-import-result-body";
@@ -185,8 +181,21 @@ function createResultRow(item = {}) {
   message.textContent = item.message || "";
 
   body.append(name, message);
-  row.append(status, body);
+  row.appendChild(body);
+  if (!item.success) {
+    const status = document.createElement("span");
+    status.className = "drop-import-result-status";
+    status.textContent = "失败";
+    row.appendChild(status);
+  }
   return row;
+}
+
+function setDropImportCurrent(panel, text, hidden = false) {
+  const current = panel.querySelector(".drop-import-current");
+  if (!current) return;
+  current.textContent = text || "";
+  current.classList.toggle("hidden", hidden);
 }
 
 function showImportSummary(result = {}) {
