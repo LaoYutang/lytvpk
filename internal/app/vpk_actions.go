@@ -276,6 +276,7 @@ func (a *App) SetVPKTags(filePath string, primaryTag string, secondaryTags []str
 		a.processVPKFileWithCache(newPath)
 	}
 
+	a.updateCompletedDownloadTaskPath(filePath, newPath)
 	return nil
 }
 
@@ -352,5 +353,6 @@ func (a *App) RenameVPKFile(filePath string, newFilename string) (string, error)
 		a.processVPKFileWithCache(newPath)
 	}
 
+	a.updateCompletedDownloadTaskPath(filePath, newPath)
 	return newPath, nil
 }

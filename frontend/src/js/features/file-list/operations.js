@@ -152,8 +152,13 @@ function buildRenamePreview(filePath, oldFileName, inputName, isHidden) {
 }
 
 export async function renameFile(filePath) {
-  const file = appState.vpkFiles.find((f) => f.path === filePath);
-  if (!file) return;
+  const file =
+    (appState.vpkFiles || []).find((f) => f.path === filePath) ||
+    (appState.allVpkFiles || []).find((f) => f.path === filePath);
+  if (!file) {
+    showError("未找到要重命名的文件，请刷新列表后重试");
+    return;
+  }
 
   const fileName = file.name;
   const isHidden = fileName.startsWith("_");

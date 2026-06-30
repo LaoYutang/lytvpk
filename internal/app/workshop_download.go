@@ -197,7 +197,8 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			}
 
 			// 替换同workshopId的旧mod
-			a.replaceExistingMod(targetPath, task.WorkshopID)
+			targetPath = a.replaceExistingMod(targetPath, task.WorkshopID)
+			setDownloadTaskFilePath(task, targetPath)
 
 			updateStatus("completed", "")
 			return
@@ -499,7 +500,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 
 	// 替换名workshopId的旧mod
-	a.replaceExistingMod(targetPath, task.WorkshopID)
+	targetPath = a.replaceExistingMod(targetPath, task.WorkshopID)
 
 	// 如果是直连下载且是压缩文件，自动解压
 	ext := strings.ToLower(filepath.Ext(targetPath))
@@ -519,14 +520,15 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		}
 	}
 
+	setDownloadTaskFilePath(task, targetPath)
 	updateStatus("completed", "")
 }
 
 // replaceExistingMod 下载完成后，查找同workshopId的旧mod并替换
 // 将新文件移动到旧mod所在目录，删才旧文件及其关联文件
-func (a *App) replaceExistingMod(newFilePath string, workshopID string) {
+func (a *App) replaceExistingMod(newFilePath string, workshopID string) string {
 	if workshopID == "" || strings.HasPrefix(workshopID, "direct-") {
-		return
+		return newFilePath
 	}
 
 	var oldFilePath string
@@ -543,7 +545,7 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string) {
 	})
 
 	if oldFilePath == "" {
-		return
+		return newFilePath
 	}
 
 	log.Printf("发玏同ID旧Mod: %s (位置: %s)，准勇替换", oldFilePath, oldLocation)
@@ -578,12 +580,12 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string) {
 	// 如果目录目录与旧mod目录目录目录，无需移动
 	if filepath.Dir(newFilePath) == targetDir {
 		log.Printf("新文件圂目录目录: %s", targetPath)
-		return
+		return targetPath
 	}
 
 	if err := os.Rename(newFilePath, targetPath); err != nil {
 		log.Printf("移动新文件到目彗目录失败: %s -> %s, %v", newFilePath, targetPath, err)
-		return
+		return newFilePath
 	}
 
 	// 同旦移动新文件的关联文件（.meta, 预览图）
@@ -600,4 +602,5 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string) {
 	}
 
 	log.Printf("已替捩旧Mod，新文件位罎: %s", targetPath)
+	return targetPath
 }

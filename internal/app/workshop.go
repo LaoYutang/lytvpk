@@ -57,6 +57,7 @@ type DownloadTask struct {
 	WorkshopID     string             `json:"workshop_id"`
 	Title          string             `json:"title"`
 	Filename       string             `json:"filename"`
+	FilePath       string             `json:"file_path"`
 	PreviewUrl     string             `json:"preview_url"`
 	FileUrl        string             `json:"file_url"` // Added for retry
 	UseOptimizedIP bool               `json:"use_optimized_ip"`
@@ -132,6 +133,7 @@ func (a *App) RetryDownloadTask(taskID string) {
 	task.DownloadedSize = 0
 	task.Error = ""
 	task.Speed = ""
+	task.FilePath = ""
 
 	// Create new context
 	ctx, cancel := context.WithCancel(context.Background())

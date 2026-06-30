@@ -407,6 +407,33 @@
   height: 14px;
 }
 
+.task-completed-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.task-completed-action-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.task-completed-action-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-100);
+  color: var(--primary);
+}
+
 /* 确认对话框样式 */
 .confirm-modal-content {
   max-width: 500px;

@@ -192,6 +192,7 @@ export namespace app {
 	    workshop_id: string;
 	    title: string;
 	    filename: string;
+	    file_path: string;
 	    preview_url: string;
 	    file_url: string;
 	    use_optimized_ip: boolean;
@@ -214,6 +215,7 @@ export namespace app {
 	        this.workshop_id = source["workshop_id"];
 	        this.title = source["title"];
 	        this.filename = source["filename"];
+	        this.file_path = source["file_path"];
 	        this.preview_url = source["preview_url"];
 	        this.file_url = source["file_url"];
 	        this.use_optimized_ip = source["use_optimized_ip"];

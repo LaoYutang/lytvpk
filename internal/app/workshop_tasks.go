@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -33,6 +35,55 @@ func (a *App) ClearCompletedTasks() {
 		}
 	}
 	runtime.EventsEmit(a.ctx, "tasks_cleared", nil)
+}
+
+func normalizeDownloadTaskPath(filePath string) string {
+	if strings.TrimSpace(filePath) == "" {
+		return ""
+	}
+	return filepath.Clean(filePath)
+}
+
+func isVPKDownloadTaskPath(filePath string) bool {
+	return strings.EqualFold(filepath.Ext(filePath), ".vpk")
+}
+
+func sameDownloadTaskPath(left string, right string) bool {
+	return strings.EqualFold(normalizeDownloadTaskPath(left), normalizeDownloadTaskPath(right))
+}
+
+func setDownloadTaskFilePath(task *DownloadTask, filePath string) {
+	filePath = normalizeDownloadTaskPath(filePath)
+	if filePath == "" || !isVPKDownloadTaskPath(filePath) {
+		return
+	}
+
+	taskManager.mu.Lock()
+	task.FilePath = filePath
+	taskManager.mu.Unlock()
+}
+
+func (a *App) updateCompletedDownloadTaskPath(oldPath string, newPath string) {
+	oldPath = normalizeDownloadTaskPath(oldPath)
+	newPath = normalizeDownloadTaskPath(newPath)
+	if oldPath == "" || newPath == "" || sameDownloadTaskPath(oldPath, newPath) {
+		return
+	}
+
+	updatedTasks := make([]DownloadTask, 0)
+
+	taskManager.mu.Lock()
+	for _, task := range taskManager.tasks {
+		if task.Status == "completed" && sameDownloadTaskPath(task.FilePath, oldPath) {
+			task.FilePath = newPath
+			updatedTasks = append(updatedTasks, *task)
+		}
+	}
+	taskManager.mu.Unlock()
+
+	for i := range updatedTasks {
+		runtime.EventsEmit(a.ctx, "task_updated", &updatedTasks[i])
+	}
 }
 
 type TaskWriteCounter struct {

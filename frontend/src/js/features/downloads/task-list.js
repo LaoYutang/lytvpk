@@ -1,6 +1,9 @@
 import { showError, showNotification } from "../../core/toast.js";
 import { showConfirmModal } from "../modals/confirm.js";
+import { appState } from "../state.js";
 import { refreshFilesKeepFilter } from "../file-list/filters.js";
+import { renameFile } from "../file-list/operations.js";
+import { openSetTagsModal } from "../file-list/tags.js";
 import {
   GetDownloadTasks,
   CancelDownloadTask,
@@ -115,7 +118,7 @@ export function createTaskElement(task) {
 
   div.innerHTML = `
     ${previewHtml}
-    <div style="flex: 1;">
+    <div class="task-content" style="flex: 1; min-width: 0;">
       <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
         <span class="task-title" style="font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;">${task.title}</span>
         <div style="display: flex; align-items: center; gap: 5px;">
@@ -134,6 +137,11 @@ export function createTaskElement(task) {
       ${task.error ? `<div style="color: #f44336; font-size: 11px; margin-top: 2px;">${task.error}</div>` : ""}
     </div>
   `;
+
+  const completedActions = createCompletedTaskActions(task);
+  if (completedActions) {
+    div.querySelector(".task-content")?.appendChild(completedActions);
+  }
 
   const copyLinkBtn = div.querySelector(".copy-link-btn");
   if (copyLinkBtn) {
@@ -190,6 +198,124 @@ export function createTaskElement(task) {
   }
 
   return div;
+}
+
+function createCompletedTaskActions(task) {
+  if (task.status !== "completed" || !getCompletedTaskFilePathCandidate(task)) {
+    return null;
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "task-completed-actions";
+
+  const renameBtn = createCompletedTaskButton("重命名", "task-rename-shortcut-btn");
+  renameBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await openCompletedTaskFile(task, renameFile);
+  });
+
+  const tagsBtn = createCompletedTaskButton("设置标签", "task-tags-shortcut-btn");
+  tagsBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await openCompletedTaskFile(task, openSetTagsModal);
+  });
+
+  actions.appendChild(renameBtn);
+  actions.appendChild(tagsBtn);
+  return actions;
+}
+
+function createCompletedTaskButton(label, extraClass) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `task-completed-action-btn ${extraClass}`;
+  button.textContent = label;
+  return button;
+}
+
+async function openCompletedTaskFile(task, action) {
+  const filePath = await resolveCompletedTaskFilePath(task);
+  if (!filePath) {
+    showError("无法定位已下载的 VPK 文件，请刷新 Mod 列表后重试");
+    return;
+  }
+
+  action(filePath);
+}
+
+async function resolveCompletedTaskFilePath(task) {
+  let file = findDownloadedTaskFile(task);
+  if (file?.path) {
+    return file.path;
+  }
+
+  if (!getTaskVPKPath(task)) {
+    return "";
+  }
+
+  await refreshFilesKeepFilter();
+  file = findDownloadedTaskFile(task);
+  return file?.path || "";
+}
+
+function getCompletedTaskFilePathCandidate(task) {
+  const file = findDownloadedTaskFile(task);
+  if (file?.path) {
+    return file.path;
+  }
+
+  return getTaskVPKPath(task);
+}
+
+function getTaskVPKPath(task) {
+  const filePath = String(task.file_path || "").trim();
+  if (!filePath || !filePath.toLowerCase().endsWith(".vpk")) {
+    return "";
+  }
+  return filePath;
+}
+
+function findDownloadedTaskFile(task) {
+  const files = getKnownVPKFiles();
+  const taskPath = normalizePathForCompare(getTaskVPKPath(task));
+  if (taskPath) {
+    const file = files.find((item) => normalizePathForCompare(item.path) === taskPath);
+    if (file) return file;
+  }
+
+  const workshopId = String(task.workshop_id || "").trim();
+  if (workshopId && !workshopId.startsWith("direct-")) {
+    const matches = files.filter((item) => String(item.workshopId || "") === workshopId);
+    if (matches.length === 1) {
+      return matches[0];
+    }
+  }
+
+  const filename = String(task.filename || "").trim().toLowerCase();
+  if (filename.endsWith(".vpk")) {
+    const matches = files.filter((item) => String(item.name || "").toLowerCase() === filename);
+    if (matches.length === 1) {
+      return matches[0];
+    }
+  }
+
+  return null;
+}
+
+function getKnownVPKFiles() {
+  const filesByPath = new Map();
+  [...(appState.allVpkFiles || []), ...(appState.vpkFiles || [])].forEach((file) => {
+    if (file?.path && !filesByPath.has(file.path)) {
+      filesByPath.set(file.path, file);
+    }
+  });
+  return Array.from(filesByPath.values());
+}
+
+function normalizePathForCompare(filePath) {
+  return String(filePath || "").replace(/\//g, "\\").toLowerCase();
 }
 
 export function updateTaskInList(task) {
