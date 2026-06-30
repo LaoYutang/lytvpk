@@ -226,6 +226,15 @@ import {
 // 暴露给全局使用，以便在 onclick 中调用
 window.BrowserOpenURL = BrowserOpenURL;
 
+const SPRAY_FILE_DROP_FALLBACK_DELAY_MS = 300;
+const DOM_SPRAY_DROP_SUPPRESS_MS = 1200;
+
+let fileDropGuardsConfigured = false;
+let pendingSprayFileDropFallback = null;
+let sprayFileDropFallbackToken = 0;
+let lastDomSprayFallbackAt = 0;
+let lastDomSprayFallbackNames = new Set();
+
 const ChangePanelDifficulty = (serverID, difficulty) => {
   const method = window?.go?.app?.App?.ChangePanelDifficulty;
   if (typeof method !== "function") {
@@ -401,6 +410,99 @@ async function initUpdateCheck() {
   } catch (err) {
     console.warn("更新检测初始化失败:", err);
   }
+}
+
+function setupFileDropGuards() {
+  if (fileDropGuardsConfigured) return;
+  fileDropGuardsConfigured = true;
+
+  window.addEventListener("dragenter", guardFileDragEvent, true);
+  window.addEventListener("dragover", guardFileDragEvent, true);
+  window.addEventListener("drop", handleGlobalDropEvent, true);
+}
+
+function guardFileDragEvent(event) {
+  if (!hasExternalFileDragData(event)) return;
+  event.preventDefault();
+  setDropEffect(event, "copy");
+}
+
+function handleGlobalDropEvent(event) {
+  const hasExternalFiles = hasExternalFileDragData(event);
+
+  event.preventDefault();
+  if (!hasExternalFiles) return;
+
+  setDropEffect(event, "copy");
+
+  const sprayFiles = getDroppedFiles(event).filter(isSprayImportFile);
+  if (sprayFiles.length > 0) {
+    scheduleSprayFileDropFallback(sprayFiles);
+  }
+}
+
+function hasExternalFileDragData(event) {
+  return getDataTransferTypes(event).includes("Files");
+}
+
+function getDataTransferTypes(event) {
+  return Array.from(event.dataTransfer?.types || []);
+}
+
+function getDroppedFiles(event) {
+  return Array.from(event.dataTransfer?.files || []);
+}
+
+function setDropEffect(event, effect) {
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = effect;
+  }
+}
+
+function scheduleSprayFileDropFallback(files) {
+  clearSprayFileDropFallback();
+
+  const token = ++sprayFileDropFallbackToken;
+  pendingSprayFileDropFallback = window.setTimeout(async () => {
+    if (token !== sprayFileDropFallbackToken) return;
+
+    pendingSprayFileDropFallback = null;
+    lastDomSprayFallbackAt = Date.now();
+    lastDomSprayFallbackNames = new Set(
+      files
+        .map((file) => String(file?.name || "").toLowerCase())
+        .filter(Boolean)
+    );
+    await importSprayFiles(files, { refreshFilesKeepFilter });
+  }, SPRAY_FILE_DROP_FALLBACK_DELAY_MS);
+}
+
+function clearSprayFileDropFallback() {
+  if (pendingSprayFileDropFallback !== null) {
+    window.clearTimeout(pendingSprayFileDropFallback);
+    pendingSprayFileDropFallback = null;
+  }
+  sprayFileDropFallbackToken++;
+}
+
+function consumeRecentDomSprayFallbackForPaths(paths) {
+  if (Date.now() - lastDomSprayFallbackAt > DOM_SPRAY_DROP_SUPPRESS_MS) {
+    return false;
+  }
+  if (lastDomSprayFallbackNames.size === 0) return false;
+
+  const allPathsMatched = paths.every((path) =>
+    lastDomSprayFallbackNames.has(getPathBasename(path).toLowerCase())
+  );
+  if (!allPathsMatched) return false;
+
+  lastDomSprayFallbackAt = 0;
+  lastDomSprayFallbackNames = new Set();
+  return true;
+}
+
+function getPathBasename(path) {
+  return String(path || "").split(/[\\/]/).pop() || "";
 }
 
 async function initializeApp() {
@@ -825,34 +927,7 @@ function setupBatchActionEvents() {
     });
   });
 
-  let suppressSprayPathDropUntil = 0;
-  const getDroppedFiles = (event) => Array.from(event.dataTransfer?.files || []);
-  const hasDroppedFiles = (event) => getDroppedFiles(event).length > 0;
-
-  window.addEventListener(
-    "dragover",
-    (event) => {
-      if (!hasDroppedFiles(event)) return;
-      event.preventDefault();
-      if (getDroppedFiles(event).some(isSprayImportFile)) {
-        event.dataTransfer.dropEffect = "copy";
-      }
-    },
-    true
-  );
-  window.addEventListener(
-    "drop",
-    async (event) => {
-      const files = getDroppedFiles(event);
-      if (!files.length) return;
-      const sprayFiles = files.filter(isSprayImportFile);
-      if (!sprayFiles.length) return;
-      event.preventDefault();
-      suppressSprayPathDropUntil = Date.now() + 1200;
-      await importSprayFiles(sprayFiles, { refreshFilesKeepFilter });
-    },
-    true
-  );
+  setupFileDropGuards();
 
   // 阻止浏览器默认的拖拽行为
   window.addEventListener("dragover", (e) => e.preventDefault());
@@ -1039,17 +1114,23 @@ function setupWailsEvents() {
   });
 
   OnFileDrop(async (x, y, paths) => {
-    if (paths && paths.length > 0) {
-      const sprayPaths = paths.filter(isSprayImportPath);
-      const otherPaths = paths.filter((path) => !isSprayImportPath(path));
-      if (sprayPaths.length > 0 && Date.now() > suppressSprayPathDropUntil) {
-        await importSprayPaths(sprayPaths, { refreshFilesKeepFilter });
-      }
-      if (otherPaths.length > 0) {
-        handleDropImportPaths(otherPaths, { source: "drop" });
-      }
+    const droppedPaths = Array.from(paths || []).filter(Boolean);
+    if (droppedPaths.length === 0) return;
+
+    clearSprayFileDropFallback();
+
+    const sprayPaths = droppedPaths.filter(isSprayImportPath);
+    const otherPaths = droppedPaths.filter((path) => !isSprayImportPath(path));
+    if (
+      sprayPaths.length > 0 &&
+      !consumeRecentDomSprayFallbackForPaths(sprayPaths)
+    ) {
+      await importSprayPaths(sprayPaths, { refreshFilesKeepFilter });
     }
-  }, true);
+    if (otherPaths.length > 0) {
+      handleDropImportPaths(otherPaths, { source: "drop" });
+    }
+  }, false);
 
   EventsOn("refresh_files", () => {
     refreshFilesKeepFilter();
