@@ -229,6 +229,7 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 }
 
 func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) error {
+	a.ensureConfigPaths()
 	a.mu.RLock()
 	alreadyMigrated := a.migrationVersion >= configMigrationVersion
 	a.mu.RUnlock()
@@ -236,14 +237,29 @@ func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) er
 		return nil
 	}
 
+	configExists, err := migrationTargetExists(a.configPath)
+	if err != nil {
+		return err
+	}
+	serversExists, err := migrationTargetExists(a.serversPath)
+	if err != nil {
+		return err
+	}
+	watchLaterExists, err := migrationTargetExists(a.workshopWatchLaterPath)
+	if err != nil {
+		return err
+	}
+
 	var legacyConfig legacyFrontendConfig
-	if payload.Config != "" {
+	if !configExists && payload.Config != "" {
 		if err := json.Unmarshal([]byte(payload.Config), &legacyConfig); err != nil {
 			return err
 		}
+	} else if configExists && (payload.Config != "" || payload.Theme != "" || payload.LastUpdateCheckTime != "") {
+		log.Printf("检测到配置文件已存在，跳过旧配置迁移: %s", a.configPath)
 	}
 
-	if payload.Servers != "" || payload.RecentServers != "" {
+	if !serversExists && (payload.Servers != "" || payload.RecentServers != "") {
 		serverStorage, err := parseLegacyServerStorage(payload.Servers, payload.RecentServers)
 		if err != nil {
 			return err
@@ -251,8 +267,10 @@ func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) er
 		if err := a.SaveServerStorage(serverStorage); err != nil {
 			return err
 		}
+	} else if serversExists && (payload.Servers != "" || payload.RecentServers != "") {
+		log.Printf("检测到服务器配置文件已存在，跳过旧服务器配置迁移: %s", a.serversPath)
 	}
-	if payload.WatchLaterItems != "" {
+	if !watchLaterExists && payload.WatchLaterItems != "" {
 		watchLaterStorage, err := parseLegacyWatchLaterStorage(payload.WatchLaterItems)
 		if err != nil {
 			return err
@@ -260,49 +278,53 @@ func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) er
 		if err := a.SaveWorkshopWatchLaterStorage(watchLaterStorage); err != nil {
 			return err
 		}
+	} else if watchLaterExists && payload.WatchLaterItems != "" {
+		log.Printf("检测到稍后再看配置文件已存在，跳过旧稍后再看迁移: %s", a.workshopWatchLaterPath)
 	}
 
 	a.mu.Lock()
-	if legacyConfig.DefaultDirectory != nil {
-		a.defaultDirectory = *legacyConfig.DefaultDirectory
-	}
-	if legacyConfig.SavedDirectories != nil {
-		a.savedDirectories = cloneSavedDirectories(legacyConfig.SavedDirectories)
-	}
-	if legacyConfig.LastActiveDirectory != nil {
-		a.lastActiveDirectory = *legacyConfig.LastActiveDirectory
-	}
-	if legacyConfig.DisplayMode != nil && *legacyConfig.DisplayMode != "" {
-		a.displayMode = *legacyConfig.DisplayMode
-	}
-	if legacyConfig.FilterLayoutMode != nil && *legacyConfig.FilterLayoutMode != "" {
-		a.filterLayoutMode = *legacyConfig.FilterLayoutMode
-	}
-	if legacyConfig.BoxSelectionEnabled != nil {
-		a.boxSelectionEnabled = *legacyConfig.BoxSelectionEnabled
-	}
-	if legacyConfig.CtrlClickSelectionEnabled != nil {
-		a.ctrlClickSelectionEnabled = *legacyConfig.CtrlClickSelectionEnabled
-	}
-	if legacyConfig.WorkshopPreferredIP != nil {
-		a.workshopPreferredIP = *legacyConfig.WorkshopPreferredIP
-	}
-	if legacyConfig.ModRotationConfig != nil {
-		a.modRotationConfig = *legacyConfig.ModRotationConfig
-	} else if legacyConfig.ModRotationEnabled != nil {
-		a.modRotationConfig = RotationConfig{
-			EnableCharacters: *legacyConfig.ModRotationEnabled,
-			EnableWeapons:    *legacyConfig.ModRotationEnabled,
+	if !configExists {
+		if legacyConfig.DefaultDirectory != nil {
+			a.defaultDirectory = *legacyConfig.DefaultDirectory
 		}
-	}
-	if legacyConfig.IgnoredVersion != nil {
-		a.ignoredVersion = *legacyConfig.IgnoredVersion
-	}
-	if payload.Theme != "" {
-		a.theme = payload.Theme
-	}
-	if payload.LastUpdateCheckTime != "" {
-		a.lastUpdateCheckTime = payload.LastUpdateCheckTime
+		if legacyConfig.SavedDirectories != nil {
+			a.savedDirectories = cloneSavedDirectories(legacyConfig.SavedDirectories)
+		}
+		if legacyConfig.LastActiveDirectory != nil {
+			a.lastActiveDirectory = *legacyConfig.LastActiveDirectory
+		}
+		if legacyConfig.DisplayMode != nil && *legacyConfig.DisplayMode != "" {
+			a.displayMode = *legacyConfig.DisplayMode
+		}
+		if legacyConfig.FilterLayoutMode != nil && *legacyConfig.FilterLayoutMode != "" {
+			a.filterLayoutMode = *legacyConfig.FilterLayoutMode
+		}
+		if legacyConfig.BoxSelectionEnabled != nil {
+			a.boxSelectionEnabled = *legacyConfig.BoxSelectionEnabled
+		}
+		if legacyConfig.CtrlClickSelectionEnabled != nil {
+			a.ctrlClickSelectionEnabled = *legacyConfig.CtrlClickSelectionEnabled
+		}
+		if legacyConfig.WorkshopPreferredIP != nil {
+			a.workshopPreferredIP = *legacyConfig.WorkshopPreferredIP
+		}
+		if legacyConfig.ModRotationConfig != nil {
+			a.modRotationConfig = *legacyConfig.ModRotationConfig
+		} else if legacyConfig.ModRotationEnabled != nil {
+			a.modRotationConfig = RotationConfig{
+				EnableCharacters: *legacyConfig.ModRotationEnabled,
+				EnableWeapons:    *legacyConfig.ModRotationEnabled,
+			}
+		}
+		if legacyConfig.IgnoredVersion != nil {
+			a.ignoredVersion = *legacyConfig.IgnoredVersion
+		}
+		if payload.Theme != "" {
+			a.theme = payload.Theme
+		}
+		if payload.LastUpdateCheckTime != "" {
+			a.lastUpdateCheckTime = payload.LastUpdateCheckTime
+		}
 	}
 	a.migrationVersion = configMigrationVersion
 	a.mu.Unlock()
@@ -312,6 +334,16 @@ func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) er
 	}
 
 	return nil
+}
+
+func migrationTargetExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (a *App) GetServerStorage() ServerStorage {

@@ -68,40 +68,10 @@ func TestConfigDefaultsWithoutFile(t *testing.T) {
 	}
 }
 
-func TestMigrateLocalStorageConfigFromVersionOne(t *testing.T) {
+func TestMigrateLocalStorageConfigCreatesMissingTargets(t *testing.T) {
 	app := newConfigTestApp(t)
-	fixedIP := "23.59.72.59"
-	metaEnabled := true
-	updateEnabled := true
-	browserTarget := "steam"
-	writeConfigFixture(t, app.configPath, ConfigFile{
-		WorkshopFixedIP:            &fixedIP,
-		WorkshopMetaEnabled:        &metaEnabled,
-		WorkshopUpdateCheckEnabled: &updateEnabled,
-		WorkshopBrowserTarget:      &browserTarget,
-		MigrationVersion:           1,
-	})
-	app.loadConfig()
 
-	err := app.MigrateLocalStorageConfig(LocalStorageMigrationPayload{
-		Config: `{
-			"defaultDirectory":"D:/Games/left4dead2/addons",
-			"savedDirectories":[{"path":"D:/Games/left4dead2/addons","lastUsed":"2026-05-19T00:00:00.000Z"}],
-			"lastActiveDirectory":"D:/Games/left4dead2/addons",
-			"displayMode":"card",
-			"filterLayoutMode":"classic",
-			"boxSelectionEnabled":true,
-			"ctrlClickSelectionEnabled":true,
-			"workshopPreferredIP":false,
-			"modRotationConfig":{"enableCharacters":true,"enableWeapons":false},
-			"ignoredVersion":"1.2.3"
-		}`,
-		Theme:               "dark",
-		LastUpdateCheckTime: "1779169113000",
-		Servers:             `[{"name":"Test","address":"127.0.0.1:27015","weight":5}]`,
-		RecentServers:       `[{"name":"Test","address":"127.0.0.1:27015","lastConnectedAt":1779169113000}]`,
-		WatchLaterItems:     `[{"publishedfileid":"123","title":"Item","preview_url":"https://example.test/a.jpg","views":10,"subscriptions":20,"favorited":30,"file_type":0,"addedAt":"2026-05-19T00:00:00.000Z"}]`,
-	})
+	err := app.MigrateLocalStorageConfig(legacyMigrationPayload())
 	if err != nil {
 		t.Fatalf("migrate local storage config: %v", err)
 	}
@@ -112,9 +82,6 @@ func TestMigrateLocalStorageConfigFromVersionOne(t *testing.T) {
 	}
 	if config.WorkshopPreferredIP == nil || *config.WorkshopPreferredIP {
 		t.Fatalf("expected migrated workshop preferred IP false")
-	}
-	if config.WorkshopFixedIP == nil || *config.WorkshopFixedIP != fixedIP {
-		t.Fatalf("expected existing fixed IP to remain %q, got %#v", fixedIP, config.WorkshopFixedIP)
 	}
 	if config.DisplayMode != "card" || config.FilterLayoutMode != "classic" {
 		t.Fatalf("expected migrated display/filter modes, got %q/%q", config.DisplayMode, config.FilterLayoutMode)
@@ -140,6 +107,131 @@ func TestMigrateLocalStorageConfigFromVersionOne(t *testing.T) {
 	watchLater := app.GetWorkshopWatchLaterStorage()
 	if len(watchLater.Items) != 1 || watchLater.Items[0].PublishedFileID != "123" {
 		t.Fatalf("expected migrated watch later storage, got %#v", watchLater)
+	}
+}
+
+func TestMigrateLocalStorageConfigExistingTargetsSkipLegacyData(t *testing.T) {
+	app := newConfigTestApp(t)
+	writeConfigFixture(t, app.configPath, ConfigFile{
+		DefaultDirectory:    "D:/Current",
+		DisplayMode:         "card",
+		FilterLayoutMode:    "compact",
+		Theme:               "current-theme",
+		MigrationVersion:    1,
+		SavedDirectories:    []SavedDirectory{{Path: "D:/Current", LastUsed: "2026-05-20T00:00:00.000Z"}},
+		LastUpdateCheckTime: "111",
+	})
+	if err := app.SaveServerStorage(ServerStorage{
+		Servers:       []SavedServer{{Name: "Current", Address: "10.0.0.1:27015", Weight: 9}},
+		RecentServers: []RecentServer{{Name: "Current Recent", Address: "10.0.0.3:27015", LastConnectedAt: 111}},
+	}); err != nil {
+		t.Fatalf("save server storage: %v", err)
+	}
+	if err := app.SaveWorkshopWatchLaterStorage(WorkshopWatchLaterStorage{
+		Items: []WorkshopWatchLaterItem{{PublishedFileID: "current", Title: "Current Item"}},
+	}); err != nil {
+		t.Fatalf("save watch later storage: %v", err)
+	}
+	app.loadConfig()
+
+	if err := app.MigrateLocalStorageConfig(legacyMigrationPayload()); err != nil {
+		t.Fatalf("migrate local storage config: %v", err)
+	}
+
+	config := app.GetAppConfig()
+	if config.MigrationVersion != configMigrationVersion {
+		t.Fatalf("expected migration version %d, got %d", configMigrationVersion, config.MigrationVersion)
+	}
+	if config.DefaultDirectory != "D:/Current" || config.DisplayMode != "card" || config.Theme != "current-theme" || config.LastUpdateCheckTime != "111" {
+		t.Fatalf("expected existing config fields to remain, got %#v", config)
+	}
+
+	servers := app.GetServerStorage()
+	if len(servers.Servers) != 1 || servers.Servers[0].Address != "10.0.0.1:27015" {
+		t.Fatalf("expected existing server storage to remain, got %#v", servers)
+	}
+	if len(servers.RecentServers) != 1 || servers.RecentServers[0].Address != "10.0.0.3:27015" {
+		t.Fatalf("expected existing recent server storage to remain, got %#v", servers.RecentServers)
+	}
+
+	watchLater := app.GetWorkshopWatchLaterStorage()
+	if len(watchLater.Items) != 1 || watchLater.Items[0].PublishedFileID != "current" {
+		t.Fatalf("expected existing watch later storage to remain, got %#v", watchLater)
+	}
+}
+
+func TestMigrateLocalStorageConfigMigratesOnlyMissingServers(t *testing.T) {
+	app := newConfigTestApp(t)
+	writeConfigFixture(t, app.configPath, ConfigFile{
+		DefaultDirectory: "D:/Current",
+		DisplayMode:      "card",
+		MigrationVersion: 1,
+	})
+	if err := app.SaveWorkshopWatchLaterStorage(WorkshopWatchLaterStorage{
+		Items: []WorkshopWatchLaterItem{{PublishedFileID: "current", Title: "Current Item"}},
+	}); err != nil {
+		t.Fatalf("save watch later storage: %v", err)
+	}
+	app.loadConfig()
+
+	if err := app.MigrateLocalStorageConfig(legacyMigrationPayload()); err != nil {
+		t.Fatalf("migrate local storage config: %v", err)
+	}
+
+	config := app.GetAppConfig()
+	if config.MigrationVersion != configMigrationVersion || config.DefaultDirectory != "D:/Current" || config.DisplayMode != "card" {
+		t.Fatalf("expected existing config to remain with migrated version, got %#v", config)
+	}
+
+	servers := app.GetServerStorage()
+	if len(servers.Servers) != 1 || servers.Servers[0].Address != "127.0.0.1:27015" {
+		t.Fatalf("expected legacy servers to be migrated, got %#v", servers)
+	}
+	if len(servers.RecentServers) != 1 || servers.RecentServers[0].LastConnectedAt != 1779169113000 {
+		t.Fatalf("expected legacy recent servers to be migrated, got %#v", servers.RecentServers)
+	}
+
+	watchLater := app.GetWorkshopWatchLaterStorage()
+	if len(watchLater.Items) != 1 || watchLater.Items[0].PublishedFileID != "current" {
+		t.Fatalf("expected existing watch later storage to remain, got %#v", watchLater)
+	}
+}
+
+func TestMigrateLocalStorageConfigMigratesOnlyMissingWatchLater(t *testing.T) {
+	app := newConfigTestApp(t)
+	writeConfigFixture(t, app.configPath, ConfigFile{
+		DefaultDirectory: "D:/Current",
+		DisplayMode:      "card",
+		MigrationVersion: 1,
+	})
+	if err := app.SaveServerStorage(ServerStorage{
+		Servers:       []SavedServer{{Name: "Current", Address: "10.0.0.1:27015", Weight: 9}},
+		RecentServers: []RecentServer{{Name: "Current Recent", Address: "10.0.0.3:27015", LastConnectedAt: 111}},
+	}); err != nil {
+		t.Fatalf("save server storage: %v", err)
+	}
+	app.loadConfig()
+
+	if err := app.MigrateLocalStorageConfig(legacyMigrationPayload()); err != nil {
+		t.Fatalf("migrate local storage config: %v", err)
+	}
+
+	config := app.GetAppConfig()
+	if config.MigrationVersion != configMigrationVersion || config.DefaultDirectory != "D:/Current" || config.DisplayMode != "card" {
+		t.Fatalf("expected existing config to remain with migrated version, got %#v", config)
+	}
+
+	servers := app.GetServerStorage()
+	if len(servers.Servers) != 1 || servers.Servers[0].Address != "10.0.0.1:27015" {
+		t.Fatalf("expected existing server storage to remain, got %#v", servers)
+	}
+	if len(servers.RecentServers) != 1 || servers.RecentServers[0].Address != "10.0.0.3:27015" {
+		t.Fatalf("expected existing recent server storage to remain, got %#v", servers.RecentServers)
+	}
+
+	watchLater := app.GetWorkshopWatchLaterStorage()
+	if len(watchLater.Items) != 1 || watchLater.Items[0].PublishedFileID != "123" {
+		t.Fatalf("expected legacy watch later storage to be migrated, got %#v", watchLater)
 	}
 }
 
@@ -387,5 +479,27 @@ func writeConfigFixture(t *testing.T, path string, config ConfigFile) {
 	}
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatalf("write config fixture: %v", err)
+	}
+}
+
+func legacyMigrationPayload() LocalStorageMigrationPayload {
+	return LocalStorageMigrationPayload{
+		Config: `{
+			"defaultDirectory":"D:/Games/left4dead2/addons",
+			"savedDirectories":[{"path":"D:/Games/left4dead2/addons","lastUsed":"2026-05-19T00:00:00.000Z"}],
+			"lastActiveDirectory":"D:/Games/left4dead2/addons",
+			"displayMode":"card",
+			"filterLayoutMode":"classic",
+			"boxSelectionEnabled":true,
+			"ctrlClickSelectionEnabled":true,
+			"workshopPreferredIP":false,
+			"modRotationConfig":{"enableCharacters":true,"enableWeapons":false},
+			"ignoredVersion":"1.2.3"
+		}`,
+		Theme:               "dark",
+		LastUpdateCheckTime: "1779169113000",
+		Servers:             `[{"name":"Test","address":"127.0.0.1:27015","weight":5}]`,
+		RecentServers:       `[{"name":"Test","address":"127.0.0.1:27015","lastConnectedAt":1779169113000}]`,
+		WatchLaterItems:     `[{"publishedfileid":"123","title":"Item","preview_url":"https://example.test/a.jpg","views":10,"subscriptions":20,"favorited":30,"file_type":0,"addedAt":"2026-05-19T00:00:00.000Z"}]`,
 	}
 }
