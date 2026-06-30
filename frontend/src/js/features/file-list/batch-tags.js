@@ -69,6 +69,7 @@ function setPrimaryValue(value) {
   valueInput.value = value || "";
   batchPrimaryTag = valueInput.value;
   updatePrimaryDropdownUI();
+  batchSecondaryTagPicker?.refresh();
 }
 
 function setupPrimaryDropdown() {
@@ -384,6 +385,7 @@ export function setupBatchTagsModalListeners() {
       updateActionAreasVisibility();
       updateSecondaryHint();
       updateSaveButtonState();
+      batchSecondaryTagPicker?.refresh();
     });
   });
 
@@ -399,6 +401,7 @@ export function setupBatchTagsModalListeners() {
       menu: document.getElementById("batch-secondary-tag-suggestions"),
       getSelectedTags: () => batchSecondaryTags,
       addTag: addSecondaryTag,
+      getPrimaryTag: () => (primaryMode === "set" ? batchPrimaryTag : ""),
     });
 
     input.addEventListener("keydown", (e) => {

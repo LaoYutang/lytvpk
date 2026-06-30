@@ -1,21 +1,30 @@
 import { appState } from "../state.js";
-
-const MAX_VISIBLE_SUGGESTIONS = 10;
+import { GetSecondaryTags } from "../../../../wailsjs/go/app/App";
 
 function normalizeTag(tag) {
   return String(tag || "").trim();
 }
 
-function getExistingSecondaryTags() {
+async function getExistingSecondaryTags(primaryTag = "") {
   const tagSet = new Set();
-  const files = [...(appState.allVpkFiles || []), ...(appState.vpkFiles || [])];
 
-  files.forEach((file) => {
-    (file.secondaryTags || []).forEach((tag) => {
+  try {
+    const tags = await GetSecondaryTags(primaryTag || "");
+    (tags || []).forEach((tag) => {
       const normalized = normalizeTag(tag);
       if (normalized) tagSet.add(normalized);
     });
-  });
+  } catch (error) {
+    const files = [...(appState.allVpkFiles || []), ...(appState.vpkFiles || [])];
+
+    files.forEach((file) => {
+      if (primaryTag && file.primaryTag !== primaryTag) return;
+      (file.secondaryTags || []).forEach((tag) => {
+        const normalized = normalizeTag(tag);
+        if (normalized) tagSet.add(normalized);
+      });
+    });
+  }
 
   return Array.from(tagSet).sort((a, b) => a.localeCompare(b, "zh-CN"));
 }
@@ -40,16 +49,23 @@ export function createSecondaryTagPicker({
   menu,
   getSelectedTags,
   addTag,
+  getPrimaryTag = () => "",
 }) {
   if (!input || !menu || !getSelectedTags || !addTag) return null;
 
   let visibleTags = [];
   let activeIndex = -1;
+  let renderRequestId = 0;
 
-  const close = () => {
+  const hideMenu = () => {
     menu.classList.add("hidden");
     input.setAttribute("aria-expanded", "false");
     activeIndex = -1;
+  };
+
+  const close = () => {
+    renderRequestId += 1;
+    hideMenu();
   };
 
   const setActiveIndex = (nextIndex) => {
@@ -59,11 +75,11 @@ export function createSecondaryTagPicker({
     });
   };
 
-  const getFilteredTags = () => {
+  const getFilteredTags = async () => {
     const query = normalizeTag(input.value).toLowerCase();
     const selectedTags = new Set((getSelectedTags() || []).map(normalizeTag));
 
-    return getExistingSecondaryTags()
+    return (await getExistingSecondaryTags(normalizeTag(getPrimaryTag())))
       .filter((tag) => !selectedTags.has(tag))
       .filter((tag) => !query || tag.toLowerCase().includes(query))
       .sort((a, b) => {
@@ -71,18 +87,20 @@ export function createSecondaryTagPicker({
         const bStarts = b.toLowerCase().startsWith(query);
         if (aStarts !== bStarts) return aStarts ? -1 : 1;
         return a.localeCompare(b, "zh-CN");
-      })
-      .slice(0, MAX_VISIBLE_SUGGESTIONS);
+      });
   };
 
-  const render = () => {
+  const render = async () => {
+    const requestId = ++renderRequestId;
     activeIndex = -1;
-    visibleTags = getFilteredTags();
+    visibleTags = await getFilteredTags();
+    if (requestId !== renderRequestId) return false;
+
     menu.replaceChildren();
 
     if (visibleTags.length === 0) {
-      close();
-      return;
+      hideMenu();
+      return false;
     }
 
     visibleTags.forEach((tag) => {
@@ -96,11 +114,13 @@ export function createSecondaryTagPicker({
         }),
       );
     });
+
+    return true;
   };
 
-  const open = () => {
-    render();
-    if (visibleTags.length === 0) return;
+  const open = async () => {
+    const didRender = await render();
+    if (!didRender || visibleTags.length === 0 || document.activeElement !== input) return;
     menu.classList.remove("hidden");
     input.setAttribute("aria-expanded", "true");
   };

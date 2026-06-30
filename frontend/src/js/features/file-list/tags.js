@@ -189,6 +189,7 @@ export function setupTagModalListeners() {
       menu: document.getElementById("secondary-tag-suggestions"),
       getSelectedTags: () => currentSecondaryTags,
       addTag: addSecondaryTag,
+      getPrimaryTag: () => "",
     });
 
     newTagInput.addEventListener("keydown", (e) => {
