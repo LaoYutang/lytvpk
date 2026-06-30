@@ -938,6 +938,32 @@ export namespace app {
 		}
 	}
 	
+	export class SpraySaveVMTRequest {
+	    name: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SpraySaveVMTRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	    }
+	}
+	export class SpraySaveVTFRequest {
+	    name: string;
+	    vtfBase64: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SpraySaveVTFRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.vtfBase64 = source["vtfBase64"];
+	    }
+	}
 	export class UpdateCheckResult {
 	    total_updates: number;
 	    new_detected: number;

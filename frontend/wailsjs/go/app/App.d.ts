@@ -187,6 +187,10 @@ export function SaveAppConfig(arg1:app.ConfigFile):Promise<void>;
 
 export function SaveServerStorage(arg1:app.ServerStorage):Promise<void>;
 
+export function SaveSprayVMT(arg1:app.SpraySaveVMTRequest):Promise<string>;
+
+export function SaveSprayVTF(arg1:app.SpraySaveVTFRequest):Promise<string>;
+
 export function SaveWorkshopWatchLaterStorage(arg1:app.WorkshopWatchLaterStorage):Promise<void>;
 
 export function ScanVPKFiles():Promise<void>;

@@ -43,7 +43,7 @@ func TestWriteSprayFilesSanitizesAndDeduplicates(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read vmt: %v", err)
 		}
-		if !strings.Contains(string(vmt), "vgui/logos/"+want[i]) {
+		if !strings.Contains(string(vmt), "vgui/logos/custom/"+want[i]) {
 			t.Fatalf("vmt does not reference final name %q: %s", want[i], string(vmt))
 		}
 	}
@@ -124,5 +124,18 @@ func TestLoadSprayImportFilesReadsSupportedMedia(t *testing.T) {
 	}
 	if files[0].Base64 != base64.StdEncoding.EncodeToString(data) {
 		t.Fatalf("unexpected base64 payload: %q", files[0].Base64)
+	}
+}
+
+func TestLoadSprayImportFilesRejectsVideo(t *testing.T) {
+	tempDir := t.TempDir()
+	videoPath := filepath.Join(tempDir, "clip.mp4")
+	if err := os.WriteFile(videoPath, []byte("not-a-video"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	app := &App{}
+	if _, err := app.LoadSprayImportFiles([]string{videoPath}); err == nil {
+		t.Fatal("expected video import to be rejected")
 	}
 }

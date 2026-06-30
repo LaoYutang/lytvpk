@@ -366,6 +366,14 @@ export function SaveServerStorage(arg1) {
   return window['go']['app']['App']['SaveServerStorage'](arg1);
 }
 
+export function SaveSprayVMT(arg1) {
+  return window['go']['app']['App']['SaveSprayVMT'](arg1);
+}
+
+export function SaveSprayVTF(arg1) {
+  return window['go']['app']['App']['SaveSprayVTF'](arg1);
+}
+
 export function SaveWorkshopWatchLaterStorage(arg1) {
   return window['go']['app']['App']['SaveWorkshopWatchLaterStorage'](arg1);
 }

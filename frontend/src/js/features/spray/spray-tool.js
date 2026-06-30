@@ -12,10 +12,12 @@ import {
   getMipmapDimensions,
   resolveOutputSize,
   sanitizeOutputName,
+  shouldShortenOriginalVTF,
+  shouldUseOriginalMipmaps,
 } from "./vtf.js";
 
 const RESOLUTION_PRESETS = [1024, 768, 720, 512, 256, 128, 64, 32, 16, 8, 4];
-const ACCEPTED_FILES = "image/*,.tga,video/*";
+const ACCEPTED_FILES = "image/*,.tga";
 const SPRAY_IMPORT_EXTENSIONS = new Set([
   ".png",
   ".jpg",
@@ -24,22 +26,12 @@ const SPRAY_IMPORT_EXTENSIONS = new Set([
   ".bmp",
   ".gif",
   ".tga",
-  ".mp4",
-  ".webm",
-  ".ogv",
-  ".ogg",
-  ".mov",
-  ".m4v",
-  ".avi",
-  ".mkv",
-  ".wmv",
 ]);
 
 const state = {
   projects: [],
   activeProjectId: null,
   options: { ...DEFAULT_SPRAY_OPTIONS },
-  packageName: "spray_pack",
   frameIndex: 0,
   playing: false,
   timer: null,
@@ -65,7 +57,7 @@ export function isSprayImportPath(path) {
 export function isSprayImportFile(file) {
   if (!file) return false;
   const type = String(file.type || "").toLowerCase();
-  return type.startsWith("image/") || type.startsWith("video/") || isSprayImportPath(file.name);
+  return type.startsWith("image/") || isSprayImportPath(file.name);
 }
 
 export async function importSprayFiles(files = [], { refreshFilesKeepFilter } = {}) {
@@ -120,7 +112,7 @@ function createModalContent() {
   const titleWrap = el("div", "spray-tool-title-wrap");
   titleWrap.append(
     el("h3", "", "喷漆制作"),
-    el("p", "", "制作 L4D2 可用的 VTF/VMT 喷漆，并可直接打包安装。")
+    el("p", "", "制作 L4D2 可用的 VTF/VMT 喷漆文件。")
   );
   const closeBtn = button("spray-tool-close", "close-btn", "×");
   closeBtn.setAttribute("aria-label", "关闭");
@@ -134,8 +126,8 @@ function createModalContent() {
   status.id = "spray-footer-status";
   const actions = el("div", "spray-tool-footer-actions");
   actions.append(
-    button("spray-export-btn", "btn btn-secondary", "导出文件"),
-    button("spray-install-btn", "btn btn-primary", "制作 VPK 并安装")
+    button("spray-save-vtf-btn", "btn btn-primary", "保存 VTF"),
+    button("spray-save-vmt-btn", "btn btn-secondary", "保存 VMT")
   );
   footer.append(status, actions);
 
@@ -209,7 +201,6 @@ function createSettingsPanel() {
   sizeNote.hidden = true;
   form.append(
     textControl("喷漆名称", "spray-project-name", "", "留空默认使用素材文件名"),
-    textControl("VPK 名称", "spray-package-name", state.packageName),
     dimensionControl("宽度", "spray-width-value"),
     dimensionControl("高度", "spray-height-value"),
     checkboxControl("缩放以适应", "spray-rescale", true),
@@ -292,8 +283,8 @@ function bindStaticEvents() {
   refs.prevBtn.addEventListener("click", () => moveFrame(-1));
   refs.nextBtn.addEventListener("click", () => moveFrame(1));
   refs.playBtn.addEventListener("click", togglePlayback);
-  refs.exportBtn.addEventListener("click", exportSprayFiles);
-  refs.installBtn.addEventListener("click", installSprayVPK);
+  refs.saveVTFBtn.addEventListener("click", saveSprayVTF);
+  refs.saveVMTBtn.addEventListener("click", saveSprayVMT);
   refs.mipmapImportBtn.addEventListener("click", () => refs.mipmapInput.click());
   refs.mipmapInput.addEventListener("change", async () => {
     await importMipmapOverride(refs.mipmapInput.files);
@@ -320,9 +311,6 @@ function bindOptionControls() {
       renderProjectList();
       updateFooter();
     }
-  });
-  refs.packageName.addEventListener("input", () => {
-    state.packageName = refs.packageName.value;
   });
   bindDimensionControl("width", refs.widthValue);
   bindDimensionControl("height", refs.heightValue);
@@ -413,7 +401,7 @@ function enforceMipmapSizeLimit(showMessage) {
   state.options.mipmaps = false;
   refs.mipmaps.checked = false;
   if (showMessage) {
-    showNotification("Mipmaps 仅在宽高不高于 512 时可用", "info");
+    showNotification("当前尺寸、格式或采样设置不符合原版 Mipmaps 规则", "info");
   }
 }
 
@@ -428,10 +416,6 @@ async function importPrimaryFiles(files) {
     state.activeProjectId = project.id;
     state.frameIndex = 0;
     enforceMipmapSizeLimit(true);
-    if (!state.packageName || state.packageName === "spray_pack") {
-      state.packageName = sanitizeOutputName(project.name) || "spray_pack";
-      refs.packageName.value = state.packageName;
-    }
     renderAll();
     showNotification("素材已导入", "success");
   } catch (error) {
@@ -491,71 +475,61 @@ function clearMipmapOverride() {
   updatePreview();
 }
 
-async function exportSprayFiles() {
-  const outputs = await buildOutputsForProjects();
-  if (!outputs) return;
-  setBusy(true, "正在导出...");
+async function saveSprayVTF() {
+  const output = await buildOutputForActiveProject();
+  if (!output) return;
+  setBusy(true, "正在保存 VTF...");
   try {
-    const result = await callApp("ExportSprayFiles", {
-      files: outputs.map(outputPayload),
+    const path = await callApp("SaveSprayVTF", {
+      name: output.name,
+      vtfBase64: output.vtfBase64,
     });
-    if (result?.outputDir) {
-      showNotification(`已导出 ${result.files?.length || outputs.length} 组喷漆文件`, "success");
-      await callOptionalApp("OpenFileLocation", result.outputDir);
+    if (path) {
+      showNotification("VTF 已保存", "success");
     }
   } catch (error) {
-    showError("导出失败: " + formatError(error));
+    showError("保存 VTF 失败: " + formatError(error));
   } finally {
     setBusy(false);
   }
 }
 
-async function installSprayVPK() {
-  const outputs = await buildOutputsForProjects();
-  if (!outputs) return;
-  setBusy(true, "正在制作 VPK...");
+async function saveSprayVMT() {
+  const project = activeProject();
+  if (!project) {
+    showError("请先导入素材");
+    return;
+  }
+  setBusy(true, "正在保存 VMT...");
   try {
-    await callApp("InstallSprayVPK", {
-      packageName: refs.packageName.value || state.packageName || "spray_pack",
-      files: outputs.map(outputPayload),
+    const path = await callApp("SaveSprayVMT", {
+      name: sanitizeOutputName(getProjectDisplayName(project)),
     });
-    showNotification("喷漆 VPK 已安装", "success");
-    if (typeof state.refreshFilesKeepFilter === "function") {
-      await state.refreshFilesKeepFilter();
+    if (path) {
+      showNotification("VMT 已保存", "success");
     }
   } catch (error) {
-    showError("制作 VPK 失败: " + formatError(error));
+    showError("保存 VMT 失败: " + formatError(error));
   } finally {
     setBusy(false);
   }
 }
 
-async function buildOutputsForProjects() {
-  if (!state.projects.length) {
+async function buildOutputForActiveProject() {
+  const project = activeProject();
+  if (!project) {
     showError("请先导入素材");
     return null;
   }
   setBusy(true, "正在转换 VTF...");
   try {
-    const outputs = [];
-    for (const project of state.projects) {
-      outputs.push(await buildSprayOutputs(project, state.options));
-    }
-    return outputs;
+    return await buildSprayOutputs(project, state.options);
   } catch (error) {
     showError("转换失败: " + formatError(error));
     return null;
   } finally {
     setBusy(false);
   }
-}
-
-function outputPayload(output) {
-  return {
-    name: output.name,
-    vtfBase64: output.vtfBase64,
-    vmtText: output.vmtText,
-  };
 }
 
 function renderAll() {
@@ -600,7 +574,6 @@ function renderProjectList() {
 function renderSettings() {
   const project = activeProject();
   refs.projectName.value = project?.name || "";
-  refs.packageName.value = state.packageName || "spray_pack";
   refs.widthValue.value = dimensionValueFromOptions("width");
   refs.heightValue.value = dimensionValueFromOptions("height");
   refs.rescale.checked = !!state.options.rescale;
@@ -676,8 +649,8 @@ function updatePreview() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     refs.previewMeta.textContent = "等待素材";
     refs.frameLabel.textContent = "0 / 0";
-    refs.exportBtn.disabled = true;
-    refs.installBtn.disabled = true;
+    refs.saveVTFBtn.disabled = true;
+    refs.saveVMTBtn.disabled = true;
     refs.sizeNote.hidden = true;
     refs.sizeNote.textContent = "";
     updateFooter();
@@ -691,24 +664,33 @@ function updatePreview() {
   drawFrameToCanvas(project.frames[state.frameIndex], canvas, state.options);
   refs.previewMeta.textContent = `${size.width}×${size.height}`;
   refs.frameLabel.textContent = `${state.frameIndex + 1} / ${project.frames.length}`;
-  refs.exportBtn.disabled = state.busy;
-  refs.installBtn.disabled = state.busy;
+  refs.saveVTFBtn.disabled = state.busy;
+  refs.saveVMTBtn.disabled = state.busy;
   updateSizeNote(project, size);
   updateFooter();
 }
 
 function updateSizeNote(project, size) {
   const frames = getEffectiveFrameCount(project);
+  const format = Number(state.options.format);
+  const shortened = shouldShortenOriginalVTF(size.width, size.height, frames, format);
+  const useMipmaps = state.options.mipmaps && canUseMipmaps();
   const estimate = estimateVTFSize(
     size.width,
     size.height,
     frames,
-    Number(state.options.format),
-    state.options.mipmaps && canUseMipmaps()
+    format,
+    useMipmaps,
+    shortened
   );
   const kb = Math.round(estimate / 1024);
+  const suffix = [
+    FORMAT_LABELS.get(format) || "VTF",
+    useMipmaps ? "Mipmaps" : "",
+    shortened ? "原版缩宽" : "",
+  ].filter(Boolean).join(" · ");
   refs.sizeNote.hidden = false;
-  refs.sizeNote.textContent = `预计 ${kb} KB · ${FORMAT_LABELS.get(Number(state.options.format)) || "VTF"}`;
+  refs.sizeNote.textContent = `预计 ${kb} KB · ${suffix}`;
   refs.sizeNote.classList.toggle("is-warning", kb >= 512);
 }
 
@@ -724,8 +706,8 @@ function updateFooter() {
 
 function setBusy(busy, message = "") {
   state.busy = busy;
-  refs.exportBtn.disabled = busy || !state.projects.length;
-  refs.installBtn.disabled = busy || !state.projects.length;
+  refs.saveVTFBtn.disabled = busy || !state.projects.length;
+  refs.saveVMTBtn.disabled = busy || !state.projects.length;
   refs.footerStatus.textContent = busy ? message : "";
   if (!busy) updateFooter();
 }
@@ -780,12 +762,23 @@ function activeProject() {
 
 function canUseMipmaps() {
   const project = activeProject();
-  if (!project) {
-    return getConfiguredMipmapDimension("width") <= 512 &&
-      getConfiguredMipmapDimension("height") <= 512;
-  }
-  const size = resolveOutputSize(project, state.options);
-  return size.width <= 512 && size.height <= 512;
+  const size = project
+    ? resolveOutputSize(project, state.options)
+    : {
+      width: getConfiguredMipmapDimension("width"),
+      height: getConfiguredMipmapDimension("height"),
+    };
+  const frames = project ? getEffectiveFrameCount(project) : 1;
+  const format = Number(state.options.format);
+  const shortened = shouldShortenOriginalVTF(size.width, size.height, frames, format);
+  return shouldUseOriginalMipmaps(
+    size.width,
+    size.height,
+    frames,
+    format,
+    Number(state.options.sampling || 0),
+    shortened
+  );
 }
 
 function getConfiguredMipmapDimension(axis) {
@@ -823,14 +816,13 @@ function showClipOptionsModal(file, meta) {
     const modal = el("div", "modal spray-clip-modal");
     const content = el("div", "modal-content modal-small spray-clip-content");
     const header = el("div", "modal-header");
-    header.append(el("h3", "", meta.type === "video" ? "视频导入" : "动画导入"));
+    header.append(el("h3", "", "动画导入"));
     const body = el("div", "modal-body spray-clip-body");
-    const isVideo = meta.type === "video";
-    const start = numberControl(isVideo ? "起始秒" : "起始帧", "spray-clip-start", 0, 0);
-    const endDefault = isVideo ? Math.round((meta.duration || 0) * 100) / 100 : meta.frameCount || 1;
-    const end = numberControl(isVideo ? "结束秒" : "结束帧", "spray-clip-end", endDefault, 0);
-    const fps = numberControl("导入速度", "spray-clip-fps", meta.defaultFps || 5, 1, 30);
-    const all = checkboxControl(isVideo ? "使用较高帧率" : "导入所有帧", "spray-clip-all", !isVideo);
+    const start = numberControl("起始帧", "spray-clip-start", 0, 0);
+    const endDefault = meta.frameCount || 1;
+    const end = numberControl("结束帧", "spray-clip-end", endDefault, 0);
+    const fps = numberControl("导入速度", "spray-clip-fps", meta.defaultFps || 1, 1, 30);
+    const all = checkboxControl("导入所有帧", "spray-clip-all", false);
     const fileLabel = el("p", "spray-clip-file", file.name || "");
     body.append(fileLabel, start, end, fps, all);
     const footer = el("div", "modal-footer");
@@ -850,7 +842,7 @@ function showClipOptionsModal(file, meta) {
       const value = {
         start: Number(start.querySelector("input").value || 0),
         end: Number(end.querySelector("input").value || endDefault),
-        fps: Number(fps.querySelector("input").value || meta.defaultFps || 5),
+        fps: Number(fps.querySelector("input").value || meta.defaultFps || 1),
         allFrames: all.querySelector("input").checked,
       };
       cleanup();
@@ -877,7 +869,6 @@ function collectRefs() {
     frameLabel: document.getElementById("spray-frame-label"),
     frameStrip: document.getElementById("spray-frame-strip"),
     projectName: document.getElementById("spray-project-name"),
-    packageName: document.getElementById("spray-package-name"),
     widthValue: document.getElementById("spray-width-value"),
     heightValue: document.getElementById("spray-height-value"),
     rescale: document.getElementById("spray-rescale"),
@@ -894,8 +885,8 @@ function collectRefs() {
     dxtQuality: document.getElementById("spray-dxt-quality"),
     sizeNote: document.getElementById("spray-size-note"),
     footerStatus: document.getElementById("spray-footer-status"),
-    exportBtn: document.getElementById("spray-export-btn"),
-    installBtn: document.getElementById("spray-install-btn"),
+    saveVTFBtn: document.getElementById("spray-save-vtf-btn"),
+    saveVMTBtn: document.getElementById("spray-save-vmt-btn"),
   };
 }
 
@@ -990,6 +981,8 @@ function customSelectInput(id, options) {
   const menu = el("div", "select-menu spray-select-menu hidden");
   menu.id = `${id}-menu`;
   menu.setAttribute("role", "listbox");
+  valueInput._spraySelectMenu = menu;
+  valueInput._spraySelectTrigger = trigger;
   dropdown.append(valueInput, trigger, menu);
   renderCustomSelectOptions(valueInput, options);
   trigger.addEventListener("click", (event) => {
@@ -1001,8 +994,7 @@ function customSelectInput(id, options) {
 }
 
 function renderCustomSelectOptions(valueInput, options) {
-  const dropdown = valueInput.closest(".spray-select-dropdown");
-  const menu = dropdown?.querySelector(".spray-select-menu");
+  const menu = getSelectMenu(valueInput);
   if (!menu) return;
   menu.replaceChildren();
 
@@ -1039,10 +1031,9 @@ function createSelectOption(value, label) {
 }
 
 function setCustomSelectValue(valueInput, value, dispatchChange) {
-  valueInput.value = String(value || "");
-  const dropdown = valueInput.closest(".spray-select-dropdown");
-  const trigger = dropdown?.querySelector(".spray-select-trigger");
-  const options = Array.from(dropdown?.querySelectorAll(".spray-select-option") || []);
+  valueInput.value = String(value ?? "");
+  const trigger = getSelectTrigger(valueInput);
+  const options = Array.from(getSelectMenu(valueInput)?.querySelectorAll(".spray-select-option") || []);
   let selectedLabel = "";
   options.forEach((option) => {
     const isActive = option.dataset.value === valueInput.value;
@@ -1058,11 +1049,22 @@ function setCustomSelectValue(valueInput, value, dispatchChange) {
 
 function setCustomSelectDisabled(valueInput, disabled) {
   valueInput.disabled = !!disabled;
-  const dropdown = valueInput.closest(".spray-select-dropdown");
-  const trigger = dropdown?.querySelector(".spray-select-trigger");
-  const menu = dropdown?.querySelector(".spray-select-menu");
+  const trigger = getSelectTrigger(valueInput);
+  const menu = getSelectMenu(valueInput);
   if (trigger) trigger.disabled = !!disabled;
   if (disabled && menu) closeSprayDropdown(menu);
+}
+
+function getSelectMenu(valueInput) {
+  return valueInput?._spraySelectMenu ||
+    valueInput?.closest(".spray-select-dropdown")?.querySelector(".spray-select-menu") ||
+    null;
+}
+
+function getSelectTrigger(valueInput) {
+  return valueInput?._spraySelectTrigger ||
+    valueInput?.closest(".spray-select-dropdown")?.querySelector(".spray-select-trigger") ||
+    null;
 }
 
 function toggleSprayDropdown(menu, anchor, expandedTrigger = anchor) {
@@ -1172,7 +1174,7 @@ function inferMimeType(name) {
   if ([".png", ".jpg", ".jpeg", ".webp", ".bmp"].includes(ext)) {
     return `image/${ext === ".jpg" ? "jpeg" : ext.slice(1)}`;
   }
-  return "video/mp4";
+  return "application/octet-stream";
 }
 
 function getPathExtension(path) {
@@ -1201,16 +1203,6 @@ function callApp(methodName, ...args) {
     return Promise.reject(new Error(`当前后端不支持 ${methodName}`));
   }
   return method(...args);
-}
-
-async function callOptionalApp(methodName, ...args) {
-  const method = window?.go?.app?.App?.[methodName];
-  if (typeof method !== "function") return null;
-  try {
-    return await method(...args);
-  } catch (error) {
-    return null;
-  }
 }
 
 function formatError(error) {

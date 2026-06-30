@@ -1,6 +1,12 @@
-// Derived from the GPL-3.0 VTF-Editor conversion flow by Mishcatt.
-// This file keeps the VTF header/data layout and texture-format handling,
-// but is reorganized for LytVPK's module-based spray tool UI.
+// VTF writing follows the original GPL-3.0 VTF-Editor conversion flow by Mishcatt.
+// Keep the byte layout intentionally close to the upstream createVTF/convert.js path.
+
+import {
+  CalculateColourWeightings,
+  CompressAlphaBlock,
+  CompressRGBBlock,
+  configureDXTQuality,
+} from "./vtf-editor-dxt.js";
 
 export const TEXTURE_FORMATS = {
   RGBA8888: 0,
@@ -23,6 +29,27 @@ export const FORMAT_LABELS = new Map([
 ]);
 
 const HEADER_SIZE = 64;
+const VTF_MAX_COLUMN_HEIGHT = 32767;
+
+const DITHER_MATRIX = [
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+  [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+  [1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+  [1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
+  [1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+  [1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1],
+  [1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1],
+  [1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1],
+  [1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+  [1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+  [1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+  [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+  [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+];
 
 export function buildVTFBytes(payload) {
   const width = Math.max(1, payload.width | 0);
@@ -31,20 +58,26 @@ export function buildVTFBytes(payload) {
   const frameCount = Math.max(1, frames[0]?.length || 1);
   const format = Number(payload.format ?? TEXTURE_FORMATS.DXT1);
   const sampling = Number(payload.sampling || 0);
+  const shortened = !!payload.shortened;
   const hasMipmaps = frames.length > 1;
 
-  const encodedMipmaps = frames.map((mipFrames) =>
-    mipFrames.map((frame) => encodeFrame(frame, format, payload))
+  const encodedLevels = frames.map((mipFrames, level) =>
+    encodeOriginalLevel(mipFrames, {
+      baseWidth: width,
+      baseHeight: height,
+      level,
+      frameCount,
+      format,
+      shortened,
+      dither: !!payload.dither,
+      dxtQuality: Number(payload.dxtQuality || 2),
+    })
   );
 
-  const dataSize = encodedMipmaps.reduce(
-    (sum, mipFrames) =>
-      sum + mipFrames.reduce((inner, frame) => inner + frame.length, 0),
-    0
-  );
+  const dataSize = encodedLevels.reduce((sum, level) => sum + level.length, 0);
   const file = new Uint8Array(HEADER_SIZE + dataSize);
   writeHeader(file, {
-    width,
+    width: shortened ? width - 4 : width,
     height,
     format,
     sampling,
@@ -54,44 +87,58 @@ export function buildVTFBytes(payload) {
   });
 
   let pos = HEADER_SIZE;
-  for (let mip = encodedMipmaps.length - 1; mip >= 0; mip -= 1) {
-    const mipFrames = encodedMipmaps[mip];
-    for (let frame = 0; frame < mipFrames.length; frame += 1) {
-      file.set(mipFrames[frame], pos);
-      pos += mipFrames[frame].length;
-    }
+  for (let mip = encodedLevels.length - 1; mip >= 0; mip -= 1) {
+    file.set(encodedLevels[mip], pos);
+    pos += encodedLevels[mip].length;
   }
 
   return file;
 }
 
-export function estimateVTFSize(width, height, frameCount, format, mipmaps) {
-  const levels = mipmaps ? getMipmapDimensions(width, height) : [{ width, height }];
+export function estimateVTFSize(width, height, frameCount, format, mipmaps, shortened = false) {
   const frames = Math.max(1, frameCount || 1);
-  const dataBytes = levels.reduce((sum, level) => {
-    return sum + getFrameEncodedSize(level.width, level.height, format) * frames;
+  const baseWidth = Math.max(1, Math.round(Number(width) || 1));
+  const baseHeight = Math.max(1, Math.round(Number(height) || 1));
+  const levels = mipmaps ? getMipmapDimensions(baseWidth, baseHeight) : [{ width: baseWidth, height: baseHeight }];
+  return HEADER_SIZE + levels.reduce((sum, _, level) => {
+    const levelWidth = Math.max(1, Math.floor(baseWidth / (2 ** level)));
+    const levelFrameHeight = Math.max(1, Math.floor(baseHeight / (2 ** level)));
+    const encodedWidth = shortened ? levelWidth - 4 : levelWidth;
+    const totalHeight = levelFrameHeight * frames;
+    return sum + getOriginalEncodedSize(encodedWidth, totalHeight, format);
   }, 0);
-  return HEADER_SIZE + dataBytes;
 }
 
 export function getMipmapDimensions(width, height) {
-  const levels = [];
-  let w = Math.max(1, width | 0);
-  let h = Math.max(1, height | 0);
-  while (true) {
-    levels.push({ width: w, height: h });
-    if (w === 1 && h === 1) break;
-    w = Math.max(1, Math.floor(w / 2));
-    h = Math.max(1, Math.floor(h / 2));
+  const levels = [{ width: Math.max(1, width | 0), height: Math.max(1, height | 0) }];
+  for (let divisor = 2; width / divisor > 16 && height / divisor > 16; divisor *= 2) {
+    levels.push({
+      width: Math.max(1, Math.floor(width / divisor)),
+      height: Math.max(1, Math.floor(height / divisor)),
+    });
   }
   return levels;
+}
+
+export function shouldUseOriginalMipmaps(width, height, frameCount, format, sampling, shortened = false) {
+  const sizeKB = estimateVTFSize(width, height, frameCount, format, false, shortened) / 1024;
+  return sizeKB < 385 &&
+    !shortened &&
+    Number(sampling || 0) !== 1 &&
+    width % 64 === 0 &&
+    height % 64 === 0;
+}
+
+export function shouldShortenOriginalVTF(width, height, frameCount, format) {
+  const sizeKB = estimateVTFSize(width, height, frameCount, format, false, false) / 1024;
+  return sizeKB >= 512 && sizeKB < 513;
 }
 
 export function buildVMTText(name) {
   const clean = sanitizeVMTTextureName(name || "spray");
   return `"UnlitGeneric"
 {
-\t"$basetexture" "vgui/logos/${clean}"
+\t"$basetexture" "vgui/logos/custom/${clean}"
 \t"$translucent" "1"
 \t"$ignorez" "1"
 \t"$vertexcolor" "1"
@@ -100,11 +147,205 @@ export function buildVMTText(name) {
 `;
 }
 
-function sanitizeVMTTextureName(value) {
-  return String(value || "spray")
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .trim()
-    .replace(/[. ]+$/g, "") || "spray";
+function encodeOriginalLevel(mipFrames, options) {
+  const levelWidth = Math.max(1, Math.floor(options.baseWidth / (2 ** options.level)));
+  const levelFrameHeight = Math.max(1, Math.floor(options.baseHeight / (2 ** options.level)));
+  const encodedWidth = options.shortened ? levelWidth - 4 : levelWidth;
+  const rows = getFrameRows(options.frameCount, options.baseHeight);
+  const columns = getFrameColumns(options.frameCount, options.baseHeight);
+  const strips = [];
+  const workerCountForLevel = getWorkerCount(levelFrameHeight * options.frameCount);
+
+  for (let column = 0; column < columns; column += 1) {
+    let columnHeight = levelFrameHeight * options.frameCount;
+    if (columns > 1) {
+      columnHeight = column === columns - 1
+        ? (options.frameCount % rows) * options.baseHeight
+        : rows * options.baseHeight;
+    }
+
+    const workerCount = Math.max(1, Math.min(workerCountForLevel, Math.ceil(Math.max(1, columnHeight) / 64)));
+    let stripHeight = Math.ceil(columnHeight / workerCount / 4) * 4;
+    let stripStart = 0;
+
+    for (let strip = 0; strip < workerCount; strip += 1) {
+      if (strip === workerCount - 1) {
+        stripHeight = columnHeight - stripStart;
+      }
+      const stripIndex = strip * columns + column;
+      strips[stripIndex] = encodeOriginalStrip(mipFrames, {
+        ...options,
+        levelWidth,
+        levelFrameHeight,
+        encodedWidth,
+        rows,
+        columns,
+        column,
+        stripStart,
+        stripHeight,
+      });
+      stripStart += stripHeight;
+    }
+  }
+
+  return concatByteArrays(strips.filter(Boolean));
+}
+
+function encodeOriginalStrip(mipFrames, options) {
+  const format = Number(options.format);
+  const strip = collectOriginalStripPixels(mipFrames, options);
+  if (format === TEXTURE_FORMATS.DXT1 || format === TEXTURE_FORMATS.DXT5) {
+    return encodeOriginalDXT(strip, options);
+  }
+  if (format === TEXTURE_FORMATS.RGBA8888) {
+    return strip.data;
+  }
+
+  if (format === TEXTURE_FORMATS.RGB888) {
+    forceOpaque(strip.data);
+    return packRGB888Original(strip.data);
+  }
+  if (format === TEXTURE_FORMATS.RGB565) {
+    forceOpaque(strip.data);
+    reduceColorsOriginal(strip, 5, 6, 5, 8, options.dither);
+    return packRGB565Original(strip.data);
+  }
+  if (format === TEXTURE_FORMATS.BGRA5551) {
+    reduceColorsOriginal(strip, 5, 5, 5, 1, options.dither);
+    return packBGRA5551Original(strip.data);
+  }
+  if (format === TEXTURE_FORMATS.BGRA4444) {
+    reduceColorsOriginal(strip, 4, 4, 4, 4, options.dither);
+    return packBGRA4444Original(strip.data);
+  }
+  return strip.data;
+}
+
+function collectOriginalStripPixels(mipFrames, options) {
+  const isDXT = options.format === TEXTURE_FORMATS.DXT1 || options.format === TEXTURE_FORMATS.DXT5;
+  const width = isDXT ? Math.ceil(options.encodedWidth / 4) * 4 : options.encodedWidth;
+  const height = isDXT ? Math.ceil(options.stripHeight / 4) * 4 : options.stripHeight;
+  const out = new Uint8ClampedArray(Math.max(0, width * height * 4));
+  const cropStart = (options.levelWidth * options.columns) / 2 / options.columns -
+    options.encodedWidth / 2 +
+    options.column * options.encodedWidth;
+
+  for (let y = 0; y < height; y += 1) {
+    const virtualY = options.stripStart + y;
+    const frameOffsetInColumn = Math.floor(virtualY / options.levelFrameHeight);
+    const frameIndex = options.column * options.rows + frameOffsetInColumn;
+    const sourceFrame = mipFrames[Math.min(frameIndex, mipFrames.length - 1)];
+    const sourceY = virtualY - frameOffsetInColumn * options.levelFrameHeight;
+
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = Math.round(cropStart + x - options.column * options.levelWidth);
+      const dest = (y * width + x) * 4;
+      if (!sourceFrame ||
+        sourceX < 0 ||
+        sourceY < 0 ||
+        sourceX >= sourceFrame.width ||
+        sourceY >= sourceFrame.height) {
+        continue;
+      }
+      const src = (sourceY * sourceFrame.width + sourceX) * 4;
+      out[dest] = sourceFrame.data[src];
+      out[dest + 1] = sourceFrame.data[src + 1];
+      out[dest + 2] = sourceFrame.data[src + 2];
+      out[dest + 3] = sourceFrame.data[src + 3];
+    }
+  }
+
+  return { width, height, data: out };
+}
+
+function encodeOriginalDXT(strip, options) {
+  configureDXTQuality(Number(options.dxtQuality || 2));
+  const out = new Int32Array(Math.ceil(strip.width / 4) * 4 * Math.ceil(strip.height / 4) * 4 /
+    (options.format === TEXTURE_FORMATS.DXT1 ? 8 : 4));
+  const bufsrc = new Int32Array(16);
+  const bufprv = new Uint8Array(64);
+  const bufsrcalpha = new Uint8Array(16);
+  const bufout = new Int32Array(2);
+  let blockPosition = 0;
+
+  for (let blockY = 0; blockY < strip.height / 4; blockY += 1) {
+    for (let blockX = 0; blockX < strip.width / 4; blockX += 1) {
+      for (let y = 0; y < 4; y += 1) {
+        for (let x = 0; x < 4; x += 1) {
+          const position = x * 4 + (16 * blockX) + (strip.width * 16 * blockY) + (strip.width * 4 * y);
+          bufsrc[x + y * 4] =
+            (strip.data[position + 3] << 24) +
+            (strip.data[position] << 16) +
+            (strip.data[position + 1] << 8) +
+            strip.data[position + 2];
+        }
+      }
+
+      if (options.format === TEXTURE_FORMATS.DXT5) {
+        for (let y = 0; y < 4; y += 1) {
+          for (let x = 0; x < 4; x += 1) {
+            const position = x * 4 + (16 * blockX) + (strip.width * 16 * blockY) + (strip.width * 4 * y);
+            bufsrcalpha[x + y * 4] = strip.data[position + 3];
+          }
+        }
+        CompressAlphaBlock(bufsrcalpha, bufout, bufprv);
+        out.set(bufout, blockPosition);
+        blockPosition += 2;
+      }
+
+      CompressRGBBlock(
+        bufsrc,
+        bufout,
+        CalculateColourWeightings(bufsrc),
+        options.format === TEXTURE_FORMATS.DXT1,
+        options.format === TEXTURE_FORMATS.DXT1,
+        127,
+        bufprv
+      );
+      out.set(bufout, blockPosition);
+      blockPosition += 2;
+    }
+  }
+
+  const bytes = new Uint8Array(out.length * 4);
+  let pos = 0;
+  for (let i = 0; i < out.length; i += 1) {
+    writeUint32(bytes, pos, out[i]);
+    pos += 4;
+  }
+  return bytes;
+}
+
+function writeHeader(file, options) {
+  file[0] = 86;
+  file[1] = 84;
+  file[2] = 70;
+  file[3] = 0;
+  writeUint32(file, 4, 7);
+  writeUint32(file, 8, 1);
+  writeUint32(file, 12, HEADER_SIZE);
+  writeUint16(file, 16, options.width);
+  writeUint16(file, 18, options.height);
+  file[20] = 12 + Number(options.sampling || 0);
+  file[21] = 35 - (options.hasMipmaps ? 1 : 0);
+  writeUint16(file, 24, options.frameCount);
+  file[52] = options.format & 0xff;
+  file[56] = options.mipmapCount & 0xff;
+  file[57] = TEXTURE_FORMATS.DXT1;
+  file[62] = 0;
+  file[63] = 1;
+}
+
+function getOriginalEncodedSize(width, totalHeight, format) {
+  if (format === TEXTURE_FORMATS.DXT1) {
+    return Math.ceil(width / 4) * Math.ceil(totalHeight / 4) * 8;
+  }
+  if (format === TEXTURE_FORMATS.DXT5) {
+    return Math.ceil(width / 4) * Math.ceil(totalHeight / 4) * 16;
+  }
+  if (format === TEXTURE_FORMATS.RGBA8888) return width * totalHeight * 4;
+  if (format === TEXTURE_FORMATS.RGB888) return width * totalHeight * 3;
+  return width * totalHeight * 2;
 }
 
 function normalizeMipFrames(mipmaps) {
@@ -124,479 +365,170 @@ function normalizeMipFrames(mipmaps) {
   });
 }
 
-function writeHeader(file, options) {
-  file[0] = 86;
-  file[1] = 84;
-  file[2] = 70;
-  file[3] = 0;
-  writeUint32(file, 4, 7);
-  writeUint32(file, 8, 1);
-  writeUint32(file, 12, HEADER_SIZE);
-  writeUint16(file, 16, options.width);
-  writeUint16(file, 18, options.height);
+function reduceColorsOriginal(image, rb, gb, bb, ab, useDither) {
+  const data = image.data;
+  const rs = 8 - rb;
+  const gs = 8 - gb;
+  const bs = 8 - bb;
+  const as = 8 - ab;
+  const rm = 255 / (255 >> rs);
+  const gm = 255 / (255 >> gs);
+  const bm = 255 / (255 >> bs);
+  const am = 255 / (255 >> as);
 
-  // Match VTF-Editor's flags baseline, with sampling bits mixed in.
-  file[20] = 12 + Number(options.sampling || 0);
-  file[21] = 35 - (options.hasMipmaps ? 1 : 0);
-
-  writeUint16(file, 24, options.frameCount);
-  file[52] = options.format & 0xff;
-  file[56] = options.mipmapCount & 0xff;
-  file[57] = TEXTURE_FORMATS.DXT1;
-  file[62] = 0;
-  file[63] = 1;
-}
-
-function getFrameEncodedSize(width, height, format) {
-  if (format === TEXTURE_FORMATS.DXT1) {
-    return Math.ceil(width / 4) * Math.ceil(height / 4) * 8;
-  }
-  if (format === TEXTURE_FORMATS.DXT5) {
-    return Math.ceil(width / 4) * Math.ceil(height / 4) * 16;
-  }
-  if (format === TEXTURE_FORMATS.RGBA8888) return width * height * 4;
-  if (format === TEXTURE_FORMATS.RGB888) return width * height * 3;
-  return width * height * 2;
-}
-
-function encodeFrame(frame, format, options = {}) {
-  const rgba = frame.data instanceof Uint8ClampedArray || frame.data instanceof Uint8Array
-    ? frame.data
-    : new Uint8ClampedArray(frame.data);
-  const source = shouldDither(format, options)
-    ? applyFloydSteinbergDither(rgba, frame.width, frame.height, format)
-    : rgba;
-
-  switch (format) {
-    case TEXTURE_FORMATS.RGBA8888:
-      return new Uint8Array(source);
-    case TEXTURE_FORMATS.RGB888:
-      return encodeRGB888(source);
-    case TEXTURE_FORMATS.RGB565:
-      return encodeRGB565(source);
-    case TEXTURE_FORMATS.BGRA5551:
-      return encodeBGRA5551(source);
-    case TEXTURE_FORMATS.BGRA4444:
-      return encodeBGRA4444(source);
-    case TEXTURE_FORMATS.DXT5:
-      return encodeDXT5(source, frame.width, frame.height, options);
-    case TEXTURE_FORMATS.DXT1:
-    default:
-      return encodeDXT1(source, frame.width, frame.height, options);
-  }
-}
-
-function encodeRGB888(rgba) {
-  const out = new Uint8Array((rgba.length / 4) * 3);
-  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
-    out[j] = rgba[i];
-    out[j + 1] = rgba[i + 1];
-    out[j + 2] = rgba[i + 2];
-  }
-  return out;
-}
-
-function encodeRGB565(rgba) {
-  const out = new Uint8Array((rgba.length / 4) * 2);
-  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 2) {
-    writeUint16(out, j, rgbTo565(rgba[i], rgba[i + 1], rgba[i + 2]));
-  }
-  return out;
-}
-
-function encodeBGRA5551(rgba) {
-  const out = new Uint8Array((rgba.length / 4) * 2);
-  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 2) {
-    const b = rgba[i + 2] >> 3;
-    const g = rgba[i + 1] >> 3;
-    const r = rgba[i] >> 3;
-    const a = rgba[i + 3] >= 128 ? 1 : 0;
-    writeUint16(out, j, b | (g << 5) | (r << 10) | (a << 15));
-  }
-  return out;
-}
-
-function encodeBGRA4444(rgba) {
-  const out = new Uint8Array((rgba.length / 4) * 2);
-  for (let i = 0, j = 0; i < rgba.length; i += 4, j += 2) {
-    const b = rgba[i + 2] >> 4;
-    const g = rgba[i + 1] >> 4;
-    const r = rgba[i] >> 4;
-    const a = rgba[i + 3] >> 4;
-    writeUint16(out, j, b | (g << 4) | (r << 8) | (a << 12));
-  }
-  return out;
-}
-
-function encodeDXT1(rgba, width, height, options = {}) {
-  const blocksX = Math.ceil(width / 4);
-  const blocksY = Math.ceil(height / 4);
-  const out = new Uint8Array(blocksX * blocksY * 8);
-  let offset = 0;
-
-  for (let by = 0; by < blocksY; by += 1) {
-    for (let bx = 0; bx < blocksX; bx += 1) {
-      const block = collectBlock(rgba, width, height, bx, by);
-      const encoded = encodeDXT1Block(block, true, options);
-      out.set(encoded, offset);
-      offset += 8;
-    }
-  }
-  return out;
-}
-
-function encodeDXT5(rgba, width, height, options = {}) {
-  const blocksX = Math.ceil(width / 4);
-  const blocksY = Math.ceil(height / 4);
-  const out = new Uint8Array(blocksX * blocksY * 16);
-  let offset = 0;
-
-  for (let by = 0; by < blocksY; by += 1) {
-    for (let bx = 0; bx < blocksX; bx += 1) {
-      const block = collectBlock(rgba, width, height, bx, by);
-      out.set(encodeDXT5Alpha(block), offset);
-      out.set(encodeDXT1Block(block, false, options), offset + 8);
-      offset += 16;
-    }
-  }
-  return out;
-}
-
-function collectBlock(rgba, width, height, blockX, blockY) {
-  const pixels = new Array(16);
-  let p = 0;
-  for (let y = 0; y < 4; y += 1) {
-    const sy = Math.min(height - 1, blockY * 4 + y);
-    for (let x = 0; x < 4; x += 1) {
-      const sx = Math.min(width - 1, blockX * 4 + x);
-      const i = (sy * width + sx) * 4;
-      pixels[p] = [rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]];
-      p += 1;
-    }
-  }
-  return pixels;
-}
-
-function encodeDXT1Block(block, oneBitAlpha, options = {}) {
-  const transparent = oneBitAlpha && block.some((p) => p[3] < 128);
-  const endpoints = chooseColorEndpoints(block, transparent, Number(options.dxtQuality || 0));
-  let c0 = rgbTo565(endpoints.max[0], endpoints.max[1], endpoints.max[2]);
-  let c1 = rgbTo565(endpoints.min[0], endpoints.min[1], endpoints.min[2]);
-
-  if (transparent && c0 > c1) {
-    [c0, c1] = [c1, c0];
-  } else if (!transparent && c0 < c1) {
-    [c0, c1] = [c1, c0];
-  }
-
-  const palette = buildDXTColorPalette(c0, c1, transparent);
-  let indices = 0;
-  for (let i = 0; i < 16; i += 1) {
-    let index = 0;
-    if (transparent && block[i][3] < 128) {
-      index = 3;
-    } else {
-      index = closestColorIndex(block[i], palette, transparent ? 3 : 4);
-    }
-    indices |= index << (i * 2);
-  }
-
-  const out = new Uint8Array(8);
-  writeUint16(out, 0, c0);
-  writeUint16(out, 2, c1);
-  writeUint32(out, 4, indices);
-  return out;
-}
-
-function encodeDXT5Alpha(block) {
-  let min = 255;
-  let max = 0;
-  for (const pixel of block) {
-    min = Math.min(min, pixel[3]);
-    max = Math.max(max, pixel[3]);
-  }
-
-  const palette = new Array(8);
-  palette[0] = max;
-  palette[1] = min;
-  if (max > min) {
-    for (let i = 1; i <= 6; i += 1) {
-      palette[i + 1] = Math.round(((7 - i) * max + i * min) / 7);
-    }
-  } else {
-    for (let i = 1; i <= 4; i += 1) {
-      palette[i + 1] = Math.round(((5 - i) * max + i * min) / 5);
-    }
-    palette[6] = 0;
-    palette[7] = 255;
-  }
-
-  let bits = BigInt(0);
-  for (let i = 0; i < 16; i += 1) {
-    let best = 0;
-    let bestDistance = Infinity;
-    for (let p = 0; p < palette.length; p += 1) {
-      const distance = Math.abs(block[i][3] - palette[p]);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = p;
-      }
-    }
-    bits |= BigInt(best) << BigInt(i * 3);
-  }
-
-  const out = new Uint8Array(8);
-  out[0] = max;
-  out[1] = min;
-  for (let i = 0; i < 6; i += 1) {
-    out[2 + i] = Number((bits >> BigInt(i * 8)) & BigInt(0xff));
-  }
-  return out;
-}
-
-function chooseColorEndpoints(block, transparent, quality) {
-  const candidates = block.filter((pixel) => !transparent || pixel[3] >= 128);
-  if (!candidates.length) {
-    return { min: [0, 0, 0, 0], max: [0, 0, 0, 0] };
-  }
-
-  const luma = chooseLumaEndpoints(candidates);
-  if (quality <= 0) return luma;
-
-  const bounds = chooseBoundsEndpoints(candidates);
-  if (quality === 1) return bounds;
-
-  const farthest = chooseFarthestEndpoints(candidates);
-  if (quality < 3) return farthest;
-
-  return [luma, bounds, farthest].reduce((best, pair) => {
-    const score = scoreEndpointPair(block, pair, transparent);
-    if (score < best.score) {
-      return { pair, score };
-    }
-    return best;
-  }, { pair: luma, score: Infinity }).pair;
-}
-
-function chooseLumaEndpoints(candidates) {
-  let min = null;
-  let max = null;
-  let minLuma = Infinity;
-  let maxLuma = -Infinity;
-  for (const pixel of candidates) {
-    const luma = pixel[0] * 0.299 + pixel[1] * 0.587 + pixel[2] * 0.114;
-    if (luma < minLuma) {
-      minLuma = luma;
-      min = pixel;
-    }
-    if (luma > maxLuma) {
-      maxLuma = luma;
-      max = pixel;
-    }
-  }
-  return { min, max };
-}
-
-function chooseBoundsEndpoints(candidates) {
-  const min = [255, 255, 255, 255];
-  const max = [0, 0, 0, 255];
-  for (const pixel of candidates) {
-    min[0] = Math.min(min[0], pixel[0]);
-    min[1] = Math.min(min[1], pixel[1]);
-    min[2] = Math.min(min[2], pixel[2]);
-    max[0] = Math.max(max[0], pixel[0]);
-    max[1] = Math.max(max[1], pixel[1]);
-    max[2] = Math.max(max[2], pixel[2]);
-  }
-  return { min, max };
-}
-
-function chooseFarthestEndpoints(candidates) {
-  let min = candidates[0];
-  let max = candidates[0];
-  let best = -1;
-  for (let i = 0; i < candidates.length; i += 1) {
-    for (let j = i; j < candidates.length; j += 1) {
-      const distance = colorDistance(candidates[i], candidates[j]);
-      if (distance > best) {
-        best = distance;
-        min = candidates[i];
-        max = candidates[j];
-      }
-    }
-  }
-  return { min, max };
-}
-
-function scoreEndpointPair(block, endpoints, transparent) {
-  let c0 = rgbTo565(endpoints.max[0], endpoints.max[1], endpoints.max[2]);
-  let c1 = rgbTo565(endpoints.min[0], endpoints.min[1], endpoints.min[2]);
-  if (transparent && c0 > c1) {
-    [c0, c1] = [c1, c0];
-  } else if (!transparent && c0 < c1) {
-    [c0, c1] = [c1, c0];
-  }
-  const palette = buildDXTColorPalette(c0, c1, transparent);
-  let score = 0;
-  for (const pixel of block) {
-    if (transparent && pixel[3] < 128) continue;
-    const index = closestColorIndex(pixel, palette, transparent ? 3 : 4);
-    score += colorDistance(pixel, palette[index]);
-  }
-  return score;
-}
-
-function buildDXTColorPalette(c0, c1, transparent) {
-  const a = colorFrom565(c0);
-  const b = colorFrom565(c1);
-  const palette = [a, b];
-  if (c0 > c1 || !transparent) {
-    palette[2] = [
-      Math.round((2 * a[0] + b[0]) / 3),
-      Math.round((2 * a[1] + b[1]) / 3),
-      Math.round((2 * a[2] + b[2]) / 3),
-      255,
-    ];
-    palette[3] = [
-      Math.round((a[0] + 2 * b[0]) / 3),
-      Math.round((a[1] + 2 * b[1]) / 3),
-      Math.round((a[2] + 2 * b[2]) / 3),
-      255,
-    ];
-  } else {
-    palette[2] = [
-      Math.round((a[0] + b[0]) / 2),
-      Math.round((a[1] + b[1]) / 2),
-      Math.round((a[2] + b[2]) / 2),
-      255,
-    ];
-    palette[3] = [0, 0, 0, 0];
-  }
-  return palette;
-}
-
-function closestColorIndex(pixel, palette, count) {
-  let best = 0;
-  let bestDistance = Infinity;
-  for (let i = 0; i < count; i += 1) {
-    const p = palette[i];
-    const dr = pixel[0] - p[0];
-    const dg = pixel[1] - p[1];
-    const db = pixel[2] - p[2];
-    const distance = dr * dr + dg * dg + db * db;
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = i;
-    }
-  }
-  return best;
-}
-
-function colorDistance(a, b) {
-  const dr = a[0] - b[0];
-  const dg = a[1] - b[1];
-  const db = a[2] - b[2];
-  return dr * dr + dg * dg + db * db;
-}
-
-function shouldDither(format, options) {
-  return !!options.dither && (
-    format === TEXTURE_FORMATS.RGB565 ||
-    format === TEXTURE_FORMATS.BGRA5551 ||
-    format === TEXTURE_FORMATS.BGRA4444
-  );
-}
-
-function applyFloydSteinbergDither(rgba, width, height, format) {
-  const work = new Float32Array(rgba.length);
-  for (let i = 0; i < rgba.length; i += 1) {
-    work[i] = rgba[i];
-  }
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const i = (y * width + x) * 4;
-      const oldPixel = [
-        clampByte(work[i]),
-        clampByte(work[i + 1]),
-        clampByte(work[i + 2]),
-        clampByte(work[i + 3]),
+  for (let x = 0; x < image.width; x += 1) {
+    for (let y = 0; y < image.height; y += 1) {
+      const pixel = (y * image.width * 4) + (x * 4);
+      const color = [data[pixel], data[pixel + 1], data[pixel + 2]];
+      const floor = [
+        Math.round(Math.floor(data[pixel] / rm) * rm),
+        Math.round(Math.floor(data[pixel + 1] / gm) * gm),
+        Math.round(Math.floor(data[pixel + 2] / bm) * bm),
       ];
-      const nextPixel = quantizePixelForFormat(oldPixel, format);
-      work[i] = nextPixel[0];
-      work[i + 1] = nextPixel[1];
-      work[i + 2] = nextPixel[2];
-      work[i + 3] = nextPixel[3];
+      const ceil = [
+        Math.round(Math.ceil(data[pixel] / rm) * rm),
+        Math.round(Math.ceil(data[pixel + 1] / gm) * gm),
+        Math.round(Math.ceil(data[pixel + 2] / bm) * bm),
+      ];
+      const closest = bestMatchOriginal([floor, ceil], color);
+      const closest2 = closest[0] === floor[0] && closest[1] === floor[1] && closest[2] === floor[2]
+        ? ceil
+        : floor;
+      let alpha = Math.round(Math.floor(data[pixel + 3] / am) * am);
+      const alpha2 = Math.round(Math.ceil(data[pixel + 3] / am) * am);
+      if (Math.abs(alpha - data[pixel + 3]) > Math.abs(alpha2 - data[pixel + 3])) {
+        alpha = alpha2;
+      }
 
-      diffuseError(work, width, height, x + 1, y, oldPixel, nextPixel, 7 / 16, format);
-      diffuseError(work, width, height, x - 1, y + 1, oldPixel, nextPixel, 3 / 16, format);
-      diffuseError(work, width, height, x, y + 1, oldPixel, nextPixel, 5 / 16, format);
-      diffuseError(work, width, height, x + 1, y + 1, oldPixel, nextPixel, 1 / 16, format);
+      if (useDither) {
+        const between = [];
+        for (let b = 0; b < 17; b += 1) {
+          between.push([
+            closest[0] + (closest2[0] - closest[0]) * b / 16,
+            closest[1] + (closest2[1] - closest[1]) * b / 16,
+            closest[2] + (closest2[2] - closest[2]) * b / 16,
+          ]);
+        }
+        const closest3 = bestMatchOriginal(between, color);
+        const index3 = between.indexOf(closest3);
+        const trans = [closest, closest2][getDitherOriginal(DITHER_MATRIX[index3], x, y)];
+        data[pixel] = trans[0];
+        data[pixel + 1] = trans[1];
+        data[pixel + 2] = trans[2];
+      } else {
+        data[pixel] = closest[0];
+        data[pixel + 1] = closest[1];
+        data[pixel + 2] = closest[2];
+      }
+      data[pixel + 3] = alpha;
     }
   }
-
-  return Uint8ClampedArray.from(work, clampByte);
 }
 
-function diffuseError(work, width, height, x, y, oldPixel, nextPixel, factor, format) {
-  if (x < 0 || x >= width || y < 0 || y >= height) return;
-  const i = (y * width + x) * 4;
-  const channels = format === TEXTURE_FORMATS.RGB565 ? 3 : 4;
-  for (let channel = 0; channel < channels; channel += 1) {
-    work[i + channel] += (oldPixel[channel] - nextPixel[channel]) * factor;
+function bestMatchOriginal(palette, color) {
+  let best = [Infinity, [0, 0, 0]];
+  for (let i = 0; i < palette.length; i += 1) {
+    const difference = Math.abs(palette[i][0] - color[0]) +
+      Math.abs(palette[i][1] - color[1]) +
+      Math.abs(palette[i][2] - color[2]);
+    if (difference < best[0]) {
+      best = [difference, palette[i]];
+    }
+  }
+  return best[1];
+}
+
+function getDitherOriginal(matrix, x, y) {
+  return matrix[((y % 4) * 4) + (x % 4)];
+}
+
+function forceOpaque(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    data[i + 3] = 255;
   }
 }
 
-function quantizePixelForFormat(pixel, format) {
-  if (format === TEXTURE_FORMATS.RGB565) {
-    const value = rgbTo565(pixel[0], pixel[1], pixel[2]);
-    const rgb = colorFrom565(value);
-    return [rgb[0], rgb[1], rgb[2], pixel[3]];
+function packRGB888Original(data) {
+  const out = new Uint8Array((data.length / 4) * 3);
+  let pos = 0;
+  for (let k = 0; k < data.length; k += 4) {
+    out[pos] = data[k];
+    out[pos + 1] = data[k + 1];
+    out[pos + 2] = data[k + 2];
+    pos += 3;
   }
-  if (format === TEXTURE_FORMATS.BGRA5551) {
-    return [
-      Math.round(((pixel[0] >> 3) * 255) / 31),
-      Math.round(((pixel[1] >> 3) * 255) / 31),
-      Math.round(((pixel[2] >> 3) * 255) / 31),
-      pixel[3] >= 128 ? 255 : 0,
-    ];
+  return out;
+}
+
+function packRGB565Original(data) {
+  const out = new Uint8Array((data.length / 4) * 2);
+  let pos = 0;
+  for (let k = 0; k < data.length; k += 4) {
+    writeUint16(out, pos, (data[k] >> 3) + ((data[k + 1] >> 2) << 5) + ((data[k + 2] >> 3) << 11));
+    pos += 2;
   }
-  return [
-    Math.round(((pixel[0] >> 4) * 255) / 15),
-    Math.round(((pixel[1] >> 4) * 255) / 15),
-    Math.round(((pixel[2] >> 4) * 255) / 15),
-    Math.round(((pixel[3] >> 4) * 255) / 15),
-  ];
+  return out;
 }
 
-function clampByte(value) {
-  return Math.max(0, Math.min(255, Math.round(value || 0)));
+function packBGRA5551Original(data) {
+  // VTF-Editor's BGRA5551 writer references the wrong loop variable, so it emits zeros.
+  return new Uint8Array((data.length / 4) * 2);
 }
 
-function rgbTo565(r, g, b) {
-  return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+function packBGRA4444Original(data) {
+  const out = new Uint8Array((data.length / 4) * 2);
+  let pos = 0;
+  for (let k = 0; k < data.length; k += 4) {
+    writeUint16(out, pos, ((data[k] >> 4) << 8) +
+      ((data[k + 1] >> 4) << 4) +
+      (data[k + 2] >> 4) +
+      ((data[k + 3] >> 4) << 12));
+    pos += 2;
+  }
+  return out;
 }
 
-function colorFrom565(value) {
-  const r = (value >> 11) & 31;
-  const g = (value >> 5) & 63;
-  const b = value & 31;
-  return [
-    Math.round((r * 255) / 31),
-    Math.round((g * 255) / 63),
-    Math.round((b * 255) / 31),
-    255,
-  ];
+function getFrameRows(frameCount, height) {
+  return Math.min(frameCount, Math.floor(VTF_MAX_COLUMN_HEIGHT / height));
+}
+
+function getFrameColumns(frameCount, height) {
+  return Math.ceil(frameCount * height / VTF_MAX_COLUMN_HEIGHT);
+}
+
+function getWorkerCount(height) {
+  const concurrency = typeof navigator !== "undefined" && navigator.hardwareConcurrency
+    ? navigator.hardwareConcurrency
+    : 1;
+  return Math.max(1, Math.min(concurrency, Math.ceil(height / 64)));
+}
+
+function concatByteArrays(parts) {
+  const size = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(size);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+function sanitizeVMTTextureName(value) {
+  return String(value || "spray")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim()
+    .replace(/[. ]+$/g, "") || "spray";
 }
 
 function writeUint16(out, offset, value) {
   out[offset] = value & 0xff;
-  out[offset + 1] = (value >> 8) & 0xff;
+  out[offset + 1] = (value >>> 8) & 0xff;
 }
 
 function writeUint32(out, offset, value) {
   out[offset] = value & 0xff;
-  out[offset + 1] = (value >> 8) & 0xff;
-  out[offset + 2] = (value >> 16) & 0xff;
-  out[offset + 3] = (value >> 24) & 0xff;
+  out[offset + 1] = (value >>> 8) & 0xff;
+  out[offset + 2] = (value >>> 16) & 0xff;
+  out[offset + 3] = (value >>> 24) & 0xff;
 }

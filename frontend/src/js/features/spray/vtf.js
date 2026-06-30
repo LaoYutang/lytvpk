@@ -5,9 +5,18 @@ import {
   buildVTFBytes,
   estimateVTFSize,
   getMipmapDimensions,
+  shouldShortenOriginalVTF,
+  shouldUseOriginalMipmaps,
 } from "./vtf-core.js";
 
-export { TEXTURE_FORMATS, FORMAT_LABELS, estimateVTFSize, getMipmapDimensions };
+export {
+  TEXTURE_FORMATS,
+  FORMAT_LABELS,
+  estimateVTFSize,
+  getMipmapDimensions,
+  shouldShortenOriginalVTF,
+  shouldUseOriginalMipmaps,
+};
 
 export const DEFAULT_SPRAY_OPTIONS = {
   widthMode: "auto",
@@ -24,8 +33,7 @@ export const DEFAULT_SPRAY_OPTIONS = {
   dxtQuality: 2,
 };
 
-const IMAGE_DECODER_MAX_FRAMES = 120;
-const VIDEO_MAX_FRAMES = 120;
+const IMAGE_DECODER_MAX_FRAMES = 4096;
 
 export async function decodeFilesAsProject(files, { requestClipOptions } = {}) {
   const list = Array.from(files || []).filter(Boolean);
@@ -89,6 +97,7 @@ export async function buildSprayOutputs(project, options) {
     frameCount: payload.frameCount,
     mipmapCount: payload.mipmaps.length,
     format: Number(finalOptions.format),
+    shortened: !!payload.shortened,
     vtfBytes,
     vtfBase64: bytesToBase64(vtfBytes),
     vmtText: buildVMTText(outputName),
@@ -105,18 +114,24 @@ export function resolveOutputSize(project, options) {
     }),
     { width: 1, height: 1 }
   );
+  const frameCount = getProjectFrames(project || { frames }, options).length || 1;
+  const largestResolution = getOriginalLargestResolution(
+    maxSource.width,
+    maxSource.height,
+    frameCount
+  );
 
   const width =
     options.widthMode === "custom"
       ? Number(options.customWidth)
       : options.widthMode === "auto"
-        ? maxSource.width
+        ? largestResolution
         : Number(options.widthMode);
   const height =
     options.heightMode === "custom"
       ? Number(options.customHeight)
       : options.heightMode === "auto"
-        ? maxSource.height
+        ? largestResolution
         : Number(options.heightMode);
 
   return {
@@ -147,8 +162,13 @@ export function drawFrameToCanvas(frame, targetCanvas, options = {}) {
 
 function prepareVTFPayload(project, options, size) {
   const baseFrames = getProjectFrames(project, options);
+  const format = Number(options.format);
+  const sampling = Number(options.sampling || 0);
+  const shortened = shouldShortenOriginalVTF(size.width, size.height, baseFrames.length, format);
+  const useMipmaps = !!options.mipmaps &&
+    shouldUseOriginalMipmaps(size.width, size.height, baseFrames.length, format, sampling, shortened);
   const mipDimensions =
-    options.mipmaps && size.width <= 512 && size.height <= 512
+    useMipmaps
       ? getMipmapDimensions(size.width, size.height)
       : [{ width: size.width, height: size.height }];
 
@@ -167,10 +187,11 @@ function prepareVTFPayload(project, options, size) {
     width: size.width,
     height: size.height,
     frameCount: baseFrames.length,
-    format: Number(options.format),
-    sampling: Number(options.sampling || 0),
+    format,
+    sampling,
     dither: !!options.dither,
     dxtQuality: Number(options.dxtQuality || 2),
+    shortened,
     mipmaps,
   };
 }
@@ -240,9 +261,6 @@ function buildVTFWithWorker(payload) {
 }
 
 async function decodeFileFrames(file, { requestClipOptions } = {}) {
-  if (isVideoFile(file)) {
-    return decodeVideoFile(file, { requestClipOptions });
-  }
   if (isTGAFile(file)) {
     const canvas = decodeTGAToCanvas(await file.arrayBuffer());
     return frameResult(file, [canvas]);
@@ -271,64 +289,29 @@ async function decodeGifFile(file, { requestClipOptions } = {}) {
   const opts = await getClipOptions(requestClipOptions, file, {
     type: "gif",
     frameCount: safeFrameCount,
-    defaultFps: 5,
+    defaultFps: 1,
   });
   const start = clamp(Math.floor(opts.start || 0), 0, safeFrameCount - 1);
   const end = clamp(Math.ceil(opts.end || safeFrameCount), start + 1, safeFrameCount);
-  const step = opts.allFrames ? 1 : Math.max(1, Math.round(5 / Math.max(1, Number(opts.fps || 5))));
+  const frameTimeUnits = Math.max(1, Number(opts.fps || 1)) * 20;
   const frames = [];
+  let timeUnits = 0;
 
-  for (let i = start; i < end && frames.length < IMAGE_DECODER_MAX_FRAMES; i += step) {
+  for (let i = start; i < end && frames.length < IMAGE_DECODER_MAX_FRAMES; i += 1) {
     const decoded = await decoder.decode({ frameIndex: i });
-    frames.push(imageBitmapToCanvas(decoded.image));
+    const canvas = imageBitmapToCanvas(decoded.image);
+    const delayUnits = getImageDecodeDelayUnits(decoded.image);
+    let amount = Math.ceil((timeUnits + delayUnits) / frameTimeUnits) -
+      Math.ceil(timeUnits / frameTimeUnits);
+    if (opts.allFrames) amount = 1;
+    for (let repeat = 0; repeat < amount && frames.length < IMAGE_DECODER_MAX_FRAMES; repeat += 1) {
+      frames.push(canvas);
+    }
+    timeUnits += delayUnits;
     decoded.image.close?.();
   }
   decoder.close?.();
   return frames.length ? frames : [await loadImageToCanvas(file)];
-}
-
-async function decodeVideoFile(file, { requestClipOptions } = {}) {
-  const video = document.createElement("video");
-  video.muted = true;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.src = URL.createObjectURL(file);
-
-  try {
-    await waitForEvent(video, "loadedmetadata");
-    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      await waitForEvent(video, "loadeddata");
-    }
-    await waitForVideoFrame(video);
-    const duration = Number.isFinite(video.duration) ? video.duration : 0;
-    const opts = await getClipOptions(requestClipOptions, file, {
-      type: "video",
-      duration,
-      width: video.videoWidth,
-      height: video.videoHeight,
-      defaultFps: 5,
-    });
-    const start = clamp(Number(opts.start || 0), 0, Math.max(0, duration));
-    const end = clamp(Number(opts.end || duration || 0), start, Math.max(start, duration));
-    const fps = opts.allFrames ? 12 : clamp(Number(opts.fps || 5), 1, 30);
-    const interval = 1 / fps;
-    const frames = [];
-
-    for (
-      let time = start;
-      time <= end + 0.0001 && frames.length < VIDEO_MAX_FRAMES;
-      time += interval
-    ) {
-      const targetTime = Math.min(time, duration || time);
-      await seekVideoTo(video, targetTime);
-      frames.push(videoFrameToCanvas(video));
-    }
-
-    const cleanedFrames = trimLeadingBlankVideoFrames(frames);
-    return frameResult(file, cleanedFrames.length ? cleanedFrames : [videoFrameToCanvas(video)]);
-  } finally {
-    URL.revokeObjectURL(video.src);
-  }
 }
 
 async function getClipOptions(requestClipOptions, file, meta) {
@@ -339,19 +322,11 @@ async function getClipOptions(requestClipOptions, file, meta) {
     }
     if (selected) return selected;
   }
-  if (meta.type === "video") {
-    return {
-      start: 0,
-      end: meta.duration || 0,
-      fps: meta.defaultFps,
-      allFrames: false,
-    };
-  }
   return {
     start: 0,
     end: meta.frameCount || 1,
     fps: meta.defaultFps,
-    allFrames: true,
+    allFrames: false,
   };
 }
 
@@ -396,101 +371,12 @@ function imageBitmapToCanvas(bitmap) {
   return canvas;
 }
 
-function videoFrameToCanvas(video) {
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth || 1;
-  canvas.height = video.videoHeight || 1;
-  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-  return canvas;
-}
-
-async function seekVideoTo(video, targetTime) {
-  if (Math.abs(video.currentTime - targetTime) > 0.001) {
-    video.currentTime = targetTime;
-    await waitForEvent(video, "seeked");
+function getImageDecodeDelayUnits(image) {
+  const duration = Number(image?.duration || 0);
+  if (Number.isFinite(duration) && duration > 0) {
+    return Math.max(1, Math.round(duration / 10000));
   }
-  await waitForVideoFrame(video);
-}
-
-function waitForVideoFrame(video) {
-  return new Promise((resolve) => {
-    let done = false;
-    let callbackHandle = null;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      if (
-        callbackHandle != null &&
-        typeof video.cancelVideoFrameCallback === "function"
-      ) {
-        video.cancelVideoFrameCallback(callbackHandle);
-      }
-      resolve();
-    };
-    const timer = setTimeout(finish, 90);
-
-    if (typeof video.requestVideoFrameCallback === "function") {
-      callbackHandle = video.requestVideoFrameCallback(finish);
-    } else {
-      requestAnimationFrame(() => requestAnimationFrame(finish));
-    }
-  });
-}
-
-function trimLeadingBlankVideoFrames(frames) {
-  if (frames.length <= 1) return frames;
-
-  let firstContentIndex = -1;
-  for (let i = 0; i < frames.length; i += 1) {
-    if (!isNearBlankCanvas(frames[i])) {
-      firstContentIndex = i;
-      break;
-    }
-  }
-
-  if (firstContentIndex > 0 && firstContentIndex <= 2) {
-    return frames.slice(firstContentIndex);
-  }
-  return frames;
-}
-
-function isNearBlankCanvas(canvas) {
-  const sampleSize = 32;
-  const sample = document.createElement("canvas");
-  sample.width = sampleSize;
-  sample.height = sampleSize;
-  const ctx = sample.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(canvas, 0, 0, sampleSize, sampleSize);
-  const data = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
-  let visiblePixels = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const alpha = data[i + 3];
-    const brightness = data[i] + data[i + 1] + data[i + 2];
-    if (alpha > 12 && brightness > 30) {
-      visiblePixels += 1;
-    }
-  }
-  return visiblePixels / (data.length / 4) < 0.01;
-}
-
-function waitForEvent(target, eventName) {
-  return new Promise((resolve, reject) => {
-    const onEvent = () => {
-      cleanup();
-      resolve();
-    };
-    const onError = () => {
-      cleanup();
-      reject(new Error("媒体读取失败"));
-    };
-    const cleanup = () => {
-      target.removeEventListener(eventName, onEvent);
-      target.removeEventListener("error", onError);
-    };
-    target.addEventListener(eventName, onEvent, { once: true });
-    target.addEventListener("error", onError, { once: true });
-  });
+  return 20;
 }
 
 function decodeTGAToCanvas(buffer) {
@@ -576,10 +462,6 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 
-function isVideoFile(file) {
-  return /^video\//i.test(file.type || "");
-}
-
 function isGifFile(file) {
   return (file.type || "").toLowerCase() === "image/gif" || /\.gif$/i.test(file.name || "");
 }
@@ -594,6 +476,24 @@ function baseName(name) {
     .replace(/\.[^.]+$/, "")
     .replace(/[\\/:*?"<>|]/g, "_")
     .trim();
+}
+
+function getOriginalLargestResolution(width, height, frameCount) {
+  let maxres = Math.max(width || 1, height || 1);
+  const frames = Math.max(1, frameCount || 1);
+  if (frames > 16384 && maxres > 4) maxres = 4;
+  else if (frames > 4096 && maxres > 8) maxres = 8;
+  else if (frames > 1024 && maxres > 16) maxres = 16;
+  else if (frames > 256 && maxres > 32) maxres = 32;
+  else if (frames > 64 && maxres > 64) maxres = 64;
+  else if (frames > 16 && maxres > 128) maxres = 128;
+  else if (frames > 4 && maxres > 256) maxres = 256;
+  else if (frames > 1 && maxres > 512) maxres = 512;
+
+  for (let value = 4; value <= 1024; value *= 2) {
+    if (value >= maxres || value === 1024) return value;
+  }
+  return 1024;
 }
 
 function clampDimension(value) {

@@ -237,7 +237,7 @@ function appendSprayTool(container, openSprayTool, refreshFilesKeepFilter) {
   status.textContent = "可制作";
   row.append(title, status);
   const desc = document.createElement("p");
-  desc.textContent = "导入图片、GIF 或视频，预览并生成 VTF/VMT，或直接打包安装为喷漆 VPK。";
+  desc.textContent = "导入图片或 GIF，预览并保存 VTF/VMT 喷漆文件。";
   main.append(row, desc);
 
   const button = document.createElement("button");

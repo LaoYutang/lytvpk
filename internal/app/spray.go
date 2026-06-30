@@ -26,6 +26,15 @@ type SprayExportRequest struct {
 	Files []SprayFilePayload `json:"files"`
 }
 
+type SpraySaveVTFRequest struct {
+	Name      string `json:"name"`
+	VTFBase64 string `json:"vtfBase64"`
+}
+
+type SpraySaveVMTRequest struct {
+	Name string `json:"name"`
+}
+
 type SprayInstallRequest struct {
 	PackageName string             `json:"packageName"`
 	Files       []SprayFilePayload `json:"files"`
@@ -122,6 +131,78 @@ func (a *App) ExportSprayFiles(request SprayExportRequest) (SprayExportResult, e
 	result.OutputDir = outputDir
 	result.Files = written
 	return result, nil
+}
+
+func (a *App) SaveSprayVTF(request SpraySaveVTFRequest) (string, error) {
+	name := sanitizeSprayFileName(request.Name)
+	if name == "" {
+		name = "spray"
+	}
+	if strings.TrimSpace(request.VTFBase64) == "" {
+		return "", fmt.Errorf("喷漆 %s 缺少 VTF 数据", name)
+	}
+
+	selection, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "保存 VTF 喷漆文件",
+		DefaultFilename: name + ".vtf",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "VTF Files (*.vtf)", Pattern: "*.vtf"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(selection) == "" {
+		return "", nil
+	}
+	if strings.ToLower(filepath.Ext(selection)) != ".vtf" {
+		selection += ".vtf"
+	}
+
+	vtfData, err := base64.StdEncoding.DecodeString(request.VTFBase64)
+	if err != nil {
+		return "", fmt.Errorf("解码 %s.vtf 失败: %v", name, err)
+	}
+	if len(vtfData) == 0 {
+		return "", fmt.Errorf("%s.vtf 数据为空", name)
+	}
+	if err := os.WriteFile(selection, vtfData, 0644); err != nil {
+		return "", fmt.Errorf("写入 %s 失败: %v", selection, err)
+	}
+	return selection, nil
+}
+
+func (a *App) SaveSprayVMT(request SpraySaveVMTRequest) (string, error) {
+	name := sanitizeSprayFileName(request.Name)
+	if name == "" {
+		name = "spray"
+	}
+
+	selection, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "保存 VMT 材质文件",
+		DefaultFilename: name + ".vmt",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "VMT Files (*.vmt)", Pattern: "*.vmt"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(selection) == "" {
+		return "", nil
+	}
+	if strings.ToLower(filepath.Ext(selection)) != ".vmt" {
+		selection += ".vmt"
+	}
+
+	vmtName := sanitizeSprayFileName(strings.TrimSuffix(filepath.Base(selection), filepath.Ext(selection)))
+	if vmtName == "" {
+		vmtName = name
+	}
+	if err := os.WriteFile(selection, []byte(buildSprayVMTText(vmtName)), 0644); err != nil {
+		return "", fmt.Errorf("写入 %s 失败: %v", selection, err)
+	}
+	return selection, nil
 }
 
 func (a *App) InstallSprayVPK(request SprayInstallRequest) (SprayInstallResult, error) {
@@ -291,13 +372,12 @@ func buildSprayVMTText(name string) string {
 	if name == "" {
 		name = "spray"
 	}
-	return fmt.Sprintf("\"UnlitGeneric\"\n{\n\t\"$basetexture\" \"vgui/logos/%s\"\n\t\"$translucent\" \"1\"\n\t\"$ignorez\" \"1\"\n\t\"$vertexcolor\" \"1\"\n\t\"$vertexalpha\" \"1\"\n}\n", name)
+	return fmt.Sprintf("\"UnlitGeneric\"\n{\n\t\"$basetexture\" \"vgui/logos/custom/%s\"\n\t\"$translucent\" \"1\"\n\t\"$ignorez\" \"1\"\n\t\"$vertexcolor\" \"1\"\n\t\"$vertexalpha\" \"1\"\n}\n", name)
 }
 
 func isSupportedSprayImportExt(ext string) bool {
 	switch strings.ToLower(ext) {
-	case ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tga",
-		".mp4", ".webm", ".ogv", ".ogg", ".mov", ".m4v", ".avi", ".mkv", ".wmv":
+	case ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tga":
 		return true
 	default:
 		return false
@@ -318,21 +398,7 @@ func sprayImportMimeType(ext string) string {
 		return "image/gif"
 	case ".tga":
 		return "image/x-tga"
-	case ".webm":
-		return "video/webm"
-	case ".ogv", ".ogg":
-		return "video/ogg"
-	case ".mov":
-		return "video/quicktime"
-	case ".m4v":
-		return "video/x-m4v"
-	case ".avi":
-		return "video/x-msvideo"
-	case ".mkv":
-		return "video/x-matroska"
-	case ".wmv":
-		return "video/x-ms-wmv"
 	default:
-		return "video/mp4"
+		return "image/png"
 	}
 }
