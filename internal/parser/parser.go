@@ -59,9 +59,6 @@ func ParseVPKFile(filePath string) (*VPKFile, error) {
 		vpkFile.PrimaryTag = "其他"
 		vpkFile.SecondaryTags = []string{}
 		vpkFile.Chapters = make(map[string]ChapterInfo)
-		if isSprayVPKArchive(archive) {
-			secondaryTags["喷涂"] = true
-		}
 		// 注意：不在这里 return，让它继续执行提取预览图的逻辑
 	}
 
@@ -160,11 +157,10 @@ func GetSecondaryTags(vpkFiles []VPKFile, primaryTag string) []string {
 }
 
 // ExtractPreviewImage 从VPK中提取预览图并转换为Base64
-// 采用四级查找策略:
+// 采用三级查找策略:
 // 1. 优先查找 addonimage.jpg (Steam 创意工坊标准)
 // 2. 查找内部其他预览图
 // 3. 查找外部同名 .jpg 文件
-// 4. 喷涂 VTF 第一帧
 func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath string) string {
 	// ========== 优先级 1: 查找 addonimage.jpg ==========
 	// Steam 创意工坊的标准缩略图文件名
@@ -188,16 +184,11 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath s
 	}
 
 	var previewFile *vpk.File
-	var sprayPreviewFile *vpk.File
 
 	// 遍历所有文件，查找预览图
 	for i := range archive.Files {
 		file := &archive.Files[i]
 		filename := strings.ToLower(file.Name())
-
-		if sprayPreviewFile == nil && isSprayVTFPath(filename) {
-			sprayPreviewFile = file
-		}
 
 		// 检查是否匹配预览图模式
 		for _, pattern := range previewPatterns {
@@ -213,7 +204,7 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath s
 			}
 		}
 
-		if previewFile != nil && sprayPreviewFile != nil {
+		if previewFile != nil {
 			break
 		}
 	}
@@ -235,12 +226,6 @@ func ExtractPreviewImage(opener *vpk.Opener, archive *vpk.Archive, vpkFilePath s
 			if base64Data := readExternalImageFile(externalPath); base64Data != "" {
 				return base64Data
 			}
-		}
-	}
-
-	if sprayPreviewFile != nil {
-		if base64Data := readAndEncodeVTFPreview(opener, sprayPreviewFile); base64Data != "" {
-			return base64Data
 		}
 	}
 
@@ -330,7 +315,6 @@ func ExtractVPKResources(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKF
 	var addonImageFile *vpk.File
 	var addonInfoFile *vpk.File
 	var previewFile *vpk.File
-	var sprayPreviewFile *vpk.File
 
 	// 预览图匹配模式
 	previewPatterns := []string{
@@ -371,25 +355,21 @@ func ExtractVPKResources(opener *vpk.Opener, archive *vpk.Archive, vpkFile *VPKF
 			}
 		}
 
-		if sprayPreviewFile == nil && isSprayVTFPath(filename) {
-			sprayPreviewFile = file
-		}
-
 		// 如果所有需要的文件都找到了，提前退出循环
-		if addonImageFile != nil && addonInfoFile != nil && sprayPreviewFile != nil {
+		if addonImageFile != nil && addonInfoFile != nil {
 			break
 		}
 	}
 
 	// 处理预览图
-	vpkFile.PreviewImage = extractPreviewImageFromFiles(opener, addonImageFile, previewFile, sprayPreviewFile, vpkFilePath)
+	vpkFile.PreviewImage = extractPreviewImageFromFiles(opener, addonImageFile, previewFile, vpkFilePath)
 
 	// 处理addoninfo
 	parseAddonInfoFromFile(opener, addonInfoFile, vpkFile)
 }
 
 // extractPreviewImageFromFiles 从找到的文件中提取预览图
-func extractPreviewImageFromFiles(opener *vpk.Opener, addonImageFile, previewFile, sprayPreviewFile *vpk.File, vpkFilePath string) string {
+func extractPreviewImageFromFiles(opener *vpk.Opener, addonImageFile, previewFile *vpk.File, vpkFilePath string) string {
 	// 优先级1: 外部同名图片文件
 	basePath := strings.TrimSuffix(vpkFilePath, filepath.Ext(vpkFilePath))
 	exts := []string{".jpg", ".png", ".jpeg", ".gif"}
@@ -412,13 +392,6 @@ func extractPreviewImageFromFiles(opener *vpk.Opener, addonImageFile, previewFil
 	// 优先级3: 其他预览图
 	if previewFile != nil {
 		if base64Data := readAndEncodeImage(opener, previewFile); base64Data != "" {
-			return base64Data
-		}
-	}
-
-	// 优先级4: 喷涂 VTF 第一帧
-	if sprayPreviewFile != nil {
-		if base64Data := readAndEncodeVTFPreview(opener, sprayPreviewFile); base64Data != "" {
 			return base64Data
 		}
 	}
