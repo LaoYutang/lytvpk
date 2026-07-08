@@ -5,8 +5,11 @@ const NAV_ICONS = {
   servers: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z"/><path d="M4 14h16a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z"/><path d="M8 9h.01"/><path d="M8 17h.01"/></svg>`,
   diagnostics: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6V5a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v1"/><path d="M4 6h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M2 12h20"/><path d="M12 12v3"/></svg>`,
   settings: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.68 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  docs: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M8 7h8"/><path d="M8 11h6"/></svg>`,
   about: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
 };
+
+const DOCS_URL = "https://lytvpk-docs.laoyutang.cn";
 
 const MENU_ITEMS = [
   { page: "mods", id: "app-nav-mods", label: "MOD 管理", icon: NAV_ICONS.mods },
@@ -15,6 +18,7 @@ const MENU_ITEMS = [
   { page: "servers", sourceId: "server-favorites-btn", label: "收藏服务器", icon: NAV_ICONS.servers },
   { page: "diagnostics", id: "app-nav-diagnostics", label: "工具箱", icon: NAV_ICONS.diagnostics },
   { page: "settings", sourceId: "global-settings-btn", label: "设置", icon: NAV_ICONS.settings },
+  { id: "app-nav-docs", label: "使用说明", icon: NAV_ICONS.docs, externalUrl: DOCS_URL },
   { page: "about", sourceId: "info-btn", label: "关于", icon: NAV_ICONS.about },
 ];
 
@@ -115,10 +119,18 @@ function buildSidebar(sidebar) {
     }
 
     button.className = "sidebar-nav-item";
-    button.dataset.page = item.page;
+    if (item.page) {
+      button.dataset.page = item.page;
+    }
     button.title = item.label;
     button.setAttribute("type", "button");
-    button.addEventListener("click", () => switchAppPage(item.page));
+    button.addEventListener("click", () => {
+      if (item.externalUrl) {
+        openExternalUrl(item.externalUrl);
+        return;
+      }
+      switchAppPage(item.page);
+    });
     nav.appendChild(button);
   });
 
@@ -245,6 +257,14 @@ function hideEmbeddedModalSources() {
   document
     .querySelectorAll(".embedded-modal-source")
     .forEach((modal) => modal.classList.add("hidden"));
+}
+
+function openExternalUrl(url) {
+  if (typeof window.BrowserOpenURL === "function") {
+    window.BrowserOpenURL(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function updateActiveIndicator(skipTransition = false) {
