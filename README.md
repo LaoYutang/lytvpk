@@ -8,6 +8,10 @@
 ![Language](https://img.shields.io/badge/Language-Go_+_JavaScript-orange)
 ![License](https://img.shields.io/badge/License-GPL--3.0--only-blue)
 
+## 📖 使用文档
+
+完整使用说明请查看：[https://lytvpk-docs.laoyutang.cn](https://lytvpk-docs.laoyutang.cn)
+
 ## 🚀 功能特性
 
 ### 核心功能
