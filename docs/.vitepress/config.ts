@@ -17,7 +17,6 @@ export default defineConfig({
     nav: [
       { text: "快速开始", link: "/guide/quick-start" },
       { text: "功能说明", link: "/features/mod-management" },
-      { text: "常见问题", link: "/operations/troubleshooting" },
       {
         text: "立即下载",
         link: "https://github.com/LaoYutang/lytvpk/releases",
@@ -56,13 +55,6 @@ export default defineConfig({
           },
           { text: "设置", link: "/features/settings" },
           { text: "关于与更新", link: "/features/about-update" },
-        ],
-      },
-      {
-        text: "排查与开发",
-        items: [
-          { text: "常见问题", link: "/operations/troubleshooting" },
-          { text: "文档站构建", link: "/development/build" },
         ],
       },
     ],
