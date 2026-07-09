@@ -107,17 +107,16 @@ function renderDropImportProgress(progress = {}) {
   const name = progress.name || basename(progress.path || "");
   const message = progress.message || "正在处理...";
   const activeNames = Array.isArray(progress.activeNames) ? progress.activeNames : [];
+  const fileLabel = formatImportFileLabel(name, current, total);
 
   panel.querySelector(".drop-import-title").textContent = "正在导入文件";
   panel.querySelector(".drop-import-phase").textContent = formatPhase(progress.phase);
   panel.querySelector(".drop-import-summary").textContent = `总进度 ${percent}%`;
+  panel.querySelector(".drop-import-file").textContent = fileLabel;
+  panel.querySelector(".drop-import-file").title = progress.path || name || "";
   if (activeNames.length > 0) {
-    panel.querySelector(".drop-import-file").textContent = "正在并行解压 VPK";
-    panel.querySelector(".drop-import-file").title = activeNames.join(", ");
-    setDropImportCurrent(panel, "", true);
+    setDropImportCurrent(panel, "正在并行解压 VPK");
   } else {
-    panel.querySelector(".drop-import-file").textContent = name || "当前文件";
-    panel.querySelector(".drop-import-file").title = progress.path || name || "";
     setDropImportCurrent(panel, message);
   }
   renderActiveNames(panel.querySelector(".drop-import-active-list"), activeNames);
@@ -315,6 +314,17 @@ function getOverallPercent(itemPercent, current, total) {
   if (!total || total <= 1) return itemPercent;
   const safeCurrent = Math.max(1, Math.min(current || 1, total));
   return clampPercent(((safeCurrent - 1) * 100 + itemPercent) / total);
+}
+
+function formatImportFileLabel(name, current, total) {
+  if (total > 1) {
+    if (current >= 1) {
+      const safeCurrent = Math.min(current, total);
+      return `[${safeCurrent}/${total}] ${name || "当前文件"}`;
+    }
+    return `等待处理 ${total} 个文件`;
+  }
+  return name || "当前文件";
 }
 
 function basename(path = "") {
