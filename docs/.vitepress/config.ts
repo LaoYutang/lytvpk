@@ -5,6 +5,9 @@ export default defineConfig({
   title: "LytVPK",
   description: "Left 4 Dead 2 VPK Mod 管理器使用文档",
   cleanUrls: true,
+  sitemap: {
+    hostname: "https://lytvpk-docs.laoyutang.cn",
+  },
   appearance: "force-dark",
   lastUpdated: true,
   head: [
