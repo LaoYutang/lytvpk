@@ -17,8 +17,8 @@ cloud.google.com/go/storage v1.5.0/go.mod h1:tpKbwo567HUNpVclU5sGELwQWBDZ8gh0Zeo
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/LaoYutang/l4d2-server-next/backend v0.0.0-20260608064832-ca3b9a8cc048 h1:9qS0koKleM8SyrBXto4R7jfl3ugVBD3JNCxVs3D4jRE=
-github.com/LaoYutang/l4d2-server-next/backend v0.0.0-20260608064832-ca3b9a8cc048/go.mod h1:eAy+4+FGvGRubqK9XMjnl+GuuDmgRNpSVfn5o106Mpo=
+github.com/LaoYutang/l4d2-server-next/backend v0.0.0-20260715011016-b6589a367a56 h1:2lP42BPLtrxX69uKIpkGo3JxMQK3zlEWZ9jxCYEa5Ro=
+github.com/LaoYutang/l4d2-server-next/backend v0.0.0-20260715011016-b6589a367a56/go.mod h1:eAy+4+FGvGRubqK9XMjnl+GuuDmgRNpSVfn5o106Mpo=
 github.com/andybalholm/brotli v1.1.1 h1:PR2pgnyFznKEugtsUo0xLdDop5SKXd5Qf5ysW+7XdTA=
 github.com/andybalholm/brotli v1.1.1/go.mod h1:05ib4cKhjx3OQYUY22hTVd34Bc8upXjOLL2rKwwZBoA=
 github.com/bep/debounce v1.2.1 h1:v67fRdBA9UQu2NhLFXrSg0Brw7CexQekrBwDMM8bzeY=

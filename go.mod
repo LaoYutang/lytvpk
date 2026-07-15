@@ -12,7 +12,7 @@ require (
 	github.com/wailsapp/wails/v2 v2.10.2
 	golang.org/x/sys v0.40.0
 	golang.org/x/text v0.33.0
-	l4d2-manager-next v0.0.0-20260608064832-ca3b9a8cc048
+	l4d2-manager-next v0.0.0-20260715011016-b6589a367a56
 )
 
 require (
@@ -58,4 +58,4 @@ require (
 
 // replace github.com/wailsapp/wails/v2 v2.6.0 => C:\Users\PC\go\pkg\mod
 
-replace l4d2-manager-next => github.com/LaoYutang/l4d2-server-next/backend v0.0.0-20260608064832-ca3b9a8cc048
+replace l4d2-manager-next => github.com/LaoYutang/l4d2-server-next/backend v0.0.0-20260715011016-b6589a367a56
