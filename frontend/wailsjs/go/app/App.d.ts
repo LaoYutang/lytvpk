@@ -49,6 +49,8 @@ export function ExtractVPKFromRar(arg1:string,arg2:string):Promise<void>;
 
 export function ExtractVPKFromZip(arg1:string,arg2:string):Promise<void>;
 
+export function FetchPanelMapHotReloadStatus(arg1:string):Promise<app.PanelMapHotReloadStatus>;
+
 export function FetchPanelMapList(arg1:string):Promise<Array<app.PanelCampaign>>;
 
 export function FetchPanelServerStatus(arg1:string):Promise<app.PanelServerStatus>;
@@ -140,6 +142,8 @@ export function HasActiveDownloads():Promise<boolean>;
 export function HasActivePanelUploads():Promise<boolean>;
 
 export function HasWorkshopTranslateCustomAPIKey():Promise<boolean>;
+
+export function HotReloadPanelMaps(arg1:string):Promise<app.PanelMapHotReloadResult>;
 
 export function InstallSprayVPK(arg1:app.SprayInstallRequest):Promise<app.SprayInstallResult>;
 

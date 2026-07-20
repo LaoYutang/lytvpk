@@ -714,6 +714,26 @@
   padding: 0 var(--spacing-3);
 }
 
+.panel-map-toolbar .panel-map-hot-reload-btn {
+  width: auto;
+  min-width: 7.5rem;
+  white-space: nowrap;
+}
+
+.panel-map-toolbar .panel-map-icon-btn {
+  gap: var(--spacing-1);
+}
+
+.panel-map-icon-btn .icon-svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+#confirm-modal .panel-hot-reload-confirm .confirm-message {
+  white-space: pre-line;
+}
+
 .panel-map-official-toggle {
   flex-shrink: 0;
   order: -1;

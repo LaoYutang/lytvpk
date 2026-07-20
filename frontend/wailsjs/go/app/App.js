@@ -90,6 +90,10 @@ export function ExtractVPKFromZip(arg1, arg2) {
   return window['go']['app']['App']['ExtractVPKFromZip'](arg1, arg2);
 }
 
+export function FetchPanelMapHotReloadStatus(arg1) {
+  return window['go']['app']['App']['FetchPanelMapHotReloadStatus'](arg1);
+}
+
 export function FetchPanelMapList(arg1) {
   return window['go']['app']['App']['FetchPanelMapList'](arg1);
 }
@@ -272,6 +276,10 @@ export function HasActivePanelUploads() {
 
 export function HasWorkshopTranslateCustomAPIKey() {
   return window['go']['app']['App']['HasWorkshopTranslateCustomAPIKey']();
+}
+
+export function HotReloadPanelMaps(arg1) {
+  return window['go']['app']['App']['HotReloadPanelMaps'](arg1);
 }
 
 export function InstallSprayVPK(arg1) {

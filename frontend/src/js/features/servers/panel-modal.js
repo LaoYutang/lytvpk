@@ -8,6 +8,8 @@ let RestartPanelServer;
 let FetchPanelMapList;
 let ClearPanelMaps;
 let ChangePanelMap;
+let FetchPanelMapHotReloadStatus;
+let HotReloadPanelMaps;
 let ChangePanelDifficulty;
 let SendPanelRconCommand;
 let SelectPanelMapUploadFiles;
@@ -36,6 +38,8 @@ export function configurePanelModal(deps) {
     FetchPanelMapList,
     ClearPanelMaps,
     ChangePanelMap,
+    FetchPanelMapHotReloadStatus,
+    HotReloadPanelMaps,
     ChangePanelDifficulty,
     SendPanelRconCommand,
     SelectPanelMapUploadFiles,
@@ -345,6 +349,7 @@ async function loadPanelMaps() {
   loading.classList.remove("hidden");
   list.innerHTML = "";
   refreshBtn.disabled = true;
+  refreshBtn.querySelector(".icon-svg")?.classList.add("spinning");
 
   try {
     const customMaps = await FetchPanelMapList(currentPanelServer.id);
@@ -361,7 +366,63 @@ async function loadPanelMaps() {
   } finally {
     loading.classList.add("hidden");
     refreshBtn.disabled = false;
+    refreshBtn.querySelector(".icon-svg")?.classList.remove("spinning");
   }
+}
+
+function setPanelMapHotReloading(loading) {
+  const button = document.getElementById("panel-map-hot-reload-btn");
+  if (!button) return;
+
+  button.disabled = loading;
+  button.setAttribute("aria-busy", loading ? "true" : "false");
+  button.querySelector(".icon-svg")?.classList.toggle("spinning", loading);
+}
+
+async function executePanelMapHotReload() {
+  if (!currentPanelServer) return;
+
+  setPanelMapHotReloading(true);
+  try {
+    const result = await HotReloadPanelMaps(currentPanelServer.id);
+    showNotification(result?.message || "地图热重载指令已发送", "success");
+  } catch (err) {
+    console.error("热重载地图失败:", err);
+    showError("热重载失败: " + err);
+  } finally {
+    setPanelMapHotReloading(false);
+  }
+}
+
+async function confirmPanelMapHotReload() {
+  if (!currentPanelServer) return;
+
+  setPanelMapHotReloading(true);
+  let status;
+  try {
+    status = await FetchPanelMapHotReloadStatus(currentPanelServer.id);
+  } catch (err) {
+    console.error("获取地图热重载状态失败:", err);
+    showError("获取热重载状态失败: " + err);
+    return;
+  } finally {
+    setPanelMapHotReloading(false);
+  }
+
+  let message =
+    "热重载会重新加载地图资源。如果地图过多，会占用 CPU 并影响正在游玩的游戏。";
+  if (status?.using_default) {
+    message +=
+      "\n\n当前使用默认指令，仅会更新游戏服务器的地图，投票插件的地图缓存不会被刷新。如需同时刷新投票插件缓存，请自定义地图插件的更新指令。";
+  }
+
+  showConfirmModal(
+    "确认热重载地图？",
+    message,
+    executePanelMapHotReload,
+    false,
+    "panel-hot-reload-confirm"
+  );
 }
 
 export function openPanelUploadModal() {
@@ -874,6 +935,9 @@ export function setupPanelModalListeners() {
   document
     .getElementById("panel-map-refresh-btn")
     ?.addEventListener("click", loadPanelMaps);
+  document
+    .getElementById("panel-map-hot-reload-btn")
+    ?.addEventListener("click", confirmPanelMapHotReload);
   document
     .getElementById("panel-map-official-toggle-btn")
     ?.addEventListener("click", togglePanelOfficialMaps);

@@ -33,6 +33,8 @@ let RestartPanelServer;
 let FetchPanelMapList;
 let ClearPanelMaps;
 let ChangePanelMap;
+let FetchPanelMapHotReloadStatus;
+let HotReloadPanelMaps;
 let ChangePanelDifficulty;
 let SendPanelRconCommand;
 let SelectPanelMapUploadFiles;
@@ -61,6 +63,8 @@ export function configureServers(deps) {
     FetchPanelMapList,
     ClearPanelMaps,
     ChangePanelMap,
+    FetchPanelMapHotReloadStatus,
+    HotReloadPanelMaps,
     ChangePanelDifficulty,
     SendPanelRconCommand,
     SelectPanelMapUploadFiles,
@@ -102,6 +106,8 @@ export function configureServers(deps) {
     FetchPanelMapList,
     ClearPanelMaps,
     ChangePanelMap,
+    FetchPanelMapHotReloadStatus,
+    HotReloadPanelMaps,
     ChangePanelDifficulty,
     SendPanelRconCommand,
     SelectPanelMapUploadFiles,

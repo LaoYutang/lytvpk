@@ -45,6 +45,15 @@ type PanelChapter struct {
 	Modes []string `json:"modes"`
 }
 
+type PanelMapHotReloadStatus struct {
+	UsingDefault bool `json:"using_default"`
+}
+
+type PanelMapHotReloadResult struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
 type panelCredentials struct {
 	baseURL    string
 	password   string
@@ -94,6 +103,22 @@ func (a *App) ChangePanelMap(serverID string, mapName string) (string, error) {
 		return "", fmt.Errorf("地图名称不能为空")
 	}
 	return a.panelPost(serverID, "/rcon/changemap", map[string]string{"mapName": mapName}, nil)
+}
+
+func (a *App) FetchPanelMapHotReloadStatus(serverID string) (*PanelMapHotReloadStatus, error) {
+	var status PanelMapHotReloadStatus
+	if _, err := a.panelPost(serverID, "/maps/hot-reload/status", nil, &status); err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
+func (a *App) HotReloadPanelMaps(serverID string) (*PanelMapHotReloadResult, error) {
+	var result PanelMapHotReloadResult
+	if _, err := a.panelPost(serverID, "/maps/hot-reload", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func (a *App) ChangePanelDifficulty(serverID string, difficulty string) (string, error) {

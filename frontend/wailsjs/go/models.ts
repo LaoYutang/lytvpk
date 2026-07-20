@@ -446,6 +446,32 @@ export namespace app {
 		}
 	}
 	
+	export class PanelMapHotReloadResult {
+	    status: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PanelMapHotReloadResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.message = source["message"];
+	    }
+	}
+	export class PanelMapHotReloadStatus {
+	    using_default: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PanelMapHotReloadStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.using_default = source["using_default"];
+	    }
+	}
 	export class PanelMapUploadTask {
 	    id: string;
 	    server_id: string;

@@ -1420,8 +1420,45 @@
               >
                 隐藏官方
               </button>
-              <button id="panel-map-refresh-btn" class="btn btn-secondary">
+              <button
+                id="panel-map-refresh-btn"
+                class="btn btn-secondary panel-map-icon-btn"
+              >
+                <svg
+                  class="icon-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                  <path d="M21 3v6h-6"></path>
+                </svg>
                 刷新
+              </button>
+              <button
+                id="panel-map-hot-reload-btn"
+                class="btn btn-secondary panel-map-icon-btn panel-map-hot-reload-btn"
+                type="button"
+                aria-busy="false"
+              >
+                <svg
+                  class="icon-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+                  <path d="M21 3v6h-6"></path>
+                </svg>
+                热重载地图
               </button>
             </div>
             <div id="panel-map-loading" class="loading-text server-details-loading hidden">

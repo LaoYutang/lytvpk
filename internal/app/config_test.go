@@ -413,6 +413,12 @@ func TestPanelProxyRequests(t *testing.T) {
 				t.Fatalf("unexpected mapName: %q", got)
 			}
 			w.Write([]byte("地图切换成功"))
+		case "/panel/maps/hot-reload/status":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"using_default":true}`))
+		case "/panel/maps/hot-reload":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status":"ok","message":"地图热重载指令已发送"}`))
 		case "/panel/rcon/changedifficulty":
 			if got := r.FormValue("difficulty"); got != "高级" {
 				t.Fatalf("unexpected difficulty: %q", got)
@@ -455,6 +461,14 @@ func TestPanelProxyRequests(t *testing.T) {
 	if text, err := app.ChangePanelMap("srv_panel", "c2m1_highway"); err != nil || text != "地图切换成功" {
 		t.Fatalf("change map = %q, %v", text, err)
 	}
+	hotReloadStatus, err := app.FetchPanelMapHotReloadStatus("srv_panel")
+	if err != nil || !hotReloadStatus.UsingDefault {
+		t.Fatalf("fetch map hot reload status = %#v, %v", hotReloadStatus, err)
+	}
+	hotReloadResult, err := app.HotReloadPanelMaps("srv_panel")
+	if err != nil || hotReloadResult.Status != "ok" || hotReloadResult.Message != "地图热重载指令已发送" {
+		t.Fatalf("hot reload maps = %#v, %v", hotReloadResult, err)
+	}
 	if text, err := app.ChangePanelDifficulty("srv_panel", "高级"); err != nil || text != "难度切换成功" {
 		t.Fatalf("change difficulty = %q, %v", text, err)
 	}
@@ -465,7 +479,7 @@ func TestPanelProxyRequests(t *testing.T) {
 		t.Fatalf("clear maps = %q, %v", text, err)
 	}
 
-	expected := []string{"/panel/rcon/getstatus", "/panel/rcon/changemap", "/panel/rcon/changedifficulty", "/panel/rcon", "/panel/clear"}
+	expected := []string{"/panel/rcon/getstatus", "/panel/rcon/changemap", "/panel/maps/hot-reload/status", "/panel/maps/hot-reload", "/panel/rcon/changedifficulty", "/panel/rcon", "/panel/clear"}
 	if strings.Join(seen, ",") != strings.Join(expected, ",") {
 		t.Fatalf("unexpected request paths: %#v", seen)
 	}
