@@ -1,16 +1,22 @@
-import { appState } from "../state.js";
+import {
+  appState,
+  showLoadingScreen,
+  showMainScreen,
+  updateLoadingMessage,
+} from "../state.js";
 import { showError, showNotification } from "../../core/toast.js";
 import { unpackVPKFromPath } from "../diagnostics/vpk-unpack.js";
 import { showConfirmModal } from "../modals/confirm.js";
 import { refreshFilesKeepFilter } from "./filters.js";
 import {
   ToggleVPKFile,
-  MoveWorkshopToAddons,
+  MoveWorkshopFilesToAddons,
   DeleteVPKFile,
   OpenFileLocation,
   RenameVPKFile,
   ToggleVPKVisibility,
 } from "../../../../wailsjs/go/app/App";
+import { EventsOn } from "../../../../wailsjs/runtime/runtime";
 
 export async function toggleFile(filePath) {
   try {
@@ -25,14 +31,65 @@ export async function toggleFile(filePath) {
 }
 
 export async function moveFileToAddons(filePath) {
+  return moveWorkshopFilesToAddons([filePath]);
+}
+
+export async function moveWorkshopFilesToAddons(filePaths) {
+  const paths = Array.isArray(filePaths) ? filePaths.filter(Boolean) : [];
+  if (paths.length === 0) {
+    showNotification("没有可转移的创意工坊文件", "info");
+    return null;
+  }
+
+  const cleanupProgress = EventsOn("workshop_transfer_progress", (progress) => {
+    const current = Number(progress?.current || 0);
+    const total = Number(progress?.total || 0);
+    const name = String(progress?.name || "").trim();
+    const message = String(progress?.message || "正在转移...");
+    const suffix = total > 0 ? ` (${current}/${total})` : "";
+    updateLoadingMessage(`${message}${name ? `：${name}` : ""}${suffix}`);
+  });
+
+  updateLoadingMessage("正在准备转移创意工坊文件...");
+  showLoadingScreen();
+
   try {
-    console.log("转移文件到插件目录:", filePath);
-    await MoveWorkshopToAddons(filePath);
+    const result = await MoveWorkshopFilesToAddons(paths);
     await refreshFilesKeepFilter();
-    showNotification("文件已转移到插件目录", "success");
+
+    const successCount = Number(result?.successCount || 0);
+    const failCount = Number(result?.failCount || 0);
+    const skippedCount = Number(result?.skippedCount || 0);
+    const warningCount = Number(result?.warningCount || 0);
+    const items = Array.isArray(result?.items) ? result.items : [];
+    const firstError = items.find((item) => item?.error)?.error || "";
+    const firstWarning = items
+      .flatMap((item) => (Array.isArray(item?.warnings) ? item.warnings : []))
+      .find(Boolean) || "";
+    const unsubscribeReminder = successCount > 0
+      ? "。请前往创意工坊取消订阅已转移项目，避免自动下载造成重复或冲突"
+      : "";
+
+    if (failCount > 0) {
+      const summary = `转移完成：成功 ${successCount} 个，失败 ${failCount} 个，跳过 ${skippedCount} 个`;
+      showNotification(`${summary}${firstError ? `。${firstError}` : ""}${unsubscribeReminder}`, "warning");
+    } else if (warningCount > 0) {
+      const summary = `已转移 ${successCount} 个文件，跳过 ${skippedCount} 个，产生 ${warningCount} 条警告`;
+      showNotification(`${summary}${firstWarning ? `。${firstWarning}` : ""}${unsubscribeReminder}`, "warning");
+    } else if (successCount > 0) {
+      const skippedText = skippedCount > 0 ? `，跳过 ${skippedCount} 个` : "";
+      showNotification(`成功转移 ${successCount} 个文件${skippedText}${unsubscribeReminder}`, "success");
+    } else {
+      showNotification(`没有可转移的创意工坊文件，已跳过 ${skippedCount} 个`, "info");
+    }
+    return result;
   } catch (error) {
     console.error("转移文件失败:", error);
     showError("转移失败: " + error);
+    return null;
+  } finally {
+    if (typeof cleanupProgress === "function") cleanupProgress();
+    showMainScreen();
   }
 }
 

@@ -20,6 +20,7 @@ import {
   ToggleVPKVisibility,
 } from "../../../../wailsjs/go/app/App";
 import { EventsOn } from "../../../../wailsjs/runtime/runtime";
+import { moveWorkshopFilesToAddons } from "./operations.js";
 
 export function selectAll() {
   const checkboxes = document.querySelectorAll(".file-checkbox");
@@ -300,6 +301,41 @@ export async function moveSelected() {
     console.error("移动文件出错:", error);
     showError(`移动文件出错: ${error}`);
   }
+}
+
+export function transferSelectedWorkshopFiles() {
+  const selectedPaths = Array.from(appState.selectedFiles);
+  if (selectedPaths.length === 0) {
+    showNotification("请先选择文件", "info");
+    return;
+  }
+
+  const selectedFiles = selectedPaths
+    .map(
+      (filePath) =>
+        appState.vpkFiles.find((file) => file.path === filePath) ||
+        appState.allVpkFiles.find((file) => file.path === filePath),
+    )
+    .filter(Boolean);
+  const eligibleCount = selectedFiles.filter(
+    (file) => file.location === "workshop",
+  ).length;
+  const skippedCount = selectedPaths.length - eligibleCount;
+
+  if (eligibleCount === 0) {
+    showNotification("没有可转移的创意工坊文件", "info");
+    return;
+  }
+
+  const skippedText = skippedCount > 0 ? `，跳过其他位置的 ${skippedCount} 个文件` : "";
+  showConfirmModal(
+    "确认转移至根目录",
+    `将把 ${eligibleCount} 个创意工坊文件转移至根目录${skippedText}。确定继续吗？`,
+    async () => {
+      document.getElementById("confirm-modal")?.classList.add("hidden");
+      return moveWorkshopFilesToAddons(selectedPaths);
+    },
+  );
 }
 
 export async function batchToggleVisibility(hide) {

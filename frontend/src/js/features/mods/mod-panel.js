@@ -65,7 +65,7 @@ export function renderModInfoPanel(file) {
   const tags = renderTags(file.primaryTag, file.secondaryTags);
   const hidden = file.name?.startsWith("_");
   const firstAction = file.location === "workshop"
-    ? `<button class="panel-action move-btn primary" data-file-path="${path}" data-action="move">移入 addons</button>`
+    ? `<button class="panel-action move-btn primary" data-file-path="${path}" data-action="move">转移</button>`
     : `<button class="panel-action toggle-btn primary" data-file-path="${path}" data-action="toggle">${file.enabled ? "禁用" : "启用"}</button>`;
 
   panel.innerHTML = `

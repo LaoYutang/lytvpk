@@ -330,6 +330,10 @@ export function MoveVpkFiles(arg1, arg2) {
   return window['go']['app']['App']['MoveVpkFiles'](arg1, arg2);
 }
 
+export function MoveWorkshopFilesToAddons(arg1) {
+  return window['go']['app']['App']['MoveWorkshopFilesToAddons'](arg1);
+}
+
 export function MoveWorkshopToAddons(arg1) {
   return window['go']['app']['App']['MoveWorkshopToAddons'](arg1);
 }

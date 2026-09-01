@@ -169,6 +169,8 @@ export function MigrateLocalStorageConfig(arg1:app.LocalStorageMigrationPayload)
 
 export function MoveVpkFiles(arg1:Array<string>,arg2:string):Promise<app.MoveResult>;
 
+export function MoveWorkshopFilesToAddons(arg1:Array<string>):Promise<app.WorkshopTransferResult>;
+
 export function MoveWorkshopToAddons(arg1:string):Promise<void>;
 
 export function OpenFileLocation(arg1:string):Promise<void>;

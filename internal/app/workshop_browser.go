@@ -69,6 +69,7 @@ type WorkshopPreviewImage struct {
 type WorkshopItemDetail struct {
 	PublishedFileId string                 `json:"publishedfileid"`
 	Title           string                 `json:"title"`
+	Creator         string                 `json:"creator"`
 	Description     string                 `json:"description"`
 	FileUrl         string                 `json:"file_url"`
 	PreviewUrl      string                 `json:"preview_url"`
@@ -219,11 +220,23 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 
 // FetchWorkshopDetail 获取单个MOD详情
 func (a *App) FetchWorkshopDetail(id string) (WorkshopItemDetail, error) {
-	cacheKey := "detail:" + id
-	if val, ok := getWorkshopCache(cacheKey); ok {
-		if res, ok := val.(WorkshopItemDetail); ok {
-			fmt.Println("[Workshop] Hit Cache for Detail:", id)
-			return res, nil
+	item, err := a.fetchWorkshopDetailRaw(id, false)
+	if err != nil {
+		return WorkshopItemDetail{}, err
+	}
+	return a.processWorkshopDetailImages(item), nil
+}
+
+// fetchWorkshopDetailRaw 获取未经过本地图片代理处理的工坊详情。
+// forceRefresh 为 true 时跳过进程内缓存，但请求成功后仍会刷新缓存。
+func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool) (WorkshopItemDetail, error) {
+	cacheKey := "detail:raw:" + id
+	if !forceRefresh {
+		if val, ok := getWorkshopCache(cacheKey); ok {
+			if res, ok := val.(WorkshopItemDetail); ok {
+				fmt.Println("[Workshop] Hit Cache for Detail:", id)
+				return res, nil
+			}
 		}
 	}
 
@@ -249,19 +262,27 @@ func (a *App) FetchWorkshopDetail(id string) (WorkshopItemDetail, error) {
 
 	item := result.Response.PublishedFileDetails[0]
 
-	if a.GetWorkshopPreferredIP() {
-		item.PreviewUrl = a.processWorkshopImage(item.PreviewUrl)
-		for i := range item.Previews {
-			item.Previews[i].PreviewUrl = a.processWorkshopImage(item.Previews[i].PreviewUrl)
-		}
-		for i := range item.ChildItems {
-			item.ChildItems[i].PreviewUrl = a.processWorkshopImage(item.ChildItems[i].PreviewUrl)
-		}
-	}
-
 	setWorkshopCache(cacheKey, item)
 
 	return item, nil
+}
+
+func (a *App) processWorkshopDetailImages(item WorkshopItemDetail) WorkshopItemDetail {
+	if !a.GetWorkshopPreferredIP() {
+		return item
+	}
+
+	// 复制切片，避免修改缓存中的原始 URL。
+	item.Previews = append([]WorkshopPreviewImage(nil), item.Previews...)
+	item.ChildItems = append([]WorkshopPreviewItem(nil), item.ChildItems...)
+	item.PreviewUrl = a.processWorkshopImage(item.PreviewUrl)
+	for i := range item.Previews {
+		item.Previews[i].PreviewUrl = a.processWorkshopImage(item.Previews[i].PreviewUrl)
+	}
+	for i := range item.ChildItems {
+		item.ChildItems[i].PreviewUrl = a.processWorkshopImage(item.ChildItems[i].PreviewUrl)
+	}
+	return item
 }
 
 func (a *App) processWorkshopImage(url string) string {

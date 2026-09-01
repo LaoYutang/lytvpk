@@ -250,7 +250,7 @@ export function createFileCard(file) {
   let actionBtn = "";
   if (file.location === "workshop") {
     actionBtn = `
-      <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move" title="转移到addons">
+      <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move" title="转移">
         <span class="btn-icon">${iconSvg("package")}</span>
         <span class="btn-text">转移</span>
       </button>

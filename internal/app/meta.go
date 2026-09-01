@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,8 +29,6 @@ func GetMetaFilePath(filePath string) string {
 
 // SaveWorkshopMeta 将工坊详情保存为.meta文件
 func SaveWorkshopMeta(filePath string, details WorkshopFileDetails) error {
-	metaPath := GetMetaFilePath(filePath)
-
 	meta := WorkshopMeta{
 		WorkshopID:   details.PublishedFileId,
 		Title:        details.Title,
@@ -39,6 +38,26 @@ func SaveWorkshopMeta(filePath string, details WorkshopFileDetails) error {
 		FileURL:      details.FileUrl,
 		DownloadedAt: time.Now().Format(time.RFC3339),
 	}
+	return writeWorkshopMeta(filePath, meta)
+}
+
+// SaveWorkshopDetailMeta 保存从工坊详情接口获取的完整元数据。
+func SaveWorkshopDetailMeta(filePath string, workshopID string, detail WorkshopItemDetail) (WorkshopMeta, error) {
+	meta := WorkshopMeta{
+		WorkshopID:   workshopID,
+		Title:        detail.Title,
+		Author:       detail.Creator,
+		Description:  detail.Description,
+		PreviewURL:   detail.PreviewUrl,
+		FileURL:      detail.FileUrl,
+		DownloadedAt: time.Now().Format(time.RFC3339),
+		TimeUpdated:  workshopTimeUpdatedRFC3339(detail.TimeUpdated),
+	}
+	return meta, writeWorkshopMeta(filePath, meta)
+}
+
+func writeWorkshopMeta(filePath string, meta WorkshopMeta) error {
+	metaPath := GetMetaFilePath(filePath)
 
 	data, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
@@ -46,6 +65,41 @@ func SaveWorkshopMeta(filePath string, details WorkshopFileDetails) error {
 	}
 
 	return os.WriteFile(metaPath, data, 0644)
+}
+
+func workshopTimeUpdatedRFC3339(value interface{}) string {
+	var timestamp int64
+	var ok bool
+
+	switch v := value.(type) {
+	case float64:
+		timestamp, ok = int64(v), true
+	case float32:
+		timestamp, ok = int64(v), true
+	case int:
+		timestamp, ok = int64(v), true
+	case int64:
+		timestamp, ok = v, true
+	case int32:
+		timestamp, ok = int64(v), true
+	case json.Number:
+		parsed, err := v.Int64()
+		if err == nil {
+			timestamp, ok = parsed, true
+		}
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if parsed, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+			timestamp, ok = parsed, true
+		} else if parsedTime, err := time.Parse(time.RFC3339, trimmed); err == nil {
+			return parsedTime.Format(time.RFC3339)
+		}
+	}
+
+	if !ok || timestamp <= 0 {
+		return ""
+	}
+	return time.Unix(timestamp, 0).UTC().Format(time.RFC3339)
 }
 
 // LoadWorkshopMeta 读取.meta文件，不存在时返回nil

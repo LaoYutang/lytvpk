@@ -204,7 +204,7 @@ function createConflictGroupElement(group) {
       const isWorkshop = vpk.location === "workshop";
       const btnText = isWorkshop ? "转移" : "禁用";
       const btnClass = isWorkshop ? "btn-transfer" : "btn-disable";
-      const title = isWorkshop ? "转移到插件目录后可禁用" : "禁用此Mod";
+      const title = isWorkshop ? "转移后可禁用" : "禁用此Mod";
 
       return `
         <div class="conflict-vpk-item">
@@ -271,7 +271,7 @@ function createConflictGroupElement(group) {
           btn.innerHTML = '<span>处理中...</span>';
 
           if (location === "workshop") {
-            // workshop文件需要先转移到插件目录
+            // workshop 文件需要先转移
             await moveFileToAddons(path);
           } else {
             // 其他位置直接禁用

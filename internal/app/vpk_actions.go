@@ -63,7 +63,7 @@ func (a *App) ToggleVPKFile(filePath string) error {
 
 	// workshop文件不能直接启用/禁用
 	if vpkFile.Location == "workshop" {
-		return fmt.Errorf("workshop文件需要先转移到插件目录才能启用/禁用")
+		return fmt.Errorf("workshop 文件需要先转移才能启用/禁用")
 	}
 
 	var newPath string
@@ -120,44 +120,18 @@ func (a *App) ToggleVPKFile(filePath string) error {
 
 // MoveWorkshopToAddons 将workshop中的VPK移动到addons目录（root目录）
 func (a *App) MoveWorkshopToAddons(filePath string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	// 从缓存中获取文件信息
-	cached, ok := a.vpkCache.Load(filePath)
-	if !ok {
-		return fmt.Errorf("文件未找到: %s", filePath)
-	}
-
-	cache := cached.(*VPKFileCache)
-	vpkFile := cache.File
-
-	if vpkFile.Location != "workshop" {
-		return fmt.Errorf("只能转移workshop文件")
-	}
-
-	newPath := filepath.Join(a.rootDir, vpkFile.Name)
-	err := os.Rename(vpkFile.Path, newPath)
+	result, err := a.MoveWorkshopFilesToAddons([]string{filePath})
 	if err != nil {
 		return err
 	}
-	// 同步移动同名图片
-	a.handleSidecarFile(vpkFile.Path, newPath, "move")
-
-	// 转移到root目录后，文件默认为启用状态
-	vpkFile.Path = newPath
-	vpkFile.Location = "root"
-	vpkFile.Enabled = true
-
-	// 删除旧路径的缓存
-	a.vpkCache.Delete(filePath)
-
-	// 在新路径下存储缓存
-	cache.File = vpkFile
-	a.vpkCache.Store(newPath, cache)
-
-	log.Printf("文件已转移: %s -> %s", filePath, newPath)
-
+	for _, item := range result.Items {
+		if item.Status == workshopTransferStatusFailed {
+			return fmt.Errorf("%s", item.Error)
+		}
+		if item.Status == workshopTransferStatusSkipped {
+			return fmt.Errorf("只能转移workshop文件")
+		}
+	}
 	return nil
 }
 
