@@ -1,3 +1,58 @@
+// ----------------------------------------------------
+// 简易令牌桶限流 (按客户端 IP, 仅进程内计数)
+// 桶容量是突发额度, REFILL_PER_MIN 是持续速率:
+// 客户端启动时的更新检测会一次性打出与 Mod 库等量的 /detail 请求,
+// ----------------------------------------------------
+const RATE_LIMIT_BURST = 500;
+const RATE_LIMIT_REFILL_PER_MIN = 50;
+const RATE_LIMIT_REFILL_PER_MS = RATE_LIMIT_REFILL_PER_MIN / 60000;
+const RATE_LIMIT_IDLE_MS = 10 * 60 * 1000;
+const RATE_LIMIT_SWEEP_EVERY = 1000;
+
+const rateLimitBuckets = new Map();
+let rateLimitRequestCount = 0;
+
+function takeRateLimitToken(clientIp) {
+  const now = Date.now();
+
+  if (++rateLimitRequestCount >= RATE_LIMIT_SWEEP_EVERY) {
+    rateLimitRequestCount = 0;
+    sweepIdleBuckets(now);
+  }
+
+  const bucket = rateLimitBuckets.get(clientIp);
+  if (!bucket) {
+    rateLimitBuckets.set(clientIp, {
+      tokens: RATE_LIMIT_BURST - 1,
+      updatedAt: now,
+    });
+    return true;
+  }
+
+  const tokens = Math.min(
+    RATE_LIMIT_BURST,
+    bucket.tokens + (now - bucket.updatedAt) * RATE_LIMIT_REFILL_PER_MS
+  );
+  bucket.updatedAt = now;
+
+  if (tokens < 1) {
+    bucket.tokens = tokens;
+    return false;
+  }
+
+  bucket.tokens = tokens - 1;
+  return true;
+}
+
+// 闲置超过 IDLE_MS 的桶此时早已补满, 直接回收, 避免 Map 无界增长
+function sweepIdleBuckets(now) {
+  for (const [ip, bucket] of rateLimitBuckets) {
+    if (now - bucket.updatedAt > RATE_LIMIT_IDLE_MS) {
+      rateLimitBuckets.delete(ip);
+    }
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -18,6 +73,16 @@ export default {
       "Access-Control-Allow-Origin": "*",
       "Content-Type": "application/json",
     };
+
+    // 限流: 在入口处计数, 缓存命中的请求同样计入
+    // (命中也照样消耗 Worker 自身的请求额度, 免费版每天 10 万次用尽后整个服务会不可用)
+    const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+    if (!takeRateLimitToken(clientIp)) {
+      return new Response(JSON.stringify({ error: "Too Many Requests" }), {
+        status: 429,
+        headers: { ...corsHeaders, "Retry-After": "1" },
+      });
+    }
 
     // 0. 检查缓存 (CF Cache)
     const cache = caches.default;
@@ -116,8 +181,10 @@ function buildListUrl(url, env, filetype) {
 
     // 注意：Steam API "query_type" 的定义有点混乱，QueryFiles v1 经常混用。
     // 为了保险，我们用最常用的：
-    if (sort === "recent") params.set("query_type", "1"); // Date
-    else if (sort === "top") params.set("query_type", "0"); // Vote
+    if (sort === "recent")
+      params.set("query_type", "1"); // Date
+    else if (sort === "top")
+      params.set("query_type", "0"); // Vote
     else params.set("query_type", "3"); // Trend (Default)
   }
 
@@ -185,7 +252,8 @@ function mergeListData(itemData, collectionData, limit = 20) {
     response: {
       ...itemResponse,
       publishedfiledetails: merged,
-      total: Number(itemResponse.total || 0) + Number(collectionResponse.total || 0),
+      total:
+        Number(itemResponse.total || 0) + Number(collectionResponse.total || 0),
     },
   };
 }
@@ -205,7 +273,10 @@ async function handleList(url, env, headers) {
     fetchListData(url, env, "1"),
   ]);
 
-  if (itemsResult.status === "rejected" && collectionsResult.status === "rejected") {
+  if (
+    itemsResult.status === "rejected" &&
+    collectionsResult.status === "rejected"
+  ) {
     throw itemsResult.reason;
   }
 
