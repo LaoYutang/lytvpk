@@ -1,3 +1,20 @@
+// 简单的基于内存的限流器：每个 IP 每分钟最多 30 次请求
+// 用于防止外部请求无限制地触发对 Steam API 的 fetch，避免额度耗尽
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const rateLimitMap = new Map();
+
+function isRateLimited(clientIp) {
+  const now = Date.now();
+  const record = rateLimitMap.get(clientIp);
+  if (!record || now - record.start > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(clientIp, { start: now, count: 1 });
+    return false;
+  }
+  record.count += 1;
+  return record.count > RATE_LIMIT_MAX;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -18,6 +35,15 @@ export default {
       "Access-Control-Allow-Origin": "*",
       "Content-Type": "application/json",
     };
+
+    // 限流: 防止单个 IP 高频请求导致 Steam API 额度耗尽
+    const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+    if (isRateLimited(clientIp)) {
+      return new Response(JSON.stringify({ error: "Too Many Requests" }), {
+        status: 429,
+        headers: corsHeaders,
+      });
+    }
 
     // 0. 检查缓存 (CF Cache)
     const cache = caches.default;
