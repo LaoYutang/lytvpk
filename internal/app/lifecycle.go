@@ -16,6 +16,10 @@ import (
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
+	// 记住窗口尺寸：恢复保存的尺寸，并监听后续变化
+	a.setupWindowStateTracking()
+	a.clampWindowToScreen()
+
 	// 启动单例监听器，接收来自其他实例的URL参数
 	singletonMgr, err := StartSingletonListener(a)
 	if err != nil {
@@ -131,7 +135,13 @@ func (a *App) ForceExit() {
 
 // beforeClose is called when the application is about to close
 func (a *App) beforeClose() (prevent bool) {
+	// 窗口此时尚未销毁，先记住当前尺寸
+	a.rememberWindowState()
+
 	if a.forceClose {
+		// 退出前同步落盘，进程随后即结束，异步写入没有机会完成
+		a.saveConfig()
+
 		// 关闭单例监听器
 		if a.singletonMgr != nil {
 			a.singletonMgr.Close()
@@ -142,6 +152,11 @@ func (a *App) beforeClose() (prevent bool) {
 	if a.HasActiveDownloads() || a.HasActivePanelUploads() {
 		runtime.EventsEmit(a.ctx, "show_exit_confirmation", nil)
 		return true
+	}
+
+	a.saveConfig()
+	if state := a.GetAppConfig().WindowState; state != nil {
+		log.Printf("已保存窗口尺寸: %dx%d 最大化=%v", state.Width, state.Height, state.Maximised)
 	}
 
 	// 关闭单例监听器

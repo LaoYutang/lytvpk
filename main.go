@@ -27,12 +27,22 @@ func main() {
 	// Create an instance of the app structure
 	app := backend.NewApp()
 
+	// 恢复上次退出时的窗口尺寸
+	windowState := backend.InitialWindowState(app)
+	startState := options.Normal
+	if windowState.Maximised {
+		startState = options.Maximised
+	}
+
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "LytVPK MOD管理器",
-		Width:     1400,
-		Height:    900,
-		Frameless: true,
+		Title:            "LytVPK MOD管理器",
+		Width:            windowState.Width,
+		Height:           windowState.Height,
+		MinWidth:         backend.MinWindowWidth,
+		MinHeight:        backend.MinWindowHeight,
+		WindowStartState: startState,
+		Frameless:        true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

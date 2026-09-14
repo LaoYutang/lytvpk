@@ -222,6 +222,7 @@ import {
 
 import {
   EventsOn,
+  EventsEmit,
   OnFileDrop,
   BrowserOpenURL,
   WindowMinimise,
@@ -234,12 +235,16 @@ window.BrowserOpenURL = BrowserOpenURL;
 
 const SPRAY_FILE_DROP_FALLBACK_DELAY_MS = 300;
 const DOM_SPRAY_DROP_SUPPRESS_MS = 1200;
+// 窗口尺寸稳定后再上报后端，避免拖拽过程中频繁触发
+const WINDOW_RESIZE_REPORT_DELAY_MS = 400;
+const WINDOW_RESIZED_EVENT = "window:resized";
 
 let fileDropGuardsConfigured = false;
 let pendingSprayFileDropFallback = null;
 let sprayFileDropFallbackToken = 0;
 let lastDomSprayFallbackAt = 0;
 let lastDomSprayFallbackNames = new Set();
+let windowResizeReportTimer = null;
 
 const ChangePanelDifficulty = (serverID, difficulty) => {
   const method = window?.go?.app?.App?.ChangePanelDifficulty;
@@ -618,6 +623,17 @@ function setupEventListeners() {
   if (titleBar) {
     titleBar.addEventListener("dblclick", WindowToggleMaximise);
   }
+
+  // 窗口尺寸变化上报后端：最大化时后端会保留普通尺寸，避免还原尺寸被覆盖
+  window.addEventListener("resize", () => {
+    if (windowResizeReportTimer !== null) {
+      clearTimeout(windowResizeReportTimer);
+    }
+    windowResizeReportTimer = setTimeout(() => {
+      windowResizeReportTimer = null;
+      EventsEmit(WINDOW_RESIZED_EVENT);
+    }, WINDOW_RESIZE_REPORT_DELAY_MS);
+  });
 
   // 目录选择
   document

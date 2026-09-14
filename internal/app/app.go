@@ -98,6 +98,7 @@ type App struct {
 	theme                          string
 	ignoredVersion                 string
 	lastUpdateCheckTime            string
+	windowState                    WindowState
 	configDir                      string
 	configPath                     string
 	serversPath                    string
@@ -127,8 +128,16 @@ type ConfigFile struct {
 	Theme                          string           `json:"theme"`
 	IgnoredVersion                 string           `json:"ignoredVersion"`
 	LastUpdateCheckTime            string           `json:"lastUpdateCheckTime"`
+	WindowState                    *WindowState     `json:"windowState,omitempty"`
 	// migrationVersion=2 表示前端 localStorage 配置已迁移到配置目录。
 	MigrationVersion int `json:"migrationVersion"`
+}
+
+// WindowState 记录上次退出时的窗口尺寸与最大化状态，尺寸为 Wails 逻辑像素（96 DPI 基准）
+type WindowState struct {
+	Width     int  `json:"width"`
+	Height    int  `json:"height"`
+	Maximised bool `json:"maximised,omitempty"`
 }
 
 // RotationConfig Mod轮换配置

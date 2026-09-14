@@ -1,5 +1,21 @@
 export namespace app {
 	
+	export class WindowState {
+	    width: number;
+	    height: number;
+	    maximised?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new WindowState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.width = source["width"];
+	        this.height = source["height"];
+	        this.maximised = source["maximised"];
+	    }
+	}
 	export class SavedDirectory {
 	    path: string;
 	    lastUsed: string;
@@ -49,6 +65,7 @@ export namespace app {
 	    theme: string;
 	    ignoredVersion: string;
 	    lastUpdateCheckTime: string;
+	    windowState?: WindowState;
 	    migrationVersion: number;
 	
 	    static createFrom(source: any = {}) {
@@ -77,6 +94,7 @@ export namespace app {
 	        this.theme = source["theme"];
 	        this.ignoredVersion = source["ignoredVersion"];
 	        this.lastUpdateCheckTime = source["lastUpdateCheckTime"];
+	        this.windowState = this.convertValues(source["windowState"], WindowState);
 	        this.migrationVersion = source["migrationVersion"];
 	    }
 	
@@ -1130,6 +1148,7 @@ export namespace app {
 	        this.extractedFiles = source["extractedFiles"];
 	    }
 	}
+	
 	export class WorkshopChild {
 	    publishedfileid: string;
 	    sortorder: number;

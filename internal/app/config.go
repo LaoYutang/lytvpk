@@ -116,6 +116,9 @@ func (a *App) loadConfig() {
 	a.theme = config.Theme
 	a.ignoredVersion = config.IgnoredVersion
 	a.lastUpdateCheckTime = config.LastUpdateCheckTime
+	if config.WindowState != nil && config.WindowState.Width > 0 && config.WindowState.Height > 0 {
+		a.windowState = *config.WindowState
+	}
 	a.migrationVersion = config.MigrationVersion
 	a.mu.Unlock()
 
@@ -143,6 +146,11 @@ func (a *App) snapshotConfig() ConfigFile {
 	}
 	boxSelectionEnabled := a.boxSelectionEnabled
 	ctrlClickSelectionEnabled := a.ctrlClickSelectionEnabled
+	var windowState *WindowState
+	if a.windowState.Width > 0 && a.windowState.Height > 0 {
+		state := a.windowState
+		windowState = &state
+	}
 
 	return ConfigFile{
 		ModRotationConfig:              a.modRotationConfig,
@@ -165,6 +173,7 @@ func (a *App) snapshotConfig() ConfigFile {
 		Theme:                          a.theme,
 		IgnoredVersion:                 a.ignoredVersion,
 		LastUpdateCheckTime:            a.lastUpdateCheckTime,
+		WindowState:                    windowState,
 		MigrationVersion:               a.migrationVersion,
 	}
 }
