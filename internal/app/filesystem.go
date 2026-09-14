@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	rt "runtime"
 	"strings"
+
+	"vpk-manager/internal/serveraddress"
 )
 
 func (a *App) SelectDirectory() (string, error) {
@@ -268,6 +270,11 @@ func (a *App) LaunchL4D2() error {
 
 // ConnectToServer 连接到指定服务器
 func (a *App) ConnectToServer(address string) error {
+	address, err := serveraddress.Normalize(address)
+	if err != nil {
+		return err
+	}
+
 	// 尝试执行 Mod 轮换
 	if !a.hasActiveProblemModScanSession() {
 		if err := a.RotateMods(); err != nil {

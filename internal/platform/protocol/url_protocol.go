@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"vpk-manager/internal/serveraddress"
 )
 
 // ProtocolAction 协议操作类型
@@ -16,14 +18,18 @@ const (
 	ProtocolActionParse ProtocolAction = "parse"
 	// ProtocolActionWorkshop 在管理器中打开工坊页面
 	ProtocolActionWorkshop ProtocolAction = "workshop"
+	// ProtocolActionFavoriteServer 添加收藏服务器
+	ProtocolActionFavoriteServer ProtocolAction = "favoriteServer"
 )
 
 const WorkshopIDDelimiter = ","
 
 // ProtocolURL 协议URL结构
 type ProtocolURL struct {
-	Action     ProtocolAction
-	WorkshopID string
+	Action        ProtocolAction
+	WorkshopID    string
+	ServerName    string
+	ServerAddress string
 }
 
 // ParseProtocolURL 解析 lytvpk:// 协议URL
@@ -31,6 +37,7 @@ type ProtocolURL struct {
 //   - lytvpk://parse/{workshop_id}
 //   - lytvpk://parse/{workshop_id},{workshop_id}
 //   - lytvpk://workshop/{workshop_id}
+//   - lytvpk://favoriteServer/{server_name}/{server_address}
 func ParseProtocolURL(rawURL string) (*ProtocolURL, error) {
 	// 检查协议前缀
 	if !strings.HasPrefix(rawURL, "lytvpk://") {
@@ -47,11 +54,6 @@ func ParseProtocolURL(rawURL string) (*ProtocolURL, error) {
 	}
 
 	action := strings.ToLower(parts[0])
-	id := parts[1]
-	decodedID, err := neturl.PathUnescape(id)
-	if err != nil {
-		return nil, fmt.Errorf("协议URL编码错误: %s", id)
-	}
 
 	// 验证操作类型
 	var protocolAction ProtocolAction
@@ -60,31 +62,90 @@ func ParseProtocolURL(rawURL string) (*ProtocolURL, error) {
 		protocolAction = ProtocolActionParse
 	case "workshop":
 		protocolAction = ProtocolActionWorkshop
+	case "favoriteserver":
+		protocolAction = ProtocolActionFavoriteServer
 	default:
 		return nil, fmt.Errorf("未知的协议操作: %s", action)
 	}
 
 	switch protocolAction {
 	case ProtocolActionParse:
+		decodedID, err := decodePathSegment(parts[1])
+		if err != nil {
+			return nil, err
+		}
 		ids, err := ParseWorkshopIDList(decodedID)
 		if err != nil {
 			return nil, err
 		}
-		id = strings.Join(ids, WorkshopIDDelimiter)
+		return &ProtocolURL{
+			Action:     protocolAction,
+			WorkshopID: strings.Join(ids, WorkshopIDDelimiter),
+		}, nil
 	case ProtocolActionWorkshop:
+		decodedID, err := decodePathSegment(parts[1])
+		if err != nil {
+			return nil, err
+		}
 		if strings.Contains(decodedID, WorkshopIDDelimiter) {
 			return nil, fmt.Errorf("工坊打开协议只支持单个工坊ID: %s", decodedID)
 		}
 		if !IsValidWorkshopID(decodedID) {
 			return nil, fmt.Errorf("无效的工坊ID: %s", decodedID)
 		}
-		id = decodedID
+		return &ProtocolURL{
+			Action:     protocolAction,
+			WorkshopID: decodedID,
+		}, nil
+	case ProtocolActionFavoriteServer:
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("收藏服务器协议格式错误，应为 lytvpk://favoriteServer/{server_name}/{server_address}")
+		}
+
+		serverName, err := decodePathSegment(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		serverAddress, err := decodePathSegment(parts[2])
+		if err != nil {
+			return nil, err
+		}
+
+		serverName = strings.TrimSpace(serverName)
+		if err := validateFavoriteServerName(serverName); err != nil {
+			return nil, err
+		}
+		serverAddress, err = serveraddress.Normalize(serverAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		return &ProtocolURL{
+			Action:        protocolAction,
+			ServerName:    serverName,
+			ServerAddress: serverAddress,
+		}, nil
 	}
 
-	return &ProtocolURL{
-		Action:     protocolAction,
-		WorkshopID: id,
-	}, nil
+	return nil, fmt.Errorf("未知的协议操作: %s", protocolAction)
+}
+
+func decodePathSegment(value string) (string, error) {
+	decoded, err := neturl.PathUnescape(value)
+	if err != nil {
+		return "", fmt.Errorf("协议URL编码错误")
+	}
+	return decoded, nil
+}
+
+func validateFavoriteServerName(name string) error {
+	if name == "" {
+		return fmt.Errorf("服务器名称不能为空")
+	}
+	if strings.IndexFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return fmt.Errorf("服务器名称不能包含控制字符")
+	}
+	return nil
 }
 
 // ParseWorkshopIDList 解析由英文逗号分隔的工坊ID列表。
@@ -141,5 +202,13 @@ func IsValidWorkshopID(id string) bool {
 
 // String 返回协议URL的字符串表示
 func (p *ProtocolURL) String() string {
+	if p.Action == ProtocolActionFavoriteServer {
+		return fmt.Sprintf(
+			"lytvpk://%s/%s/%s",
+			p.Action,
+			neturl.PathEscape(p.ServerName),
+			neturl.PathEscape(p.ServerAddress),
+		)
+	}
 	return fmt.Sprintf("lytvpk://%s/%s", p.Action, p.WorkshopID)
 }

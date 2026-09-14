@@ -13,6 +13,12 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+type favoriteServerProtocolEvent struct {
+	ServerName    string `json:"serverName"`
+	ServerAddress string `json:"serverAddress"`
+	Added         bool   `json:"added"`
+}
+
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
@@ -116,6 +122,24 @@ func (a *App) HandleProtocolURL(url string) {
 		log.Printf("触发打开工坊页面: %s", protocolURL.WorkshopID)
 		runtime.EventsEmit(a.ctx, "protocol:workshop", map[string]string{
 			"workshopId": protocolURL.WorkshopID,
+		})
+
+	case protocol.ProtocolActionFavoriteServer:
+		added, err := a.addFavoriteServer(protocolURL.ServerName, protocolURL.ServerAddress)
+		if err != nil {
+			log.Printf("添加收藏服务器失败: %v", err)
+			runtime.EventsEmit(a.ctx, "protocol:error", map[string]string{
+				"url":     url,
+				"message": "添加收藏服务器失败: " + err.Error(),
+			})
+			return
+		}
+
+		log.Printf("收藏服务器协议处理完成: %s (%s), 新增=%v", protocolURL.ServerName, protocolURL.ServerAddress, added)
+		runtime.EventsEmit(a.ctx, "protocol:favorite-server", favoriteServerProtocolEvent{
+			ServerName:    protocolURL.ServerName,
+			ServerAddress: protocolURL.ServerAddress,
+			Added:         added,
 		})
 
 	default:

@@ -15,6 +15,7 @@ import {
   setupPanelModalListeners as setupPanelListeners,
 } from "./panel-modal.js";
 import { normalizePanelUrl } from "./panel-url.js";
+import { normalizeServerAddress } from "./address.js";
 
 let showError;
 let showNotification;
@@ -317,7 +318,13 @@ function saveServers(servers) {
 }
 
 function normalizeAddress(address) {
-  return String(address || "").trim();
+  const value = String(address || "").trim();
+  if (!value) return "";
+  try {
+    return normalizeServerAddress(value);
+  } catch {
+    return value;
+  }
 }
 
 function getRawRecentServers() {
@@ -550,6 +557,19 @@ export function openServerModal() {
 
 export function closeServerModal() {
   switchAppPage("mods");
+}
+
+export async function handleProtocolFavoriteServer(data) {
+  if (!data?.serverName || !data?.serverAddress) return;
+
+  await initServerStorage();
+  openServerModal();
+
+  if (data.added) {
+    showNotification("服务器已添加到收藏", "success");
+  } else {
+    showNotification("该服务器已在收藏中", "info");
+  }
 }
 
 export function renderServers() {
@@ -822,14 +842,20 @@ function importServers(jsonStr) {
 
     newServers.forEach((server) => {
       if (server.name && server.address) {
+        let address;
+        try {
+          address = normalizeServerAddress(server.address);
+        } catch {
+          return;
+        }
         const existingIndex = currentServers.findIndex(
-          (s) => s.address === server.address
+          (s) => normalizeAddress(s.address) === address
         );
 
         if (existingIndex === -1) {
           currentServers.push({
             name: server.name,
-            address: server.address,
+            address,
             weight: server.weight || 0,
             panelUrl: normalizePanelUrl(server.panelUrl),
           });

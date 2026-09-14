@@ -10,6 +10,7 @@ import {
   saveConfig,
 } from "../core/config.js";
 import { initTheme, setupThemeToggle } from "../core/theme.js";
+import { escapeHtml } from "../core/utils.js";
 import { renderAboutPage } from "./about/about.js";
 import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
 import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
@@ -41,6 +42,7 @@ import {
   setupLaunchServerMenu,
   initServerStorage,
   getServers,
+  handleProtocolFavoriteServer,
 } from "./servers/servers.js";
 import {
   updatePanelUploadTaskInList,
@@ -1199,10 +1201,14 @@ function setupWailsEvents() {
     }
   });
 
+  EventsOn("protocol:favorite-server", (data) => {
+    handleProtocolFavoriteServer(data);
+  });
+
   EventsOn("protocol:error", (data) => {
     console.error("协议处理错误:", data);
     if (data && data.message) {
-      showError(`协议处理失败: ${data.message}`);
+      showError(`协议处理失败: ${escapeHtml(data.message)}`);
     }
   });
 

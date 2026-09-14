@@ -1,4 +1,5 @@
 import { normalizePanelUrl } from "./panel-url.js";
+import { normalizeServerAddress } from "./address.js";
 
 let showError;
 let showNotification;
@@ -94,7 +95,7 @@ export function closeServerFormModal() {
 
 export async function saveServerForm() {
   const name = document.getElementById("form-server-name").value.trim();
-  const address = document.getElementById("form-server-address").value.trim();
+  const rawAddress = document.getElementById("form-server-address").value.trim();
   const weight =
     parseInt(document.getElementById("form-server-weight").value) || 0;
   const panelUrl = normalizePanelUrl(
@@ -106,8 +107,16 @@ export async function saveServerForm() {
     document.getElementById("form-clear-panel-password")?.checked
   );
 
-  if (!name || !address) {
+  if (!name || !rawAddress) {
     showError("请输入服务器名称和地址");
+    return;
+  }
+
+  let address;
+  try {
+    address = normalizeServerAddress(rawAddress);
+  } catch (err) {
+    showError(err.message);
     return;
   }
 
@@ -148,6 +157,7 @@ export async function saveServerForm() {
     }
   } catch (err) {
     console.error("保存服务器失败:", err);
+    await initServerStorage();
     return;
   }
 

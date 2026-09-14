@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"vpk-manager/internal/network"
+	"vpk-manager/internal/serveraddress"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -356,6 +357,12 @@ func migrationTargetExists(path string) (bool, error) {
 }
 
 func (a *App) GetServerStorage() ServerStorage {
+	a.serverStorageMu.Lock()
+	defer a.serverStorageMu.Unlock()
+	return a.getServerStorage()
+}
+
+func (a *App) getServerStorage() ServerStorage {
 	a.ensureConfigPaths()
 	var storage ServerStorage
 	if err := readJSONFile(a.serversPath, &storage); err != nil {
@@ -370,6 +377,12 @@ func (a *App) GetServerStorage() ServerStorage {
 }
 
 func (a *App) SaveServerStorage(storage ServerStorage) error {
+	a.serverStorageMu.Lock()
+	defer a.serverStorageMu.Unlock()
+	return a.saveServerStorage(storage)
+}
+
+func (a *App) saveServerStorage(storage ServerStorage) error {
 	a.ensureConfigPaths()
 	var existing ServerStorage
 	if err := readJSONFile(a.serversPath, &existing); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -613,6 +626,9 @@ func cloneSavedServersForFrontend(servers []SavedServer) []SavedServer {
 		}
 		next[i].Name = strings.TrimSpace(next[i].Name)
 		next[i].Address = strings.TrimSpace(next[i].Address)
+		if normalizedAddress, err := serveraddress.Normalize(next[i].Address); err == nil {
+			next[i].Address = normalizedAddress
+		}
 		next[i].PanelURL = strings.TrimSpace(next[i].PanelURL)
 		next[i].PanelPasswordSet = next[i].PanelPasswordEncrypted != ""
 		next[i].PanelPassword = ""
@@ -642,7 +658,11 @@ func prepareSavedServersForStorage(incoming []SavedServer, existing []SavedServe
 			server.ID = newServerID()
 		}
 		server.Name = strings.TrimSpace(server.Name)
-		server.Address = strings.TrimSpace(server.Address)
+		normalizedAddress, err := serveraddress.Normalize(server.Address)
+		if err != nil {
+			return nil, err
+		}
+		server.Address = normalizedAddress
 		server.PanelURL = strings.TrimSpace(server.PanelURL)
 
 		existingServer, ok := existingByID[server.ID]
@@ -671,6 +691,9 @@ func prepareSavedServersForStorage(incoming []SavedServer, existing []SavedServe
 }
 
 func normalizeStoredAddress(address string) string {
+	if normalizedAddress, err := serveraddress.Normalize(address); err == nil {
+		return strings.ToLower(normalizedAddress)
+	}
 	return strings.ToLower(strings.TrimSpace(address))
 }
 
@@ -688,6 +711,11 @@ func cloneRecentServers(servers []RecentServer) []RecentServer {
 	}
 	next := make([]RecentServer, len(servers))
 	copy(next, servers)
+	for i := range next {
+		if normalizedAddress, err := serveraddress.Normalize(next[i].Address); err == nil {
+			next[i].Address = normalizedAddress
+		}
+	}
 	return next
 }
 

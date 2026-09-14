@@ -75,6 +75,7 @@ type App struct {
 	restyClient            *resty.Client
 	proxyServer            *network.ImageProxyServer
 	singletonMgr           *SingletonManager // 单例管理器
+	serverStorageMu        sync.Mutex
 
 	// 配置项
 	modRotationConfig              RotationConfig

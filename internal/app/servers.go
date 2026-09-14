@@ -7,6 +7,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"vpk-manager/internal/serveraddress"
 )
 
 type PlayerInfo struct {
@@ -17,6 +19,11 @@ type PlayerInfo struct {
 
 // FetchPlayerList 获取服务器玩家列表
 func (a *App) FetchPlayerList(address string) ([]PlayerInfo, error) {
+	address, err := serveraddress.Normalize(address)
+	if err != nil {
+		return nil, err
+	}
+
 	var lastErr error
 	for i := 0; i < 3; i++ {
 		players, err := queryA2SPlayers(address)
@@ -356,6 +363,11 @@ func queryA2S(address string) (*ServerInfo, error) {
 
 // FetchServerInfo 获取服务器详细信息
 func (a *App) FetchServerInfo(address string) (*ServerInfo, error) {
+	address, err := serveraddress.Normalize(address)
+	if err != nil {
+		return nil, err
+	}
+
 	// 使用 UDP 直连查询 (A2S_INFO) - 增加重试机制
 	var lastErr error
 	for i := 0; i < 3; i++ {
