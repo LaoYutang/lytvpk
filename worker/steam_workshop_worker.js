@@ -300,6 +300,8 @@ const PUBLISHED_FILE_DETAILS_URL =
   "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/";
 const COLLECTION_DETAILS_URL =
   "https://api.steampowered.com/ISteamRemoteStorage/GetCollectionDetails/v1/";
+const GETDETAILS_URL =
+  "https://api.steampowered.com/IPublishedFileService/GetDetails/v1/";
 
 async function fetchPublishedFileDetails(ids, env) {
   const formData = new FormData();
@@ -322,6 +324,43 @@ async function fetchPublishedFileDetails(ids, env) {
 
   const data = await response.json();
   return data?.response?.publishedfiledetails || [];
+}
+
+// 获取多张预览图 (官方接口, 替代原先从页面 HTML 提取的方式:
+// Steam 新版灰度页面的 HTML 里已没有截图数据)
+// 无 key 或请求失败时返回 null, 由调用方回退到单张主图
+async function fetchDetailPreviews(id, env) {
+  if (!env?.STEAM_API_KEY) {
+    return null;
+  }
+
+  const params = new URLSearchParams();
+  params.set("key", env.STEAM_API_KEY);
+  params.set("includeadditionalpreviews", "true");
+  params.set("publishedfileids[0]", String(id));
+
+  try {
+    const response = await fetch(`${GETDETAILS_URL}?${params.toString()}`);
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const item = data?.response?.publishedfiledetails?.[0];
+    const previews = Array.isArray(item?.previews) ? item.previews : [];
+
+    const mapped = previews
+      .map((preview) => ({
+        preview_url: preview.url || preview.preview_url || "",
+        preview_type: Number(preview.preview_type) || 0,
+      }))
+      .filter((preview) => preview.preview_url);
+
+    return mapped.length > 0 ? mapped : null;
+  } catch (err) {
+    console.warn(`Failed to fetch detail previews: ${err.message}`);
+    return null;
+  }
 }
 
 async function fetchCollectionDetails(id) {
@@ -401,22 +440,12 @@ async function handleDetail(url, env, headers) {
   // 注意: 虽然此接口返回 file_url，但在详情页场景下前端并不使用它(下载走单独流程)
   const p1 = fetchPublishedFileDetails([id], env);
 
-  // 2. 爬取 HTML 页面获取更多预览图 (Steam API 通常不返回多图)
-  // 目标: 从 HTML 中提取 ShowEnlargedImagePreview 调用中的高清大图链接
-  const pageUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`;
-
-  const p2 = fetch(pageUrl, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    },
-  })
-    .then((res) => (res.ok ? res.text() : null))
-    .catch(() => null);
+  // 2. 获取多张预览图 (官方接口一次性返回, 不再抓取页面 HTML)
+  const p2 = fetchDetailPreviews(id, env);
 
   try {
     // 并行请求
-    const [publishedFileDetails, pageHtml] = await Promise.all([p1, p2]);
+    const [publishedFileDetails, previews] = await Promise.all([p1, p2]);
 
     const resultOld = publishedFileDetails?.[0];
 
@@ -431,69 +460,22 @@ async function handleDetail(url, env, headers) {
       );
     }
 
-    // 解析 HTML 提取图片
-    const imageUrls = [];
-    if (pageHtml) {
-      // 策略 A (最全): 提取 rgFullScreenshotURLs 数组中的 URL
-      // 格式: { 'previewid' : '...', 'url': '...' },
-      const regexRg = /var\s+rgFullScreenshotURLs\s*=\s*\[([\s\S]+?)\];/;
-      const matchRg = pageHtml.match(regexRg);
+    // 合并逻辑: 将官方接口返回的多图列表作为 previews 字段
+    if (previews && previews.length > 0) {
+      resultOld.previews = previews;
 
-      if (matchRg && matchRg[1]) {
-        const content = matchRg[1];
-        const regexUrl = /'url'\s*:\s*'([^']+)'/g;
-        let urlMatch;
-        while ((urlMatch = regexUrl.exec(content)) !== null) {
-          imageUrls.push(urlMatch[1]);
-        }
+      // 拿到多图后同步更新主预览图 (接口返回的主图有时是低清的)
+      if (previews[0].preview_url) {
+        resultOld.preview_url = previews[0].preview_url;
       }
-
-      // 策略 B (回退): 查找 ShowEnlargedImagePreview('URL')
-      // 注意: 部分页面主图点击放大仍使用此函数直接传 URL
-      if (imageUrls.length === 0) {
-        const regexEnlarged = /ShowEnlargedImagePreview\(\s*'([^']+)'/g;
-        let match;
-        while ((match = regexEnlarged.exec(pageHtml)) !== null) {
-          // 确保是 URL 而不是 ID
-          if (match[1].startsWith("http")) {
-            imageUrls.push(match[1]);
-          }
-        }
-      }
-
-      // 策略 C (保底): 主预览图
-      // <img id="previewImageMain" class="workshopItemPreviewImageMain" src="...">
-      if (imageUrls.length === 0) {
-        const regexMain = /<img\s+id="previewImageMain"[^>]+src="([^"]+)"/i;
-        const mainMatch = pageHtml.match(regexMain);
-        if (mainMatch) {
-          imageUrls.push(mainMatch[1]);
-        }
-      }
-    }
-
-    // 合并逻辑: 将爬取到的图片列表作为 previews 字段返回
-    // 构造为 Steam API 风格的对象数组，或者直接字符串数组(取决于前端需求，这里用对象更易扩展)
-    if (imageUrls.length > 0) {
-      resultOld.previews = imageUrls.map((url) => ({
-        preview_url: url,
-        preview_type: 0, // 0 = image
-      }));
-
-      // 如果爬取到了图片，也可以更新主预览图 (API 返回的有时是低清的)
-      if (imageUrls[0]) {
-        resultOld.preview_url = imageUrls[0];
-      }
-    } else {
-      // 如果没爬到，确保 previews 字段存在（包含主图）
-      if (resultOld.preview_url) {
-        resultOld.previews = [
-          {
-            preview_url: resultOld.preview_url,
-            preview_type: 0,
-          },
-        ];
-      }
+    } else if (resultOld.preview_url) {
+      // 拿不到多图时，确保 previews 字段存在（包含主图）
+      resultOld.previews = [
+        {
+          preview_url: resultOld.preview_url,
+          preview_type: 0,
+        },
+      ];
     }
 
     const fileTypeMissing =

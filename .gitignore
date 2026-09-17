@@ -11,3 +11,4 @@ frontend/dist/*
 .codex
 .omo
 .codegraph
+.zcode
