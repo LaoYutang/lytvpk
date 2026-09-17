@@ -435,13 +435,21 @@ async function handleDetail(url, env, headers) {
   const id = url.searchParams.get("id");
   if (!id) throw new Error("Missing id parameter");
 
+  // 默认不查询多图预览(更新检测、写入 meta 等只需要基础字段), 省一次消耗 API key 的调用;
+  // 需要图集的调用方(详情页)带 with_previews=1
+  const withPreviews = /^(1|true)$/i.test(
+    url.searchParams.get("with_previews") || ""
+  );
+
   // 1. 调用旧接口 (ISteamRemoteStorage/GetPublishedFileDetails)
   // 作用: 获取 title, description, 统计数据(订阅/收藏)等
   // 注意: 虽然此接口返回 file_url，但在详情页场景下前端并不使用它(下载走单独流程)
   const p1 = fetchPublishedFileDetails([id], env);
 
   // 2. 获取多张预览图 (官方接口一次性返回, 不再抓取页面 HTML)
-  const p2 = fetchDetailPreviews(id, env);
+  const p2 = withPreviews
+    ? fetchDetailPreviews(id, env)
+    : Promise.resolve(null);
 
   try {
     // 并行请求

@@ -26,8 +26,8 @@ func (a *App) CheckModUpdates() UpdateCheckResult {
 
 	var confirmedCount int
 	var toCheck []struct {
-		filePath   string
-		workshopID string
+		filePath     string
+		workshopID   string
 		downloadedAt time.Time
 	}
 
@@ -60,8 +60,8 @@ func (a *App) CheckModUpdates() UpdateCheckResult {
 
 		// 本地更新时间未超过下载时间 → 需要调用API检查
 		toCheck = append(toCheck, struct {
-			filePath   string
-			workshopID string
+			filePath     string
+			workshopID   string
 			downloadedAt time.Time
 		}{vpkFile.Path, vpkFile.WorkshopID, downloadedAt})
 
@@ -79,7 +79,8 @@ func (a *App) CheckModUpdates() UpdateCheckResult {
 		go func(filePath, workshopID string, downloadedAt time.Time) {
 			defer wg.Done()
 
-			detail, err := a.FetchWorkshopDetail(workshopID)
+			// 只读取 time_updated，走默认轻量模式（服务端不查询多图预览）
+			detail, err := a.fetchWorkshopDetailRaw(workshopID, false, false)
 			if err != nil {
 				log.Printf("检测更新失败: (ID: %s), 错误: %v", workshopID, err)
 				return

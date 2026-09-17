@@ -218,9 +218,9 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 	return finalResult, nil
 }
 
-// FetchWorkshopDetail 获取单个MOD详情
+// FetchWorkshopDetail 获取单个MOD详情（详情页需要图集，走完整模式）
 func (a *App) FetchWorkshopDetail(id string) (WorkshopItemDetail, error) {
-	item, err := a.fetchWorkshopDetailRaw(id, false)
+	item, err := a.fetchWorkshopDetailRaw(id, false, true)
 	if err != nil {
 		return WorkshopItemDetail{}, err
 	}
@@ -229,8 +229,13 @@ func (a *App) FetchWorkshopDetail(id string) (WorkshopItemDetail, error) {
 
 // fetchWorkshopDetailRaw 获取未经过本地图片代理处理的工坊详情。
 // forceRefresh 为 true 时跳过进程内缓存，但请求成功后仍会刷新缓存。
-func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool) (WorkshopItemDetail, error) {
+// withPreviews 为 false 时走服务端默认的轻量模式（不查询多图预览，省一次 Steam API 调用），
+// 两种模式使用独立缓存键，避免互相覆盖。
+func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool, withPreviews bool) (WorkshopItemDetail, error) {
 	cacheKey := "detail:raw:" + id
+	if withPreviews {
+		cacheKey = "detail:raw:previews:" + id
+	}
 	if !forceRefresh {
 		if val, ok := getWorkshopCache(cacheKey); ok {
 			if res, ok := val.(WorkshopItemDetail); ok {
@@ -245,6 +250,10 @@ func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool) (WorkshopItem
 	req := client.R().
 		SetQueryParam("id", id).
 		SetResult(&SteamDetailResponse{})
+
+	if withPreviews {
+		req.SetQueryParam("with_previews", "1")
+	}
 
 	resp, err := req.Get(WorkshopWorkerURL + "/detail")
 	if err != nil {

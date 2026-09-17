@@ -252,7 +252,8 @@ func (a *App) processWorkshopTransferMeta(result *WorkshopTransferResult, tasks 
 		if !protocol.IsValidWorkshopID(task.workshopID) {
 			warning = fmt.Sprintf("无法从文件名识别有效工坊 ID: %s", name)
 		} else {
-			detail, err := a.fetchWorkshopDetailRaw(task.workshopID, true)
+			// meta 只用到主图与文本字段，不需要多图预览，走默认轻量模式
+			detail, err := a.fetchWorkshopDetailRaw(task.workshopID, true, false)
 			if err != nil {
 				warning = fmt.Sprintf("获取工坊信息失败 %s: %v", task.workshopID, err)
 			} else {
