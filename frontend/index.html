@@ -1079,6 +1079,39 @@
         </div>
       </div>
 
+      <!-- 工坊 ID 直达弹窗 -->
+      <div id="workshop-id-jump-modal" class="modal hidden">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h3>工坊 ID 直达</h3>
+            <button id="close-workshop-id-jump-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group mb-20">
+              <label for="workshop-id-jump-input" class="form-label"
+                >工坊 ID 或链接</label
+              >
+              <input
+                type="text"
+                id="workshop-id-jump-input"
+                class="form-input w-100"
+                placeholder="例如: 3803082047 或工坊链接"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="workshop-id-jump-cancel-btn" class="btn btn-outline">
+              取消
+            </button>
+            <button id="workshop-id-jump-confirm-btn" class="btn btn-primary">
+              前往
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 服务器收藏对话框 -->
       <div id="server-modal" class="modal hidden">
         <div class="modal-content server-modal-content">
@@ -2247,6 +2280,27 @@
               </button>
               <button id="browser-reset-btn" class="btn btn-outline">
                 <span class="icon">↺</span> 重置
+              </button>
+              <button
+                id="browser-id-jump-btn"
+                class="btn btn-outline"
+                title="输入工坊 ID 直接打开详情"
+              >
+                <span class="icon" aria-hidden="true">
+                  <svg
+                    class="icon-svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12h14"></path>
+                    <path d="m12 5 7 7-7 7"></path>
+                  </svg>
+                </span>
+                <span>ID 直达</span>
               </button>
               <button id="browser-watch-later-btn" class="btn btn-outline browser-watch-later-btn">
                 <span class="icon" aria-hidden="true">
