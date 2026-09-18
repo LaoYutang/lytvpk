@@ -76,6 +76,7 @@ type App struct {
 	proxyServer            *network.ImageProxyServer
 	singletonMgr           *SingletonManager // 单例管理器
 	serverStorageMu        sync.Mutex
+	workshopHistoryMu      sync.Mutex
 
 	// 配置项
 	modRotationConfig              RotationConfig
@@ -105,6 +106,7 @@ type App struct {
 	serversPath                    string
 	workshopWatchLaterPath         string
 	problemScanPath                string
+	workshopHistoryPath            string
 }
 
 // ConfigFile 定义配置文件结构
@@ -236,6 +238,7 @@ func NewApp() *App {
 	serversPath := filepath.Join(appConfigDir, "servers.json")
 	workshopWatchLaterPath := filepath.Join(appConfigDir, "workshop_watch_later.json")
 	problemScanPath := filepath.Join(appConfigDir, "problem_mod_scan.json")
+	workshopHistoryPath := filepath.Join(appConfigDir, "workshop_history.json")
 
 	app := &App{
 		goroutinePool:             pool,
@@ -246,6 +249,7 @@ func NewApp() *App {
 		serversPath:               serversPath,
 		workshopWatchLaterPath:    workshopWatchLaterPath,
 		problemScanPath:           problemScanPath,
+		workshopHistoryPath:       workshopHistoryPath,
 		workshopPreferredIP:       true,     // 默认开启优选IP
 		workshopMetaEnabled:       true,     // 默认开启工坊meta信息存储
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站

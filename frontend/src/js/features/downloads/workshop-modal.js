@@ -3,6 +3,7 @@ import { showError, showNotification, showInfo } from "../../core/toast.js";
 import { getConfig } from "../../core/config.js";
 import { escapeHtml } from "../../core/utils.js";
 import { refreshTaskList } from "./task-list.js";
+import { closeWorkshopHistory, recordWorkshopHistory } from "./workshop-history.js";
 import {
   GetWorkshopDetailsGrouped,
   StartDownloadTask,
@@ -154,9 +155,13 @@ function resetWorkshopParseState() {
   document.getElementById("workshop-result").classList.add("hidden");
   document.getElementById("workshop-result").innerHTML = "";
   document.getElementById("download-workshop-btn").innerHTML = DOWNLOAD_ICON_SVG + "<span>下载</span>";
-  document.getElementById("optimized-ip-container").classList.add("hidden");
-  document.getElementById("use-optimized-ip-global").checked = false;
+  document.getElementById("optimized-ip-container")?.classList.add("hidden");
+  const optimizedIpCheckbox = document.getElementById("use-optimized-ip-global");
+  if (optimizedIpCheckbox) {
+    optimizedIpCheckbox.checked = false;
+  }
   currentWorkshopResult = null;
+  closeWorkshopHistory();
 }
 
 export async function checkWorkshopUrl() {
@@ -198,46 +203,59 @@ export async function checkWorkshopUrl() {
       }
     }
 
-    currentWorkshopResult = groupedResult;
-    const groups = getCurrentGroups();
-
-    if (groups.length === 0) {
-      showError("未找到相关文件");
-      return;
-    }
-
-    const downloadBtn = document.getElementById("download-workshop-btn");
-    const optimizedIpContainer = document.getElementById("optimized-ip-container");
-    const downloadableItems = getAllDownloadableItems();
-
-    downloadUrlInput.placeholder =
-      downloadableItems.length > 0
-        ? `已解析 ${groups.length} 组 / ${downloadableItems.length} 个可下载文件`
-        : `已解析 ${groups.length} 组，但没有可下载文件`;
-    downloadBtn.innerHTML = DOWNLOAD_ICON_SVG + "<span>全部下载</span>";
-
-    const hasSteamCDN = downloadableItems.some((details) =>
-      details.file_url.includes("cdn.steamusercontent.com")
-    );
-
-    if (hasSteamCDN && optimizedIpContainer) {
-      optimizedIpContainer.classList.remove("hidden");
-    } else if (optimizedIpContainer) {
-      optimizedIpContainer.classList.add("hidden");
-    }
-
-    groups.forEach((group, groupIndex) => {
-      result.appendChild(renderWorkshopGroup(group, groupIndex));
-    });
-
-    bindWorkshopResultEvents(result);
-    result.classList.remove("hidden");
+    applyWorkshopGroups(groupedResult?.groups);
+    recordWorkshopHistory(groupedResult?.groups);
   } catch (err) {
     showError("解析失败: " + err);
   } finally {
     checkBtn.disabled = false;
     checkBtn.innerHTML = originalBtnText;
   }
+}
+
+// 把解析结果渲染到结果区，供实时解析与历史记录快照共用
+export function applyWorkshopGroups(groups) {
+  const result = document.getElementById("workshop-result");
+  const downloadUrlInput = document.getElementById("download-url");
+  const downloadBtn = document.getElementById("download-workshop-btn");
+  const optimizedIpContainer = document.getElementById("optimized-ip-container");
+
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  currentWorkshopResult = { groups: safeGroups };
+
+  result.classList.add("hidden");
+  result.innerHTML = "";
+  downloadUrlInput.value = "";
+
+  if (safeGroups.length === 0) {
+    showError("未找到相关文件");
+    return;
+  }
+
+  const downloadableItems = getAllDownloadableItems();
+
+  downloadUrlInput.placeholder =
+    downloadableItems.length > 0
+      ? `已解析 ${safeGroups.length} 组 / ${downloadableItems.length} 个可下载文件`
+      : `已解析 ${safeGroups.length} 组，但没有可下载文件`;
+  downloadBtn.innerHTML = DOWNLOAD_ICON_SVG + "<span>全部下载</span>";
+
+  const hasSteamCDN = downloadableItems.some((details) =>
+    details.file_url.includes("cdn.steamusercontent.com")
+  );
+
+  if (hasSteamCDN && optimizedIpContainer) {
+    optimizedIpContainer.classList.remove("hidden");
+  } else if (optimizedIpContainer) {
+    optimizedIpContainer.classList.add("hidden");
+  }
+
+  safeGroups.forEach((group, groupIndex) => {
+    result.appendChild(renderWorkshopGroup(group, groupIndex));
+  });
+
+  bindWorkshopResultEvents(result);
+  result.classList.remove("hidden");
 }
 
 function renderWorkshopGroup(group, groupIndex) {

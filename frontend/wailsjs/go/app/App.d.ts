@@ -5,6 +5,8 @@ import {network} from '../models';
 import {parser} from '../models';
 import {minidump} from '../models';
 
+export function AddWorkshopHistoryEntries(arg1:Array<app.WorkshopHistoryItem>):Promise<app.WorkshopHistoryStorage>;
+
 export function AutoDiscoverAddons():Promise<string>;
 
 export function CancelDownloadTask(arg1:string):Promise<void>;
@@ -26,6 +28,8 @@ export function ClearCompletedPanelMapUploads():Promise<void>;
 export function ClearCompletedTasks():Promise<void>;
 
 export function ClearPanelMaps(arg1:string):Promise<string>;
+
+export function ClearWorkshopHistory():Promise<void>;
 
 export function ConnectToServer(arg1:string):Promise<void>;
 
@@ -122,6 +126,8 @@ export function GetWorkshopDetails(arg1:string):Promise<Array<app.WorkshopFileDe
 export function GetWorkshopDetailsGrouped(arg1:string):Promise<app.WorkshopDetailsResult>;
 
 export function GetWorkshopFixedIP():Promise<string>;
+
+export function GetWorkshopHistory():Promise<app.WorkshopHistoryStorage>;
 
 export function GetWorkshopIPOptions():Promise<Array<network.IPOption>>;
 

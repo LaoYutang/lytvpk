@@ -62,6 +62,80 @@
   stroke-linejoin: round;
 }
 
+/* 覆盖 .btn-icon-only svg 的 fill: currentColor，历史图标保持描边空心 */
+.url-input-container #workshop-history-btn svg {
+  fill: none;
+}
+
+/* 解析历史下拉菜单 */
+.workshop-history-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 8px;
+  z-index: 6000;
+  width: 24rem;
+  max-width: calc(100% - 16px);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.workshop-history-list {
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: var(--spacing-2);
+  scrollbar-width: thin;
+}
+
+.workshop-history-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.workshop-history-item:hover {
+  background: var(--bg-hover);
+}
+
+.workshop-history-id {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.workshop-history-sep {
+  flex: 0 0 auto;
+  color: var(--text-tertiary);
+}
+
+.workshop-history-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+/* 输入容器给按钮的通用内边距/悬停位移不适用于菜单内的文字按钮 */
+.url-input-container .workshop-history-menu .btn-text-small {
+  padding: 0 var(--spacing-2);
+  transform: none;
+  box-shadow: none;
+}
+
+.url-input-container .workshop-history-menu .btn-text-small:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .workshop-info {
   display: flex;
   align-items: flex-start;

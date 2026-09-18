@@ -53,6 +53,9 @@ func (a *App) ensureConfigPaths() {
 	if a.problemScanPath == "" {
 		a.problemScanPath = filepath.Join(a.configDir, "problem_mod_scan.json")
 	}
+	if a.workshopHistoryPath == "" {
+		a.workshopHistoryPath = filepath.Join(a.configDir, "workshop_history.json")
+	}
 }
 
 func (a *App) loadConfig() {

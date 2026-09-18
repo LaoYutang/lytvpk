@@ -126,6 +126,7 @@ import {
   checkWorkshopUrl,
   downloadWorkshopFile,
   copyCurrentDownloadUrls,
+  applyWorkshopGroups,
 } from "./downloads/workshop-modal.js";
 import {
   refreshTaskList,
@@ -133,6 +134,7 @@ import {
   updateTaskProgress,
   setupClearCompletedTasks,
 } from "./downloads/task-list.js";
+import { setupWorkshopHistory } from "./downloads/workshop-history.js";
 import { openSetTagsModal, setupTagModalListeners } from "./file-list/tags.js";
 import {
   openBatchSetTagsModal,
@@ -679,6 +681,11 @@ function setupEventListeners() {
 
   // 清除已完成任务
   setupClearCompletedTasks();
+
+  // 解析历史下拉（点击记录直接展示解析时的结果快照）
+  setupWorkshopHistory({
+    onSelect: (item) => applyWorkshopGroups([item.group]),
+  });
 
   // ESC 键取消所有 mod 选择
   document.addEventListener("keydown", function (e) {

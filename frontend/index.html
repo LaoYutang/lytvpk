@@ -979,6 +979,37 @@
                     </svg>
                   </span>
                 </button>
+                <button
+                  id="workshop-history-btn"
+                  class="btn btn-ghost btn-icon-only"
+                  title="最近解析记录"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                >
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                      <path d="M3 3v5h5"></path>
+                      <path d="M12 7v5l4 2"></path>
+                    </svg>
+                  </span>
+                </button>
+                <div id="workshop-history-menu" class="workshop-history-menu hidden">
+                  <div class="dropdown-header">
+                    <span>最近解析</span>
+                    <button
+                      id="workshop-history-clear"
+                      class="btn-text-small"
+                      type="button"
+                    >
+                      清空
+                    </button>
+                  </div>
+                  <div id="workshop-history-list" class="workshop-history-list"></div>
+                  <div id="workshop-history-empty" class="dropdown-empty hidden">
+                    暂无解析记录
+                  </div>
+                </div>
                 <button id="check-workshop-btn" class="btn btn-primary">
                   <span class="icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none">
