@@ -223,17 +223,19 @@ function renderCollectionStats(detail) {
   `;
 }
 
-function renderCollectionItems(detail) {
-  const childItems = Array.isArray(detail.child_items) ? detail.child_items : [];
-
-  if (childItems.length === 0) {
+// 卡片列表区块(合集子项与依赖项共用)。showDownload 控制是否带独立下载按钮
+function renderChildItemsSection({ title, items, showDownload = true, emptyText = "" }) {
+  if (items.length === 0) {
+    if (!emptyText) {
+      return "";
+    }
     return `
       <div class="collection-items-section">
         <div class="collection-items-header">
-          <h3>合集物品</h3>
+          <h3>${escapeHtml(title)}</h3>
           <span>0 个物品</span>
         </div>
-        <div class="collection-empty-state">暂时无法获取合集中的物品列表</div>
+        <div class="collection-empty-state">${escapeHtml(emptyText)}</div>
       </div>
     `;
   }
@@ -241,36 +243,39 @@ function renderCollectionItems(detail) {
   return `
     <div class="collection-items-section">
       <div class="collection-items-header">
-        <h3>合集物品</h3>
-        <span>${childItems.length} 个物品</span>
+        <h3>${escapeHtml(title)}</h3>
+        <span>${items.length} 个物品</span>
       </div>
       <div class="collection-items-list">
-        ${childItems
+        ${items
           .map((child) => {
             const childId = getWorkshopItemId(child);
-            const title = child.title || `工坊 #${childId}`;
+            const childTitle = child.title || `工坊 #${childId}`;
             const previewUrl = child.preview_url || "assets/images/no-preview.png";
-            return `
-              <div class="collection-child-card" role="button" tabindex="0" data-workshop-id="${escapeHtml(childId)}">
-                <div class="collection-child-thumb">
-                  <img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(title)}" loading="lazy">
-                </div>
-                <div class="collection-child-info">
-                  <div class="collection-child-title">${escapeHtml(title)}</div>
-                  <div class="collection-child-meta">
-                    <span>ID ${escapeHtml(childId)}</span>
-                    <span>点击 ${formatNumber(child.views)}</span>
-                    <span>订阅 ${formatNumber(child.subscriptions)}</span>
-                  </div>
-                </div>
-                <button class="btn btn-secondary btn-small collection-child-download-btn" type="button" data-workshop-id="${escapeHtml(childId)}" aria-label="下载 ${escapeHtml(title)}">
+            const downloadButton = showDownload
+              ? `
+                <button class="btn btn-secondary btn-small collection-child-download-btn" type="button" data-workshop-id="${escapeHtml(childId)}" aria-label="下载 ${escapeHtml(childTitle)}">
                   <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="7 10 12 15 17 10"></polyline>
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                   </svg>
                   <span>下载</span>
-                </button>
+                </button>`
+              : "";
+            return `
+              <div class="collection-child-card" role="button" tabindex="0" data-workshop-id="${escapeHtml(childId)}">
+                <div class="collection-child-thumb">
+                  <img src="${escapeHtml(previewUrl)}" alt="${escapeHtml(childTitle)}" loading="lazy">
+                </div>
+                <div class="collection-child-info">
+                  <div class="collection-child-title">${escapeHtml(childTitle)}</div>
+                  <div class="collection-child-meta">
+                    <span>ID ${escapeHtml(childId)}</span>
+                    <span>点击 ${formatNumber(child.views)}</span>
+                    <span>订阅 ${formatNumber(child.subscriptions)}</span>
+                  </div>
+                </div>${downloadButton}
               </div>
             `;
           })
@@ -278,6 +283,29 @@ function renderCollectionItems(detail) {
       </div>
     </div>
   `;
+}
+
+function renderCollectionItems(detail) {
+  const childItems = Array.isArray(detail.child_items) ? detail.child_items : [];
+
+  return renderChildItemsSection({
+    title: "合集物品",
+    items: childItems,
+    showDownload: true,
+    emptyText: "暂时无法获取合集中的物品列表",
+  });
+}
+
+// 依赖项（必需物品）：只在完整详情时才有数据，展示与点击直达即可，
+// 下载可以在下载页解析时随主体一起完成
+function renderRequiredItems(detail) {
+  const requiredItems = Array.isArray(detail.required_items) ? detail.required_items : [];
+
+  return renderChildItemsSection({
+    title: "必需物品",
+    items: requiredItems,
+    showDownload: false,
+  });
 }
 
 function renderItemDetail(detail, parentDetail) {
@@ -294,6 +322,7 @@ function renderItemDetail(detail, parentDetail) {
                   ${renderDetailDownloadButton("下载并安装")}
               </div>
           </div>
+          ${renderRequiredItems(detail)}
           ${renderDescriptionBox(detail, "MOD 介绍")}
         </div>
     </div>

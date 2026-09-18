@@ -1387,6 +1387,7 @@ export namespace app {
 	    views: any;
 	    tags: [];
 	    child_items: WorkshopPreviewItem[];
+	    required_items: WorkshopPreviewItem[];
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkshopItemDetail(source);
@@ -1410,6 +1411,7 @@ export namespace app {
 	        this.views = source["views"];
 	        this.tags = this.convertValues(source["tags"], );
 	        this.child_items = this.convertValues(source["child_items"], WorkshopPreviewItem);
+	        this.required_items = this.convertValues(source["required_items"], WorkshopPreviewItem);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

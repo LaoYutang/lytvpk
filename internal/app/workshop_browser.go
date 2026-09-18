@@ -85,6 +85,8 @@ type WorkshopItemDetail struct {
 		Tag string `json:"tag"`
 	} `json:"tags"`
 	ChildItems []WorkshopPreviewItem `json:"child_items"`
+	// RequiredItems 是普通物品的依赖项(必需物品)，仅完整详情(with_previews)时返回
+	RequiredItems []WorkshopPreviewItem `json:"required_items"`
 }
 
 type SteamDetailResponse struct {
@@ -284,12 +286,16 @@ func (a *App) processWorkshopDetailImages(item WorkshopItemDetail) WorkshopItemD
 	// 复制切片，避免修改缓存中的原始 URL。
 	item.Previews = append([]WorkshopPreviewImage(nil), item.Previews...)
 	item.ChildItems = append([]WorkshopPreviewItem(nil), item.ChildItems...)
+	item.RequiredItems = append([]WorkshopPreviewItem(nil), item.RequiredItems...)
 	item.PreviewUrl = a.processWorkshopImage(item.PreviewUrl)
 	for i := range item.Previews {
 		item.Previews[i].PreviewUrl = a.processWorkshopImage(item.Previews[i].PreviewUrl)
 	}
 	for i := range item.ChildItems {
 		item.ChildItems[i].PreviewUrl = a.processWorkshopImage(item.ChildItems[i].PreviewUrl)
+	}
+	for i := range item.RequiredItems {
+		item.RequiredItems[i].PreviewUrl = a.processWorkshopImage(item.RequiredItems[i].PreviewUrl)
 	}
 	return item
 }

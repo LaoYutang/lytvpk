@@ -303,11 +303,10 @@ const COLLECTION_DETAILS_URL =
 const GETDETAILS_URL =
   "https://api.steampowered.com/IPublishedFileService/GetDetails/v1/";
 
-async function fetchPublishedFileDetails(ids, env) {
+// 免 key 的详情接口: 实测带不带 key 返回字段一致, 不带可避免消耗 key 的每日调用配额。
+// 需要 children / 多图预览时另走 GetDetails(必须带 key)
+async function fetchPublishedFileDetails(ids) {
   const formData = new FormData();
-  if (env?.STEAM_API_KEY) {
-    formData.append("key", env.STEAM_API_KEY);
-  }
   formData.append("itemcount", String(ids.length));
   ids.forEach((id, index) => {
     formData.append(`publishedfileids[${index}]`, id);
@@ -326,40 +325,49 @@ async function fetchPublishedFileDetails(ids, env) {
   return data?.response?.publishedfiledetails || [];
 }
 
-// 获取多张预览图 (官方接口, 替代原先从页面 HTML 提取的方式:
-// Steam 新版灰度页面的 HTML 里已没有截图数据)
-// 无 key 或请求失败时返回 null, 由调用方回退到单张主图
-async function fetchDetailPreviews(id, env) {
+// 获取完整详情的附加数据: 多图预览 + children(合集的子项 / 普通物品的依赖项)
+// 两者来自同一次 GetDetails 调用, 不额外增加调用次数
+// 无 key 或请求失败时返回空结果, 由调用方回退到单张主图
+async function fetchDetailExtras(id, env) {
+  const empty = { previews: null, childIds: [], fileType: 0 };
   if (!env?.STEAM_API_KEY) {
-    return null;
+    return empty;
   }
 
   const params = new URLSearchParams();
   params.set("key", env.STEAM_API_KEY);
   params.set("includeadditionalpreviews", "true");
+  params.set("includechildren", "true");
   params.set("publishedfileids[0]", String(id));
 
   try {
     const response = await fetch(`${GETDETAILS_URL}?${params.toString()}`);
     if (!response.ok) {
-      return null;
+      return empty;
     }
 
     const data = await response.json();
     const item = data?.response?.publishedfiledetails?.[0];
-    const previews = Array.isArray(item?.previews) ? item.previews : [];
 
-    const mapped = previews
+    const previews = (Array.isArray(item?.previews) ? item.previews : [])
       .map((preview) => ({
         preview_url: preview.url || preview.preview_url || "",
         preview_type: Number(preview.preview_type) || 0,
       }))
       .filter((preview) => preview.preview_url);
 
-    return mapped.length > 0 ? mapped : null;
+    const childIds = (Array.isArray(item?.children) ? item.children : [])
+      .map((child) => String(child?.publishedfileid || ""))
+      .filter(Boolean);
+
+    return {
+      previews: previews.length > 0 ? previews : null,
+      childIds,
+      fileType: Number(item?.file_type) || 0,
+    };
   } catch (err) {
-    console.warn(`Failed to fetch detail previews: ${err.message}`);
-    return null;
+    console.warn(`Failed to fetch detail extras: ${err.message}`);
+    return empty;
   }
 }
 
@@ -390,11 +398,16 @@ async function fetchCollectionDetails(id) {
   return collection;
 }
 
-async function fetchCollectionChildItems(collection, env) {
+async function fetchCollectionChildItems(collection) {
   const childIds = (collection?.children || [])
     .map((child) => String(child.publishedfileid || ""))
     .filter(Boolean);
 
+  return fetchChildItemsByIds(childIds);
+}
+
+// 按 ID 批量取精简详情（合集子项与依赖项共用）
+async function fetchChildItemsByIds(childIds) {
   if (childIds.length === 0) {
     return [];
   }
@@ -404,7 +417,7 @@ async function fetchCollectionChildItems(collection, env) {
     const chunkSize = 100;
     for (let i = 0; i < childIds.length; i += chunkSize) {
       const chunk = childIds.slice(i, i + chunkSize);
-      childDetails.push(...(await fetchPublishedFileDetails(chunk, env)));
+      childDetails.push(...(await fetchPublishedFileDetails(chunk)));
     }
 
     const detailsById = new Map(
@@ -426,7 +439,7 @@ async function fetchCollectionChildItems(collection, env) {
         tags: item.tags || [],
       }));
   } catch (err) {
-    console.warn(`Failed to fetch collection child items: ${err.message}`);
+    console.warn(`Failed to fetch child items: ${err.message}`);
     return [];
   }
 }
@@ -444,16 +457,17 @@ async function handleDetail(url, env, headers) {
   // 1. 调用旧接口 (ISteamRemoteStorage/GetPublishedFileDetails)
   // 作用: 获取 title, description, 统计数据(订阅/收藏)等
   // 注意: 虽然此接口返回 file_url，但在详情页场景下前端并不使用它(下载走单独流程)
-  const p1 = fetchPublishedFileDetails([id], env);
+  const p1 = fetchPublishedFileDetails([id]);
 
-  // 2. 获取多张预览图 (官方接口一次性返回, 不再抓取页面 HTML)
+  // 2. 获取附加数据：多图预览 + 依赖项（同一次 GetDetails 调用）
   const p2 = withPreviews
-    ? fetchDetailPreviews(id, env)
-    : Promise.resolve(null);
+    ? fetchDetailExtras(id, env)
+    : Promise.resolve({ previews: null, childIds: [], fileType: 0 });
 
   try {
     // 并行请求
-    const [publishedFileDetails, previews] = await Promise.all([p1, p2]);
+    const [publishedFileDetails, extras] = await Promise.all([p1, p2]);
+    const previews = extras.previews;
 
     const resultOld = publishedFileDetails?.[0];
 
@@ -507,8 +521,11 @@ async function handleDetail(url, env, headers) {
 
     if (isCollection) {
       resultOld.child_items = collectionDetails
-        ? await fetchCollectionChildItems(collectionDetails, env)
+        ? await fetchCollectionChildItems(collectionDetails)
         : [];
+    } else if (extras.fileType !== 2 && extras.childIds.length > 0) {
+      // 普通物品的 children 是依赖项(必需物品)，用 ID 批量补详情以便展示名称
+      resultOld.required_items = await fetchChildItemsByIds(extras.childIds);
     }
 
     // 构造最终响应 (保持原有结构)
