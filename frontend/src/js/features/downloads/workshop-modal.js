@@ -44,6 +44,10 @@ function getGroupItems(group) {
   return group?.main ? [group.main] : [];
 }
 
+function isCollectionGroup(group) {
+  return Number(group?.main?.file_type) === 2;
+}
+
 function isDownloadableDetail(details) {
   return (
     details &&
@@ -261,14 +265,30 @@ function renderWorkshopGroup(group, groupIndex) {
   `;
 
   const body = groupDiv.querySelector(".workshop-group-body");
+  const collectionGroup = isCollectionGroup(group);
+  let renderedCount = 0;
   getGroupItems(group).forEach((details, itemIndex) => {
-    body.appendChild(renderWorkshopItem(details, groupIndex, itemIndex));
+    // 合集本体不是文件，标题栏已经展示合集名和 ID，这里不再单独占一个卡片
+    if (collectionGroup && itemIndex === 0) {
+      return;
+    }
+    body.appendChild(
+      renderWorkshopItem(details, groupIndex, itemIndex, collectionGroup)
+    );
+    renderedCount++;
   });
+
+  if (renderedCount === 0) {
+    const empty = document.createElement("p");
+    empty.className = "workshop-group-empty";
+    empty.textContent = "该合集内暂无可显示的文件";
+    body.appendChild(empty);
+  }
 
   return groupDiv;
 }
 
-function renderWorkshopItem(details, groupIndex, itemIndex) {
+function renderWorkshopItem(details, groupIndex, itemIndex, collectionGroup = false) {
   const itemDiv = document.createElement("div");
   const isMain = itemIndex === 0;
   const downloadable = isDownloadableDetail(details);
@@ -278,11 +298,11 @@ function renderWorkshopItem(details, groupIndex, itemIndex) {
     ? `<p><strong>作者:</strong> <span>${escapeHtml(details.creator)}</span></p>`
     : "";
   const previewUrl = details.preview_url || "";
-  const title = details.title || (isMain ? "主物品" : "子物品");
+  const itemTypeLabel = isMain ? "主物品" : collectionGroup ? "合集" : "子物品";
+  const title = details.title || itemTypeLabel;
   const filename = details.filename || "";
   const fileUrl = details.file_url || "";
   const fileSize = Number.parseInt(details.file_size, 10) || 0;
-  const itemTypeLabel = isMain ? "主物品" : "子物品";
 
   const actionsHtml = downloadable
     ? `

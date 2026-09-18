@@ -27,6 +27,7 @@ type WorkshopChild struct {
 type WorkshopFileDetails struct {
 	Result          int    `json:"result"`
 	PublishedFileId string `json:"publishedfileid"`
+	FileType        int    `json:"file_type"` // 2 = 合集
 	Creator         string `json:"creator"`
 	Filename        string `json:"filename"`
 	FileSize        string `json:"file_size"`

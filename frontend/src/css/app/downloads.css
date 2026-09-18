@@ -231,6 +231,13 @@
   background: var(--bg-app);
 }
 
+.workshop-group-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
 .workshop-main-item {
   background: color-mix(in srgb, var(--primary) 5%, var(--bg-app));
   border-color: color-mix(in srgb, var(--primary) 22%, var(--border-light));

@@ -1182,6 +1182,7 @@ export namespace app {
 	export class WorkshopFileDetails {
 	    result: number;
 	    publishedfileid: string;
+	    file_type: number;
 	    creator: string;
 	    filename: string;
 	    file_size: string;
@@ -1200,6 +1201,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.result = source["result"];
 	        this.publishedfileid = source["publishedfileid"];
+	        this.file_type = source["file_type"];
 	        this.creator = source["creator"];
 	        this.filename = source["filename"];
 	        this.file_size = source["file_size"];

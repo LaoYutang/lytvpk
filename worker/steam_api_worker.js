@@ -148,6 +148,7 @@ function mapDetail(item) {
   return {
     result: isCollection ? 0 : Number(item.result) || 0,
     publishedfileid: String(item.publishedfileid || ""),
+    file_type: Number(item.file_type) || 0, // 2 = 合集, 客户端据此调整展示
     filename: item.filename || "",
     file_size: String(item.file_size ?? "0"),
     file_url: item.file_url || "",
