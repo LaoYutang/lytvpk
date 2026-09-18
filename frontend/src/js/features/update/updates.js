@@ -419,7 +419,8 @@ export async function showUpdateModal(info) {
     }
 
     // Start async test
-    TestMirrorsLatency();
+    // 首次检测带预热：第一次请求会触发镜像站回源（缓存未命中），数值明显偏高，故以第二次结果为准
+    TestMirrorsLatency(true);
 
     // Listen for updates
     cancelLatencyListener = EventsOn("mirror_latency_result", (result) => {
@@ -513,7 +514,8 @@ export async function showUpdateModal(info) {
       displayTag.textContent = "测试中";
     }
 
-    TestMirrorsLatency();
+    // 目标已被首次检测预热过，单次测量即可
+    TestMirrorsLatency(false);
   };
 
   if (refreshBtn) {

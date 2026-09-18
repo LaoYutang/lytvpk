@@ -526,8 +526,8 @@ export function SubmitProblemModScanResult(arg1) {
   return window['go']['app']['App']['SubmitProblemModScanResult'](arg1);
 }
 
-export function TestMirrorsLatency() {
-  return window['go']['app']['App']['TestMirrorsLatency']();
+export function TestMirrorsLatency(arg1) {
+  return window['go']['app']['App']['TestMirrorsLatency'](arg1);
 }
 
 export function ToggleVPKFile(arg1) {

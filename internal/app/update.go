@@ -63,7 +63,17 @@ type MirrorWithLatency struct {
 }
 
 // checkLatency 检测镜像源延迟
-func checkLatency(url string) int64 {
+// warmup 为 true 时先发一次预热请求并丢弃结果：首次请求会触发镜像站回源 GitHub，
+// 耗时明显高于后续请求，第二次的结果才接近实际下载体验
+func checkLatency(url string, warmup bool) int64 {
+	if warmup {
+		probeLatency(url)
+	}
+	return probeLatency(url)
+}
+
+// probeLatency 发送一次探测请求并返回耗时（毫秒，-1 表示超时或失败）
+func probeLatency(url string) int64 {
 	start := time.Now()
 	client := http.Client{
 		Timeout: 3 * time.Second,
@@ -314,32 +324,47 @@ func (a *App) GetMirrorsInitial() []MirrorWithLatency {
 }
 
 // TestMirrorsLatency 异步测试镜像源延迟，通过事件返回结果
-func (a *App) TestMirrorsLatency() {
+// warmup 为 true 时每个源先发一次预热请求（结果丢弃），上报第二次的延迟：
+// 首次请求会触发镜像站回源 GitHub，数值明显偏高，第二次才接近实际下载体验
+func (a *App) TestMirrorsLatency(warmup bool) {
 	// 1. 直连检测
-	go func() {
+	a.submitProbe(func() {
 		target := pendingUpdateURL
 		if target == "" {
 			target = "https://github.com"
 		}
-		latency := checkLatency(target)
+		latency := checkLatency(target, warmup)
 		wailsRuntime.EventsEmit(a.ctx, "mirror_latency_result", MirrorWithLatency{URL: "", Latency: latency})
-	}()
+	})
 
 	// 2. 镜像源检测
 	for _, mirror := range MirrorList {
-		go func(m string) {
-			target := m
+		mirror := mirror
+		a.submitProbe(func() {
+			target := mirror
 			if pendingUpdateURL != "" {
-				prefix := m
+				prefix := mirror
 				if !strings.HasSuffix(prefix, "/") {
 					prefix += "/"
 				}
 				target = prefix + pendingUpdateURL
 			}
-			latency := checkLatency(target)
-			wailsRuntime.EventsEmit(a.ctx, "mirror_latency_result", MirrorWithLatency{URL: m, Latency: latency})
-		}(mirror)
+			latency := checkLatency(target, warmup)
+			wailsRuntime.EventsEmit(a.ctx, "mirror_latency_result", MirrorWithLatency{URL: mirror, Latency: latency})
+		})
 	}
+}
+
+// submitProbe 提交延迟探测任务，优先使用协程池，池不可用时降级为独立协程
+func (a *App) submitProbe(task func()) {
+	if a.goroutinePool != nil {
+		err := a.goroutinePool.Submit(task)
+		if err == nil {
+			return
+		}
+		fmt.Printf("提交延迟检测任务失败，改用独立协程: %v\n", err)
+	}
+	go task()
 }
 
 // GetMirrorsWithLatency 获取带有延迟信息的镜像列表 (保留向后兼容，但建议使用 TestMirrorsLatency)
@@ -357,7 +382,7 @@ func (a *App) GetMirrorsWithLatency() []MirrorWithLatency {
 			// 如果没有待更新的 URL，检测 GitHub 主站作为参考
 			target = "https://github.com"
 		}
-		latency := checkLatency(target)
+		latency := checkLatency(target, false)
 		mu.Lock()
 		// 直连的 URL 为空字符串，与 DoUpdate 逻辑保持一致
 		results = append(results, MirrorWithLatency{URL: "", Latency: latency})
@@ -379,7 +404,7 @@ func (a *App) GetMirrorsWithLatency() []MirrorWithLatency {
 				target = prefix + pendingUpdateURL
 			}
 
-			latency := checkLatency(target)
+			latency := checkLatency(target, false)
 			mu.Lock()
 			results = append(results, MirrorWithLatency{URL: m, Latency: latency})
 			mu.Unlock()
