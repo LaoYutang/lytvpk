@@ -302,9 +302,22 @@ export async function showUpdateModal(info) {
       if (mirrorOptionsList.classList.contains("hidden")) {
         // Opening - Calculate fixed position
         const rect = mirrorSelectContainer.getBoundingClientRect();
-        mirrorOptionsList.style.top = rect.bottom + 4 + "px";
+        // 列表为 fixed 定位，需限制高度并选择展开方向，否则靠近视口底部时后几项被裁掉
+        const spaceBelow = window.innerHeight - rect.bottom - 8;
+        const spaceAbove = rect.top - 8;
+        const openUpward = spaceBelow < 180 && spaceAbove > spaceBelow;
+        const available = Math.max(120, Math.min(250, openUpward ? spaceAbove : spaceBelow));
+
         mirrorOptionsList.style.left = rect.left + "px";
         mirrorOptionsList.style.width = rect.width + "px";
+        mirrorOptionsList.style.maxHeight = available + "px";
+        if (openUpward) {
+          mirrorOptionsList.style.top = "auto";
+          mirrorOptionsList.style.bottom = window.innerHeight - rect.top + 4 + "px";
+        } else {
+          mirrorOptionsList.style.bottom = "auto";
+          mirrorOptionsList.style.top = rect.bottom + 4 + "px";
+        }
         mirrorOptionsList.classList.remove("hidden");
       } else {
         mirrorOptionsList.classList.add("hidden");
@@ -327,7 +340,11 @@ export async function showUpdateModal(info) {
   };
 
   // Close on scroll or resize
-  const closeDropdown = () => {
+  const closeDropdown = (e) => {
+    // scroll 事件在捕获阶段会先经过 window，若不排除列表自身，列表内滚动会立刻把它自己关掉
+    if (e && e.target instanceof Node && mirrorOptionsList.contains(e.target)) {
+      return;
+    }
     mirrorOptionsList.classList.add("hidden");
   };
 

@@ -40,12 +40,20 @@ type GithubRelease struct {
 	} `json:"assets"`
 }
 
-// MirrorList 镜像源列表 (与前端保持一致)
+// MirrorList 镜像源列表
+// 下载能力是收录的主要标准：需在国内网络下直连实测 releases/download 能取回真实文件字节，
+// 仅凭 HTTP 状态码判断会误判（页面代理型站点对 releases/latest 等网页请求返回 403 属正常策略，
+// 其响应体为 "Web page content is not allowed. This service is for resource downloads only."）
+// gh-proxy 系列属仅资源下载型，无法用于版本检测，CheckUpdate 遍历时会自动跳过
 var MirrorList = []string{
-	"https://hk.gh-proxy.com/",
 	"https://gh-proxy.com/",
-	"https://gh.llkk.cc/",
 	"https://ghfast.top/",
+	"https://gh.xxooo.cf/",
+	"https://ghproxy.net/",
+	"https://gh.acmsz.top/",
+	"https://gh.felicity.ac.cn/",
+	"https://ghproxy.cxkpro.top/",
+	"https://hk.gh-proxy.com/",
 }
 
 // MirrorWithLatency 带有延迟信息的镜像源
