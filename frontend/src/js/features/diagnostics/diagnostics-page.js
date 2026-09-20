@@ -7,6 +7,7 @@ export async function renderDiagnosticsPage({
   openMDMPReportTool,
   openVPKPackTool,
   openSprayTool,
+  openSnapshotTool,
   refreshFilesKeepFilter,
 } = {}) {
   const container = document.getElementById("diagnostics-page-content");
@@ -128,6 +129,7 @@ export async function renderDiagnosticsPage({
   `;
 
   appendMDMPReportTool(container, openMDMPReportTool);
+  appendSnapshotTool(container, openSnapshotTool, refreshFilesKeepFilter);
   appendSprayTool(container, openSprayTool, refreshFilesKeepFilter);
 
   document
@@ -249,7 +251,46 @@ function appendSprayTool(container, openSprayTool, refreshFilesKeepFilter) {
   );
 
   card.append(icon, main, button);
-  generalGrid.appendChild(card);
+  const secondPosition = generalGrid.children[1] || null;
+  generalGrid.insertBefore(card, secondPosition);
+}
+
+function appendSnapshotTool(container, openSnapshotTool, refreshFilesKeepFilter) {
+  const grids = container.querySelectorAll(".diagnostics-tool-grid");
+  const generalGrid = grids[1];
+  if (!generalGrid) return;
+
+  const card = document.createElement("section");
+  card.className = "diagnostics-tool-card";
+
+  const icon = document.createElement("div");
+  icon.className = "diagnostics-tool-icon is-snapshot";
+  icon.appendChild(createSnapshotIcon());
+
+  const main = document.createElement("div");
+  main.className = "diagnostics-tool-main";
+  const row = document.createElement("div");
+  row.className = "diagnostics-tool-title-row";
+  const title = document.createElement("h3");
+  title.textContent = "Mod 快照";
+  const status = document.createElement("span");
+  status.className = "diagnostics-status";
+  status.textContent = "可恢复";
+  row.append(title, status);
+  const desc = document.createElement("p");
+  desc.textContent = "保存当前启用状态或完整备份，恢复前可预览每一项文件变化。";
+  main.append(row, desc);
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn btn-primary diagnostics-tool-action";
+  button.textContent = "打开快照工具";
+  button.addEventListener("click", () =>
+    openSnapshotTool?.({ refreshFilesKeepFilter })
+  );
+
+  card.append(icon, main, button);
+  generalGrid.prepend(card);
 }
 
 function createDumpIcon() {
@@ -307,4 +348,28 @@ function createSprayIcon() {
 
 function packIcon() {
   return `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v8"/><path d="m9 7 3 3 3-3"/><path d="M3 14h18"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>`;
+}
+
+function createSnapshotIcon() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon-svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2.3");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  [
+    ["path", { d: "M4 5h16v14H4z" }],
+    ["path", { d: "M8 9h8" }],
+    ["path", { d: "M8 13h5" }],
+    ["path", { d: "M16 17l2-2-2-2" }],
+  ].forEach(([tag, attrs]) => {
+    const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.entries(attrs).forEach(([key, value]) =>
+      node.setAttribute(key, value)
+    );
+    svg.appendChild(node);
+  });
+  return svg;
 }

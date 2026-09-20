@@ -33,13 +33,19 @@ export function ClearWorkshopHistory():Promise<void>;
 
 export function ConnectToServer(arg1:string):Promise<void>;
 
+export function CreateSnapshot(arg1:string,arg2:string):Promise<app.SnapshotSummary>;
+
 export function DeletePanelMapFile(arg1:string,arg2:string):Promise<string>;
+
+export function DeleteSnapshot(arg1:string):Promise<void>;
 
 export function DeleteVPKFile(arg1:string):Promise<void>;
 
 export function DeleteVPKFiles(arg1:Array<string>):Promise<void>;
 
 export function DoUpdate(arg1:string):Promise<string>;
+
+export function ExecuteSnapshotRestore(arg1:string):Promise<app.SnapshotRestoreResult>;
 
 export function ExportServersToFile(arg1:string):Promise<string>;
 
@@ -115,6 +121,8 @@ export function GetSecondaryTags(arg1:string):Promise<Array<string>>;
 
 export function GetServerStorage():Promise<app.ServerStorage>;
 
+export function GetSnapshotDirectory():Promise<string>;
+
 export function GetVPKFiles():Promise<Array<parser.VPKFile>>;
 
 export function GetVPKLoadOrder(arg1:string):Promise<number>;
@@ -167,6 +175,8 @@ export function LaunchL4D2():Promise<void>;
 
 export function LaunchL4D2ForProblemScan():Promise<void>;
 
+export function ListSnapshots():Promise<Array<app.SnapshotSummary>>;
+
 export function LoadSprayImportFiles(arg1:Array<string>):Promise<Array<app.SprayImportFilePayload>>;
 
 export function LogError(arg1:string,arg2:string,arg3:string):Promise<void>;
@@ -183,11 +193,17 @@ export function MoveWorkshopToAddons(arg1:string):Promise<void>;
 
 export function OpenFileLocation(arg1:string):Promise<void>;
 
+export function OpenSnapshotDirectory():Promise<void>;
+
 export function PackVPKDirectory(arg1:string,arg2:string,arg3:boolean):Promise<app.VPKPackResult>;
 
 export function ParseMDMPFile(arg1:string):Promise<minidump.Report>;
 
 export function ParseWorkshopID(arg1:string):Promise<string>;
+
+export function PreviewSnapshotRestore(arg1:string):Promise<app.SnapshotRestorePlan>;
+
+export function RenameSnapshot(arg1:string,arg2:string):Promise<void>;
 
 export function RenameVPKFile(arg1:string,arg2:string):Promise<string>;
 
@@ -238,6 +254,8 @@ export function SetAddonListOrder(arg1:Array<string>):Promise<void>;
 export function SetModRotation(arg1:app.RotationConfig):Promise<void>;
 
 export function SetRootDirectory(arg1:string):Promise<void>;
+
+export function SetSnapshotDirectory(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetVPKLoadOrder(arg1:string,arg2:number):Promise<void>;
 

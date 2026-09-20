@@ -80,6 +80,7 @@ export namespace app {
 	    ignoredVersion: string;
 	    lastUpdateCheckTime: string;
 	    windowState?: WindowState;
+	    snapshotDirectory?: string;
 	    migrationVersion: number;
 	
 	    static createFrom(source: any = {}) {
@@ -109,6 +110,7 @@ export namespace app {
 	        this.ignoredVersion = source["ignoredVersion"];
 	        this.lastUpdateCheckTime = source["lastUpdateCheckTime"];
 	        this.windowState = this.convertValues(source["windowState"], WindowState);
+	        this.snapshotDirectory = source["snapshotDirectory"];
 	        this.migrationVersion = source["migrationVersion"];
 	    }
 	
@@ -879,6 +881,198 @@ export namespace app {
 		    }
 		    return a;
 		}
+	}
+	export class SnapshotRestoreFile {
+	    kind: string;
+	    fileName: string;
+	    detail: string;
+	    size?: number;
+	    destructive?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnapshotRestoreFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.fileName = source["fileName"];
+	        this.detail = source["detail"];
+	        this.size = source["size"];
+	        this.destructive = source["destructive"];
+	    }
+	}
+	export class SnapshotRestoreAction {
+	    kind: string;
+	    kinds: string[];
+	    modName: string;
+	    fileName: string;
+	    detail: string;
+	    size?: number;
+	    destructive?: boolean;
+	    files: SnapshotRestoreFile[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SnapshotRestoreAction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.kinds = source["kinds"];
+	        this.modName = source["modName"];
+	        this.fileName = source["fileName"];
+	        this.detail = source["detail"];
+	        this.size = source["size"];
+	        this.destructive = source["destructive"];
+	        this.files = this.convertValues(source["files"], SnapshotRestoreFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class SnapshotRestoreSummary {
+	    enableCount: number;
+	    disableCount: number;
+	    overwriteCount: number;
+	    addCount: number;
+	    skipCount: number;
+	    missingCount: number;
+	    sidecarCount: number;
+	    addonListChange: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnapshotRestoreSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enableCount = source["enableCount"];
+	        this.disableCount = source["disableCount"];
+	        this.overwriteCount = source["overwriteCount"];
+	        this.addCount = source["addCount"];
+	        this.skipCount = source["skipCount"];
+	        this.missingCount = source["missingCount"];
+	        this.sidecarCount = source["sidecarCount"];
+	        this.addonListChange = source["addonListChange"];
+	    }
+	}
+	export class SnapshotRestorePlan {
+	    id: string;
+	    snapshotId: string;
+	    snapshotName: string;
+	    snapshotType: string;
+	    sourceRoot: string;
+	    targetRoot: string;
+	    generatedAt: string;
+	    canExecute: boolean;
+	    blockers: string[];
+	    warnings: string[];
+	    summary: SnapshotRestoreSummary;
+	    actions: SnapshotRestoreAction[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SnapshotRestorePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.snapshotId = source["snapshotId"];
+	        this.snapshotName = source["snapshotName"];
+	        this.snapshotType = source["snapshotType"];
+	        this.sourceRoot = source["sourceRoot"];
+	        this.targetRoot = source["targetRoot"];
+	        this.generatedAt = source["generatedAt"];
+	        this.canExecute = source["canExecute"];
+	        this.blockers = source["blockers"];
+	        this.warnings = source["warnings"];
+	        this.summary = this.convertValues(source["summary"], SnapshotRestoreSummary);
+	        this.actions = this.convertValues(source["actions"], SnapshotRestoreAction);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SnapshotRestoreResult {
+	    planId: string;
+	    message: string;
+	    warnings: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SnapshotRestoreResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.planId = source["planId"];
+	        this.message = source["message"];
+	        this.warnings = source["warnings"];
+	    }
+	}
+	
+	export class SnapshotSummary {
+	    id: string;
+	    name: string;
+	    type: string;
+	    createdAt: string;
+	    sourceRoot: string;
+	    itemCount: number;
+	    totalBytes: number;
+	    directory: string;
+	    hasAddonList: boolean;
+	    corrupt: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SnapshotSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.createdAt = source["createdAt"];
+	        this.sourceRoot = source["sourceRoot"];
+	        this.itemCount = source["itemCount"];
+	        this.totalBytes = source["totalBytes"];
+	        this.directory = source["directory"];
+	        this.hasAddonList = source["hasAddonList"];
+	        this.corrupt = source["corrupt"];
+	        this.error = source["error"];
+	    }
 	}
 	export class SprayFilePayload {
 	    name: string;

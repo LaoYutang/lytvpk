@@ -77,6 +77,8 @@ type App struct {
 	singletonMgr           *SingletonManager // 单例管理器
 	serverStorageMu        sync.Mutex
 	workshopHistoryMu      sync.Mutex
+	snapshotMu             sync.Mutex
+	pendingRestorePlan     *snapshotPendingRestorePlan
 
 	// 配置项
 	modRotationConfig              RotationConfig
@@ -107,6 +109,7 @@ type App struct {
 	workshopWatchLaterPath         string
 	problemScanPath                string
 	workshopHistoryPath            string
+	snapshotDirectory              string
 }
 
 // ConfigFile 定义配置文件结构
@@ -132,6 +135,7 @@ type ConfigFile struct {
 	IgnoredVersion                 string           `json:"ignoredVersion"`
 	LastUpdateCheckTime            string           `json:"lastUpdateCheckTime"`
 	WindowState                    *WindowState     `json:"windowState,omitempty"`
+	SnapshotDirectory              string           `json:"snapshotDirectory,omitempty"`
 	// migrationVersion=2 表示前端 localStorage 配置已迁移到配置目录。
 	MigrationVersion int `json:"migrationVersion"`
 }

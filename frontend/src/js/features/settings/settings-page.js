@@ -2,6 +2,7 @@ const SETTINGS_NAV_ICONS = {
   network: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>`,
   interface: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/></svg>`,
   workshop: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/></svg>`,
+  storage: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg>`,
 };
 
 export async function renderSettingsPage({
@@ -12,6 +13,11 @@ export async function renderSettingsPage({
   renderTagFilters,
   refreshFilesKeepFilter,
   showNotification,
+  showError,
+  SelectDirectory,
+  GetSnapshotDirectory,
+  SetSnapshotDirectory,
+  OpenSnapshotDirectory,
   GetWorkshopPreferredIP,
   GetWorkshopFixedIP,
   GetWorkshopIPOptions,
@@ -251,6 +257,18 @@ export async function renderSettingsPage({
       </div>
     </div>
   `;
+
+  await appendSnapshotStoragePanel(container, {
+    SelectDirectory,
+    GetSnapshotDirectory,
+    SetSnapshotDirectory,
+    OpenSnapshotDirectory,
+    getConfig,
+    saveConfig,
+    showNotification,
+    showError,
+    EventsOn,
+  });
 
   bindSettingsPage({
     enabled,
@@ -809,6 +827,288 @@ function enhanceSettingsNav() {
   requestAnimationFrame(() => updateSettingsNavIndicator(true));
 }
 
+async function appendSnapshotStoragePanel(container, deps) {
+  const sidebar = container.querySelector(".settings-sidebar");
+  const track = container.querySelector(".settings-panels-track");
+  if (!sidebar || !track) return;
+
+  const nav = document.createElement("button");
+  nav.className = "settings-nav-item";
+  nav.dataset.panel = "storage";
+  nav.textContent = "存储设置";
+  sidebar.appendChild(nav);
+
+  const panel = document.createElement("div");
+  panel.className = "settings-panel";
+  panel.id = "settings-panel-storage";
+
+  const card = document.createElement("div");
+  card.className = "setting-card";
+  const cardTitle = document.createElement("div");
+  cardTitle.className = "setting-card-title";
+  cardTitle.textContent = "Mod 快照";
+
+  const row = document.createElement("div");
+  row.className = "setting-row snapshot-storage-row";
+  const info = document.createElement("div");
+  info.className = "setting-row-info";
+  const label = document.createElement("div");
+  label.className = "setting-row-label";
+  label.textContent = "快照存储位置";
+  const desc = document.createElement("div");
+  desc.className = "setting-row-desc";
+  desc.textContent = "文件名快照和完整备份默认保存在配置目录，可自定义到空间充足的位置。";
+  const pathText = document.createElement("div");
+  pathText.className = "snapshot-storage-path";
+  info.append(label, desc, pathText);
+
+  const controls = document.createElement("div");
+  controls.className = "snapshot-storage-controls";
+  const chooseButton = document.createElement("button");
+  chooseButton.type = "button";
+  chooseButton.className = "btn btn-outline btn-small";
+  chooseButton.textContent = "选择目录";
+  const resetButton = document.createElement("button");
+  resetButton.type = "button";
+  resetButton.className = "btn btn-outline btn-small";
+  resetButton.textContent = "恢复默认";
+  const openButton = document.createElement("button");
+  openButton.type = "button";
+  openButton.className = "btn btn-secondary btn-small";
+  openButton.textContent = "打开文件夹";
+  controls.append(chooseButton, resetButton, openButton);
+  row.append(info, controls);
+  card.append(cardTitle, row);
+  panel.appendChild(card);
+  track.appendChild(panel);
+
+  const refreshPath = async () => {
+    try {
+      const path = await deps.GetSnapshotDirectory();
+      pathText.textContent = path || "尚未设置";
+    } catch (error) {
+      pathText.textContent = "无法读取快照目录";
+      deps.showError?.("读取快照目录失败: " + formatError(error));
+    }
+  };
+
+  const applySnapshotDirectoryChange = async (path, targetLabel, successMessage) => {
+    const migrate = await showSnapshotStorageChoice(targetLabel, async (updateProgress) => {
+      const cleanup = typeof deps.EventsOn === "function"
+        ? deps.EventsOn("snapshot_migration_progress", updateProgress)
+        : null;
+      try {
+        await deps.SetSnapshotDirectory(path, true);
+      } finally {
+        if (typeof cleanup === "function") cleanup();
+      }
+    });
+    if (migrate === null) return;
+    if (!migrate) {
+      await deps.SetSnapshotDirectory(path, false);
+    }
+
+    const config = deps.getConfig();
+    config.snapshotDirectory = path;
+    await deps.saveConfig(config);
+    await refreshPath();
+    deps.showNotification(successMessage, "success");
+  };
+
+  chooseButton.addEventListener("click", async () => {
+    try {
+      const selected = await deps.SelectDirectory();
+      if (!selected) return;
+      await applySnapshotDirectoryChange(selected, selected, "快照存储位置已更新");
+    } catch (error) {
+      deps.showError?.("更新快照存储位置失败: " + formatError(error));
+    }
+  });
+
+  resetButton.addEventListener("click", async () => {
+    try {
+      await applySnapshotDirectoryChange("", "默认目录", "已恢复默认快照存储位置");
+    } catch (error) {
+      deps.showError?.("恢复默认快照目录失败: " + formatError(error));
+    }
+  });
+
+  openButton.addEventListener("click", async () => {
+    try {
+      await deps.OpenSnapshotDirectory();
+    } catch (error) {
+      deps.showError?.("打开快照目录失败: " + formatError(error));
+    }
+  });
+
+  await refreshPath();
+}
+
+function showSnapshotStorageChoice(target, onMigrate) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal snapshot-storage-choice-modal";
+    overlay.style.zIndex = "30000";
+    const content = document.createElement("div");
+    content.className = "modal-content snapshot-storage-choice-content";
+    const header = document.createElement("div");
+    header.className = "modal-header";
+    const title = document.createElement("h2");
+    title.textContent = "切换快照存储位置";
+    header.appendChild(title);
+    const body = document.createElement("div");
+    body.className = "modal-body";
+    const text = document.createElement("p");
+    text.textContent = `新位置：${target}。是否迁移当前位置中的已有快照？`;
+
+    const progress = document.createElement("div");
+    progress.className = "snapshot-migration-progress hidden";
+    progress.setAttribute("aria-live", "polite");
+    const progressHead = document.createElement("div");
+    progressHead.className = "snapshot-migration-progress-head";
+    const spinner = document.createElement("span");
+    spinner.className = "snapshot-migration-spinner";
+    spinner.setAttribute("aria-hidden", "true");
+    const progressMessage = document.createElement("span");
+    progressMessage.className = "snapshot-migration-message";
+    progressMessage.textContent = "正在启动迁移...";
+    const progressCount = document.createElement("span");
+    progressCount.className = "snapshot-migration-count";
+    progressHead.append(spinner, progressMessage, progressCount);
+    const progressBar = document.createElement("div");
+    progressBar.className = "snapshot-migration-bar";
+    const progressFill = document.createElement("div");
+    progressFill.className = "snapshot-migration-fill is-indeterminate";
+    progressBar.appendChild(progressFill);
+    const progressFile = document.createElement("div");
+    progressFile.className = "snapshot-migration-file";
+    progress.append(progressHead, progressBar, progressFile);
+
+    const errorText = document.createElement("div");
+    errorText.className = "snapshot-migration-error hidden";
+    errorText.setAttribute("role", "alert");
+    body.append(text, errorText, progress);
+    const footer = document.createElement("div");
+    footer.className = "modal-footer snapshot-storage-choice-footer";
+
+    let busy = false;
+    const finish = (value) => {
+      if (!overlay.isConnected) return;
+      overlay.remove();
+      resolve(value);
+    };
+    const setButtonsDisabled = (disabled) => {
+      cancel.disabled = disabled;
+      keep.disabled = disabled;
+      migrate.disabled = disabled;
+    };
+    const updateProgress = (info) => {
+      const current = Math.max(0, Number(info?.current || 0));
+      const total = Math.max(0, Number(info?.total || 0));
+      const bytesDone = Math.max(0, Number(info?.bytesDone || 0));
+      const bytesTotal = Math.max(0, Number(info?.bytesTotal || 0));
+      if (info?.message) progressMessage.textContent = info.message;
+
+      let percent = 0;
+      let determinate = false;
+      if (bytesTotal > 0) {
+        percent = (bytesDone / bytesTotal) * 100;
+        determinate = true;
+      } else if (total > 0) {
+        percent = (current / total) * 100;
+        determinate = true;
+      }
+
+      progressFill.classList.toggle("is-indeterminate", !determinate);
+      progressFill.style.width = determinate ? `${Math.max(0, Math.min(100, percent))}%` : "";
+      if (bytesTotal > 0) {
+        progressCount.textContent = `${formatProgressBytes(bytesDone)} / ${formatProgressBytes(bytesTotal)}`;
+      } else if (total > 0) {
+        progressCount.textContent = `${current}/${total}`;
+      } else {
+        progressCount.textContent = "";
+      }
+      progressFile.textContent = info?.fileName || "";
+    };
+    const showMigrationError = (error) => {
+      busy = false;
+      setButtonsDisabled(false);
+      migrate.textContent = "重试迁移";
+      spinner.classList.add("hidden");
+      progressFill.classList.remove("is-indeterminate");
+      progressFill.style.width = "0%";
+      progressMessage.textContent = "迁移失败";
+      progressCount.textContent = "";
+      progressFile.textContent = "";
+      errorText.textContent = "迁移失败: " + formatError(error);
+      errorText.classList.remove("hidden");
+    };
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn-secondary";
+    cancel.textContent = "取消";
+    cancel.addEventListener("click", () => {
+      if (!busy) finish(null);
+    });
+    const keep = document.createElement("button");
+    keep.type = "button";
+    keep.className = "btn btn-outline";
+    keep.textContent = "仅用于后续快照";
+    keep.addEventListener("click", () => {
+      if (!busy) finish(false);
+    });
+    const migrate = document.createElement("button");
+    migrate.type = "button";
+    migrate.className = "btn btn-primary";
+    migrate.textContent = "迁移已有快照";
+    migrate.addEventListener("click", async () => {
+      if (busy) return;
+      if (typeof onMigrate !== "function") {
+        finish(true);
+        return;
+      }
+
+      busy = true;
+      setButtonsDisabled(true);
+      migrate.textContent = "正在迁移...";
+      spinner.classList.remove("hidden");
+      errorText.classList.add("hidden");
+      errorText.textContent = "";
+      progress.classList.remove("hidden");
+      progressMessage.textContent = "正在启动迁移...";
+      progressCount.textContent = "";
+      progressFile.textContent = "";
+      progressFill.classList.add("is-indeterminate");
+      progressFill.style.width = "";
+      try {
+        await onMigrate(updateProgress);
+        finish(true);
+      } catch (error) {
+        showMigrationError(error);
+      }
+    });
+    footer.append(cancel, keep, migrate);
+
+    content.append(header, body, footer);
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+  });
+}
+
+function formatProgressBytes(value) {
+  const bytes = Math.max(0, Number(value) || 0);
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  let size = bytes / 1024;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  const digits = size >= 100 ? 0 : size >= 10 ? 1 : 2;
+  return `${size.toFixed(digits)} ${units[unitIndex]}`;
+}
+
 function updateSettingsNavIndicator(skipTransition = false) {
   const sidebar = document.querySelector("#settings-page-content .settings-sidebar");
   const indicator = sidebar?.querySelector(".settings-active-indicator");
@@ -861,4 +1161,8 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function formatError(error) {
+  return String(error?.message || error || "未知错误");
 }

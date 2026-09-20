@@ -58,8 +58,16 @@ export function ConnectToServer(arg1) {
   return window['go']['app']['App']['ConnectToServer'](arg1);
 }
 
+export function CreateSnapshot(arg1, arg2) {
+  return window['go']['app']['App']['CreateSnapshot'](arg1, arg2);
+}
+
 export function DeletePanelMapFile(arg1, arg2) {
   return window['go']['app']['App']['DeletePanelMapFile'](arg1, arg2);
+}
+
+export function DeleteSnapshot(arg1) {
+  return window['go']['app']['App']['DeleteSnapshot'](arg1);
 }
 
 export function DeleteVPKFile(arg1) {
@@ -72,6 +80,10 @@ export function DeleteVPKFiles(arg1) {
 
 export function DoUpdate(arg1) {
   return window['go']['app']['App']['DoUpdate'](arg1);
+}
+
+export function ExecuteSnapshotRestore(arg1) {
+  return window['go']['app']['App']['ExecuteSnapshotRestore'](arg1);
 }
 
 export function ExportServersToFile(arg1) {
@@ -222,6 +234,10 @@ export function GetServerStorage() {
   return window['go']['app']['App']['GetServerStorage']();
 }
 
+export function GetSnapshotDirectory() {
+  return window['go']['app']['App']['GetSnapshotDirectory']();
+}
+
 export function GetVPKFiles() {
   return window['go']['app']['App']['GetVPKFiles']();
 }
@@ -326,6 +342,10 @@ export function LaunchL4D2ForProblemScan() {
   return window['go']['app']['App']['LaunchL4D2ForProblemScan']();
 }
 
+export function ListSnapshots() {
+  return window['go']['app']['App']['ListSnapshots']();
+}
+
 export function LoadSprayImportFiles(arg1) {
   return window['go']['app']['App']['LoadSprayImportFiles'](arg1);
 }
@@ -358,6 +378,10 @@ export function OpenFileLocation(arg1) {
   return window['go']['app']['App']['OpenFileLocation'](arg1);
 }
 
+export function OpenSnapshotDirectory() {
+  return window['go']['app']['App']['OpenSnapshotDirectory']();
+}
+
 export function PackVPKDirectory(arg1, arg2, arg3) {
   return window['go']['app']['App']['PackVPKDirectory'](arg1, arg2, arg3);
 }
@@ -368,6 +392,14 @@ export function ParseMDMPFile(arg1) {
 
 export function ParseWorkshopID(arg1) {
   return window['go']['app']['App']['ParseWorkshopID'](arg1);
+}
+
+export function PreviewSnapshotRestore(arg1) {
+  return window['go']['app']['App']['PreviewSnapshotRestore'](arg1);
+}
+
+export function RenameSnapshot(arg1, arg2) {
+  return window['go']['app']['App']['RenameSnapshot'](arg1, arg2);
 }
 
 export function RenameVPKFile(arg1, arg2) {
@@ -468,6 +500,10 @@ export function SetModRotation(arg1) {
 
 export function SetRootDirectory(arg1) {
   return window['go']['app']['App']['SetRootDirectory'](arg1);
+}
+
+export function SetSnapshotDirectory(arg1, arg2) {
+  return window['go']['app']['App']['SetSnapshotDirectory'](arg1, arg2);
 }
 
 export function SetVPKLoadOrder(arg1, arg2) {

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snapshot Tool Preview Harness</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="confirm-modal" class="modal hidden" style="z-index: 20000">
+      <div class="modal-content confirm-modal-content">
+        <div class="modal-header">
+          <h2 id="confirm-title">确认</h2>
+          <button id="close-confirm-modal-btn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="confirm-message" class="confirm-message"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="confirm-cancel-btn" class="btn btn-secondary">取消</button>
+          <button id="confirm-ok-btn" class="btn btn-primary">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ---- Wails 运行时 mock（必须在模块加载前就绪） ----
+      const eventHandlers = new Map();
+      window.runtime = {
+        EventsOnMultiple(eventName, callback) {
+          return window.runtime.EventsOn(eventName, callback);
+        },
+        EventsOn(eventName, callback) {
+          const list = eventHandlers.get(eventName) || [];
+          list.push(callback);
+          eventHandlers.set(eventName, list);
+          return () => {
+            const current = eventHandlers.get(eventName) || [];
+            eventHandlers.set(
+              eventName,
+              current.filter((cb) => cb !== callback)
+            );
+          };
+        },
+        EventsEmit() {},
+        EventsOff() {},
+        LogPrint() {},
+      };
+      window.__emit = (eventName, payload) => {
+        (eventHandlers.get(eventName) || []).forEach((cb) => cb(payload));
+      };
+
+      const params = new URLSearchParams(location.search);
+      const scenario = params.get("view") || "list";
+
+      const demoSnapshots = [
+        {
+          id: "20260918-193022",
+          name: "完整备份 2026-09-18 19-30",
+          type: "full",
+          createdAt: "2026-09-18T19:30:22+08:00",
+          sourceRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+          itemCount: 42,
+          totalBytes: 3_820_000_000,
+          directory: "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots\\20260918-193022",
+          hasAddonList: true,
+        },
+        {
+          id: "20260917-221145",
+          name: "文件名快照 2026-09-17 22-11",
+          type: "filename",
+          createdAt: "2026-09-17T22:11:45+08:00",
+          sourceRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+          itemCount: 38,
+          totalBytes: 4_096,
+          directory: "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots\\20260917-221145",
+          hasAddonList: true,
+        },
+        {
+          id: "20260915-085512",
+          name: "整理前备份（战役地图全量）",
+          type: "full",
+          createdAt: "2026-09-15T08:55:12+08:00",
+          sourceRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+          itemCount: 57,
+          totalBytes: 8_240_000_000,
+          directory: "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots\\20260915-085512",
+          hasAddonList: true,
+        },
+        {
+          id: "20260912-204033",
+          name: "文件名快照 2026-09-12 20-40",
+          type: "filename",
+          createdAt: "2026-09-12T20:40:33+08:00",
+          sourceRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+          itemCount: 35,
+          totalBytes: 3_584,
+          directory: "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots\\20260912-204033",
+          hasAddonList: false,
+        },
+        {
+          id: "20260910-113044",
+          name: "一个名字特别特别特别长的快照用来测试省略号显示效果好不好",
+          type: "filename",
+          createdAt: "2026-09-10T11:30:44+08:00",
+          sourceRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+          itemCount: 12,
+          totalBytes: 2_048,
+          directory: "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots\\20260910-113044",
+          hasAddonList: true,
+        },
+        {
+          id: "20260901-090011",
+          name: "旧备份",
+          type: "full",
+          createdAt: "2026-09-01T09:00:11+08:00",
+          sourceRoot: "",
+          itemCount: 0,
+          totalBytes: 0,
+          directory: "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots\\20260901-090011",
+          corrupt: true,
+          error: "manifest.json 解析失败: unexpected end of JSON input",
+        },
+      ];
+
+      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      // 恢复预览按 Mod 分组：VPK 与同名图片、.meta 属于同一项。
+      const modAction = (kind, kinds, modName, files, extra = {}) => ({
+        kind,
+        kinds,
+        modName,
+        fileName: modName,
+        size: files.reduce((sum, file) => sum + (file.size || 0), 0),
+        destructive: files.some((file) => file.destructive),
+        files,
+        ...extra,
+      });
+
+      const restorePlan = (blocked) => ({
+        id: "plan-demo-1",
+        snapshotId: "20260918-193022",
+        snapshotName: "完整备份 2026-09-18 19-30",
+        snapshotType: "full",
+        sourceRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+        targetRoot: "D:\\SteamLibrary\\steamapps\\common\\Left 4 Dead 2\\left4dead2\\addons",
+        generatedAt: new Date().toISOString(),
+        canExecute: !blocked,
+        blockers: blocked
+          ? ["Left 4 Dead 2 正在运行，请关闭游戏后再恢复"]
+          : [],
+        warnings: [
+          "快照来自其他 addons 目录，恢复将按当前目录名称匹配文件",
+          "2 个文件在快照创建后被修改，恢复将覆盖这些改动",
+        ],
+        summary: {
+          enableCount: 5,
+          disableCount: 3,
+          addCount: 2,
+          overwriteCount: 4,
+          skipCount: 24,
+          missingCount: 1,
+          addonListChange: true,
+        },
+        actions: [
+          modAction("overwrite", ["skip", "overwrite", "disable"], "m60_doomskin.vpk", [
+            { kind: "skip", fileName: "m60_doomskin.vpk", detail: "当前文件与快照内容相同，跳过写入", size: 41_000_000 },
+            { kind: "overwrite", fileName: "m60_doomskin.jpg", detail: "当前文件与快照不同，将覆盖为快照版本", size: 120_000, destructive: true },
+            { kind: "disable", fileName: "m60_doomskin.meta", detail: "快照中不包含该侧车文件，将移动到 disabled", size: 1_400 },
+          ]),
+          modAction("enable", ["enable"], "2hu_gensokyo_defense.vpk", [
+            { kind: "enable", fileName: "2hu_gensokyo_defense.vpk", detail: "从 disabled 恢复到根目录", size: 482_000_000 },
+            { kind: "enable", fileName: "2hu_gensokyo_defense.jpg", detail: "同步恢复文件" },
+          ]),
+          modAction("enable", ["enable"], "ak47_neon_anomaly.vpk", [
+            { kind: "enable", fileName: "ak47_neon_anomaly.vpk", detail: "从 disabled 恢复到根目录", size: 36_200_000 },
+          ]),
+          modAction("disable", ["disable"], "old_crosshair_pack.vpk", [
+            { kind: "disable", fileName: "old_crosshair_pack.vpk", detail: "不在快照中，将移动到 disabled", size: 2_100_000 },
+          ]),
+          modAction("add", ["add"], "c5m2_park_night.vpk", [
+            { kind: "add", fileName: "c5m2_park_night.vpk", detail: "将从完整备份恢复到根目录", size: 312_000_000 },
+          ]),
+          modAction("add", ["add"], "zoey_remake_v3.vpk", [
+            { kind: "add", fileName: "zoey_remake_v3.vpk", detail: "将从完整备份恢复到根目录", size: 88_000_000 },
+            { kind: "add", fileName: "zoey_remake_v3.jpg", detail: "将从完整备份恢复到根目录", size: 240_000 },
+          ]),
+          modAction("overwrite", ["overwrite"], "safe_room_door_hd.vpk", [
+            { kind: "overwrite", fileName: "safe_room_door_hd.vpk", detail: "当前文件与快照不同，将覆盖为快照版本", size: 5_600_000, destructive: true },
+          ]),
+          modAction("missing", ["missing"], "deleted_campaign_map.vpk", [
+            { kind: "missing", fileName: "deleted_campaign_map.vpk", detail: "根目录和 disabled 中均未找到文件，无法恢复" },
+          ]),
+          modAction("skip", ["skip"], "hunter_training.vpk", [
+            { kind: "skip", fileName: "hunter_training.vpk", detail: "当前文件与快照内容相同，跳过写入", size: 12_000_000 },
+          ]),
+          {
+            kind: "addonlist",
+            kinds: ["addonlist"],
+            modName: "",
+            fileName: "addonlist.txt",
+            detail: "恢复快照中的加载顺序和启用状态",
+            size: 1_280,
+            destructive: true,
+            files: [
+              { kind: "addonlist", fileName: "addonlist.txt", detail: "恢复快照中的加载顺序和启用状态", size: 1_280, destructive: true },
+            ],
+          },
+        ],
+      });
+
+      window.go = {
+        app: {
+          App: {
+            async ListSnapshots() {
+              await delay(400);
+              return scenario === "empty" ? [] : demoSnapshots;
+            },
+            async GetSnapshotDirectory() {
+              return "C:\\Users\\PC\\AppData\\Roaming\\LytVPK\\snapshots";
+            },
+            async OpenSnapshotDirectory() {},
+            async CreateSnapshot(name, kind) {
+              const total = kind === "full" ? 42 : 38;
+              for (let i = 0; i <= total; i += 3) {
+                window.__emit("snapshot_progress", {
+                  current: Math.min(i, total),
+                  total,
+                  message: kind === "full" ? "正在打包快照文件" : "正在记录文件状态",
+                });
+                await delay(120);
+              }
+              return demoSnapshots[0];
+            },
+            async RenameSnapshot() {
+              await delay(400);
+            },
+            async DeleteSnapshot() {
+              await delay(400);
+            },
+            async PreviewSnapshotRestore() {
+              const total = 42;
+              for (let i = 0; i <= total; i += 6) {
+                window.__emit("snapshot_restore_progress", {
+                  current: Math.min(i, total),
+                  total,
+                  message: "正在检查快照文件",
+                });
+                await delay(100);
+              }
+              return restorePlan(scenario === "preview-blocked");
+            },
+            async ExecuteSnapshotRestore() {
+              await delay(3000);
+              return { message: "恢复完成", warnings: [] };
+            },
+          },
+        },
+      };
+    </script>
+
+    <script type="module">
+      import "./src/css/main.css";
+      import { appState } from "./src/js/features/state.js";
+      import { openSnapshotTool } from "./src/js/features/diagnostics/snapshot-tool.js";
+
+      const params = new URLSearchParams(location.search);
+      if (params.get("dark") === "1") {
+        document.documentElement.classList.add("dark-mode");
+      }
+      // 制造创意工坊 Mod 触发新建页警告
+      appState.allVpkFiles = [
+        { location: "workshop" },
+        { location: "workshop" },
+        { location: "workshop" },
+        { location: "addons" },
+      ];
+
+      await openSnapshotTool({});
+
+      const view = params.get("view");
+      if (view === "create" || view === "empty-create") {
+        document.querySelector(".snapshot-toolbar-actions .btn-primary")?.click()
+          || document.querySelector(".snapshot-empty .btn")?.click();
+      } else if (view === "rename") {
+        document.querySelectorAll(".snapshot-icon-btn")[0]?.click();
+      } else if (view === "preview" || view === "preview-blocked" || view === "execute") {
+        document.querySelector(".snapshot-row-actions .btn-primary")?.click();
+      }
+
+      if (view === "execute") {
+        setTimeout(() => {
+          const buttons = [...document.querySelectorAll(".snapshot-tool-footer-actions .btn-primary")];
+          buttons[0]?.click();
+        }, 1200);
+      }
+    </script>
+  </body>
+</html>

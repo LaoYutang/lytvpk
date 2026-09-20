@@ -35,6 +35,7 @@ const DEFAULT_CONFIG = {
   theme: "",
   ignoredVersion: "",
   lastUpdateCheckTime: "",
+  snapshotDirectory: "",
   migrationVersion: 0,
 };
 

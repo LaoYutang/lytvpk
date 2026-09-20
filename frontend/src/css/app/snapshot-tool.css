@@ -1,0 +1,1080 @@
+.diagnostics-tool-icon.is-snapshot {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+/* ==================== 弹窗骨架 ==================== */
+
+.snapshot-tool-content {
+  width: min(920px, calc(100vw - 32px));
+  height: min(680px, calc(100vh - 40px));
+  max-width: none;
+  max-height: calc(100vh - 24px);
+}
+
+.snapshot-tool-modal .icon-svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+}
+
+.snapshot-tool-modal.is-busy {
+  cursor: progress;
+}
+
+.snapshot-tool-header {
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.snapshot-back-btn {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.snapshot-back-btn:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.snapshot-back-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.snapshot-tool-heading {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.snapshot-tool-heading h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.12rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-tool-subtitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-tool-body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px 24px;
+}
+
+.snapshot-tool-footer {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 24px;
+}
+
+.snapshot-tool-footer-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-tool-footer-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+/* ==================== 进度条 ==================== */
+
+.snapshot-tool-progress {
+  display: grid;
+  gap: 8px;
+  padding: 10px 24px 14px;
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.snapshot-progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.snapshot-progress-message {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-progress-count {
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-progress-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-hover);
+}
+
+.snapshot-progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  transition: width var(--duration-200) var(--ease-out);
+}
+
+.snapshot-progress-fill.is-indeterminate {
+  width: 35%;
+  transition: none;
+  animation: snapshot-progress-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes snapshot-progress-slide {
+  0% {
+    margin-left: -35%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+
+/* ==================== 列表视图 ==================== */
+
+.snapshot-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.snapshot-search {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 140px;
+}
+
+.snapshot-search .icon-svg {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.snapshot-search .form-input {
+  width: 100%;
+  padding-left: 32px;
+}
+
+.snapshot-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.snapshot-toolbar-actions .btn .icon-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.snapshot-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.snapshot-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  transition: border-color var(--duration-150) var(--ease-out);
+}
+
+.snapshot-row:hover {
+  border-color: var(--border-strong);
+}
+
+.snapshot-row.is-corrupt {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.04);
+}
+
+.snapshot-row-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.snapshot-row-icon .icon-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.snapshot-row-icon.is-filename {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.snapshot-row-icon.is-full {
+  color: #0e7490;
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.snapshot-row-icon.is-corrupt {
+  color: var(--danger-dark);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.snapshot-row-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.snapshot-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.snapshot-row-title h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-type-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--primary-dark);
+  background: var(--primary-100);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.snapshot-type-badge.is-corrupt {
+  color: var(--danger-dark);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.snapshot-row-meta {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.snapshot-row-actions .btn .icon-svg {
+  width: 13px;
+  height: 13px;
+}
+
+.snapshot-icon-btn {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.snapshot-icon-btn .icon-svg {
+  width: 15px;
+  height: 15px;
+}
+
+.snapshot-icon-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.snapshot-icon-btn.is-danger:hover {
+  color: var(--danger-dark);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.snapshot-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 52px 24px;
+  border: 1px dashed var(--border-light);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.snapshot-empty-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.snapshot-empty-icon .icon-svg {
+  width: 26px;
+  height: 26px;
+}
+
+.snapshot-empty strong {
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.snapshot-empty p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.snapshot-empty .btn {
+  margin-top: 8px;
+}
+
+.snapshot-empty .btn .icon-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.snapshot-filter-empty {
+  padding: 36px 20px;
+  color: var(--text-tertiary);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+/* ==================== 新建 / 重命名视图 ==================== */
+
+.snapshot-create {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.snapshot-kind-selector {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.snapshot-kind-selector legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.snapshot-kind-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.snapshot-kind-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.snapshot-kind-option:hover {
+  border-color: var(--border-strong);
+}
+
+.snapshot-kind-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-50);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.snapshot-kind-option input {
+  flex: none;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.snapshot-kind-option-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.snapshot-kind-option-icon .icon-svg {
+  width: 17px;
+  height: 17px;
+}
+
+.snapshot-kind-option-icon.is-filename {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.snapshot-kind-option-icon.is-full {
+  color: #0e7490;
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.snapshot-kind-option-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.snapshot-kind-option-text strong {
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.snapshot-kind-option-text small {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.snapshot-kind-detail {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--primary-200);
+  border-radius: 10px;
+  background: var(--primary-50);
+}
+
+.snapshot-kind-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-dark);
+}
+
+.snapshot-kind-detail-title .icon-svg {
+  width: 14px;
+  height: 14px;
+}
+
+.snapshot-kind-detail-title strong {
+  font-size: 0.82rem;
+}
+
+.snapshot-kind-detail ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.snapshot-form-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 10px;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.1);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.snapshot-form-warning .icon-svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 2px;
+}
+
+.snapshot-name-field {
+  display: grid;
+  gap: 6px;
+}
+
+.snapshot-name-field .form-input {
+  width: 100%;
+}
+
+.snapshot-form-label {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* ==================== 恢复预览视图 ==================== */
+
+.snapshot-preview-intro {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.snapshot-actions-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.snapshot-actions-heading h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+}
+
+.snapshot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.snapshot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  font-family: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: all var(--duration-150) var(--ease-out);
+}
+
+.snapshot-chip strong {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-chip:hover {
+  border-color: var(--border-strong);
+}
+
+.snapshot-chip.is-active {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  background: var(--primary-100);
+}
+
+.snapshot-chip.is-active strong {
+  color: inherit;
+}
+
+.snapshot-action-list {
+  display: grid;
+  gap: 6px;
+}
+
+.snapshot-action-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-surface);
+}
+
+.snapshot-action-row.is-destructive {
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.snapshot-action-row.is-collapsible {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  cursor: pointer;
+  transition: border-color var(--duration-150) var(--ease-out);
+}
+
+.snapshot-action-row.is-collapsible:hover {
+  border-color: var(--border-strong);
+}
+
+.snapshot-action-row.is-collapsible:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.snapshot-action-chevron {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--text-muted);
+  transition: transform var(--duration-150) var(--ease-out);
+}
+
+.snapshot-action-chevron .icon-svg {
+  width: 15px;
+  height: 15px;
+}
+
+.snapshot-action-row.is-expanded .snapshot-action-chevron {
+  transform: rotate(180deg);
+}
+
+.snapshot-action-badge {
+  min-width: 44px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.snapshot-action-badge.is-enable {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.snapshot-action-badge.is-disable,
+.snapshot-action-badge.is-cleanup,
+.snapshot-action-badge.is-overwrite {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.snapshot-action-badge.is-add {
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.snapshot-action-badge.is-missing {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.snapshot-action-badge.is-addonlist {
+  color: #6d28d9;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.snapshot-action-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.snapshot-action-main strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-action-main span {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-action-size {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-action-files {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.snapshot-action-row:not(.is-expanded) .snapshot-action-files {
+  display: none;
+}
+
+.snapshot-file-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.snapshot-file-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.snapshot-file-main strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-file-main span {
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-file-size {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== 消息与加载 ==================== */
+
+.snapshot-message-box {
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+.snapshot-message-box.is-error {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.snapshot-message-box.is-warning {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.snapshot-message-box strong {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+}
+
+.snapshot-message-box ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.snapshot-message {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+.snapshot-message.is-error {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.snapshot-message strong {
+  color: var(--text-primary);
+}
+
+.snapshot-message p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.snapshot-loading {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 240px;
+  color: var(--text-tertiary);
+}
+
+.snapshot-loading strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.snapshot-loading p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+/* ==================== 深色模式 ==================== */
+
+html.dark-mode .snapshot-form-warning {
+  color: #fcd34d;
+}
+
+html.dark-mode .snapshot-kind-detail {
+  border-color: var(--primary-200);
+}
+
+html.dark-mode .snapshot-action-badge.is-enable {
+  color: #6ee7b7;
+}
+
+html.dark-mode .snapshot-action-badge.is-disable,
+html.dark-mode .snapshot-action-badge.is-cleanup,
+html.dark-mode .snapshot-action-badge.is-overwrite {
+  color: #fca5a5;
+}
+
+html.dark-mode .snapshot-action-badge.is-add {
+  color: #93c5fd;
+}
+
+html.dark-mode .snapshot-action-badge.is-missing {
+  color: #fcd34d;
+}
+
+html.dark-mode .snapshot-action-badge.is-addonlist {
+  color: #c4b5fd;
+}
+
+html.dark-mode .snapshot-kind-detail-title {
+  color: var(--primary-light);
+}
+
+/* ==================== 设置页快照存储（保持兼容） ==================== */
+
+.snapshot-storage-row {
+  align-items: flex-start;
+}
+
+.snapshot-storage-path {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text-primary);
+  background: var(--bg-app);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.snapshot-storage-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.snapshot-storage-choice-content {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.snapshot-storage-choice-footer {
+  flex-wrap: wrap;
+}
+
+.snapshot-migration-progress {
+  display: grid;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-app);
+}
+
+.snapshot-migration-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.snapshot-migration-spinner {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: snapshot-migration-spin 0.8s linear infinite;
+}
+
+.snapshot-migration-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-migration-count {
+  flex: none;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-migration-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-hover);
+}
+
+.snapshot-migration-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  transition: width var(--duration-200) var(--ease-out);
+}
+
+.snapshot-migration-fill.is-indeterminate {
+  width: 35%;
+  transition: none;
+  animation: snapshot-progress-slide 1.1s ease-in-out infinite;
+}
+
+.snapshot-migration-file {
+  min-height: 1em;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-migration-error {
+  margin-top: 12px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: 8px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+@keyframes snapshot-migration-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==================== 窄屏适配 ==================== */
+
+@media (max-width: 720px) {
+  .snapshot-kind-options {
+    grid-template-columns: 1fr;
+  }
+
+  .snapshot-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .snapshot-search {
+    flex: 1 1 100%;
+  }
+
+  .snapshot-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .snapshot-row-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .snapshot-tool-footer {
+    flex-wrap: wrap;
+  }
+
+  .snapshot-tool-footer-status {
+    order: 2;
+    flex-basis: 100%;
+  }
+
+  .snapshot-storage-controls {
+    justify-content: flex-start;
+  }
+}

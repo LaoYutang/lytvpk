@@ -120,6 +120,7 @@ func (a *App) loadConfig() {
 	a.theme = config.Theme
 	a.ignoredVersion = config.IgnoredVersion
 	a.lastUpdateCheckTime = config.LastUpdateCheckTime
+	a.snapshotDirectory = strings.TrimSpace(config.SnapshotDirectory)
 	if config.WindowState != nil && config.WindowState.Width > 0 && config.WindowState.Height > 0 {
 		a.windowState = *config.WindowState
 	}
@@ -178,6 +179,7 @@ func (a *App) snapshotConfig() ConfigFile {
 		IgnoredVersion:                 a.ignoredVersion,
 		LastUpdateCheckTime:            a.lastUpdateCheckTime,
 		WindowState:                    windowState,
+		SnapshotDirectory:              a.snapshotDirectory,
 		MigrationVersion:               a.migrationVersion,
 	}
 }
@@ -223,6 +225,7 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.theme = config.Theme
 	a.ignoredVersion = config.IgnoredVersion
 	a.lastUpdateCheckTime = config.LastUpdateCheckTime
+	a.snapshotDirectory = strings.TrimSpace(config.SnapshotDirectory)
 	if config.WorkshopTranslateProvider != nil {
 		provider, err := normalizeWorkshopTranslateProvider(*config.WorkshopTranslateProvider)
 		if err != nil {

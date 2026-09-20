@@ -16,6 +16,7 @@ import { renderDiagnosticsPage } from "./diagnostics/diagnostics-page.js";
 import { openVPKUnpackTool } from "./diagnostics/vpk-unpack.js";
 import { openMDMPReportTool } from "./diagnostics/mdmp-report.js";
 import { openVPKPackTool } from "./diagnostics/vpk-pack.js";
+import { openSnapshotTool } from "./diagnostics/snapshot-tool.js";
 import {
   importSprayFiles,
   importSprayPaths,
@@ -221,6 +222,10 @@ import {
   GetWorkshopWatchLaterStorage,
   SaveWorkshopWatchLaterStorage,
   GetProblemModScanSession,
+  SelectDirectory,
+  GetSnapshotDirectory,
+  SetSnapshotDirectory,
+  OpenSnapshotDirectory,
 } from "../../../wailsjs/go/app/App";
 
 import {
@@ -327,6 +332,11 @@ configureSettings({
   renderTagFilters,
   refreshFilesKeepFilter,
   showNotification,
+  showError,
+  SelectDirectory,
+  GetSnapshotDirectory,
+  SetSnapshotDirectory,
+  OpenSnapshotDirectory,
   renderSettingsPage,
   GetWorkshopPreferredIP,
   GetWorkshopFixedIP,
@@ -597,6 +607,7 @@ function setupSettingsAndAboutListeners() {
         openMDMPReportTool,
         openVPKPackTool,
         openSprayTool,
+        openSnapshotTool,
         refreshFilesKeepFilter,
       });
     } else if (page === "about") {

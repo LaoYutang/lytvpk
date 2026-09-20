@@ -5,6 +5,11 @@ let renderFileList;
 let renderTagFilters;
 let refreshFilesKeepFilter;
 let showNotification;
+let showError;
+let SelectDirectory;
+let GetSnapshotDirectory;
+let SetSnapshotDirectory;
+let OpenSnapshotDirectory;
 let renderSettingsPage;
 let GetWorkshopPreferredIP;
 let GetWorkshopFixedIP;
@@ -33,7 +38,7 @@ let EventsOn;
 let switchAppPage;
 
 export function configureSettings(deps) {
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, GetWorkshopTranslateCustomBaseURL, GetWorkshopTranslateCustomModelId, HasWorkshopTranslateCustomAPIKey, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, SetWorkshopTranslateCustomBaseURL, SetWorkshopTranslateCustomModelId, SetWorkshopTranslateCustomAPIKey, CheckModUpdates, EventsOn, switchAppPage } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, showError, SelectDirectory, GetSnapshotDirectory, SetSnapshotDirectory, OpenSnapshotDirectory, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, GetWorkshopTranslateCustomBaseURL, GetWorkshopTranslateCustomModelId, HasWorkshopTranslateCustomAPIKey, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, SetWorkshopTranslateCustomBaseURL, SetWorkshopTranslateCustomModelId, SetWorkshopTranslateCustomAPIKey, CheckModUpdates, EventsOn, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -51,6 +56,11 @@ export async function renderSettingsPageWithDeps() {
       renderTagFilters,
       refreshFilesKeepFilter,
       showNotification,
+      showError,
+      SelectDirectory,
+      GetSnapshotDirectory,
+      SetSnapshotDirectory,
+      OpenSnapshotDirectory,
       GetWorkshopPreferredIP,
       GetWorkshopFixedIP,
       GetWorkshopIPOptions,
