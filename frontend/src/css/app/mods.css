@@ -44,6 +44,24 @@
   border-color: rgba(79, 70, 229, 0.32);
 }
 
+.load-order-row.is-added {
+  border-color: rgba(16, 185, 129, 0.58);
+  background-color: rgba(16, 185, 129, 0.14);
+  box-shadow: inset 4px 0 0 var(--success);
+}
+
+.load-order-row.is-invalid {
+  cursor: not-allowed;
+  border-color: rgba(239, 68, 68, 0.56);
+  background-color: rgba(239, 68, 68, 0.14);
+  box-shadow: inset 4px 0 0 var(--danger);
+  opacity: 0.92;
+}
+
+.load-order-row.is-invalid:hover {
+  border-color: rgba(239, 68, 68, 0.68);
+}
+
 /* 拖动中的条目：跟手、轻微模糊并抬升；transition: none 保证跟手不延迟 */
 .load-order-row.is-dragging {
   position: relative;
@@ -89,6 +107,16 @@
 
 .load-order-drag-handle:active {
   cursor: grabbing;
+}
+
+.load-order-drag-handle.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.load-order-drag-handle.is-disabled:hover {
+  background: transparent;
+  color: var(--text-tertiary);
 }
 
 .load-order-row-index {
@@ -137,6 +165,43 @@
   color: var(--text-secondary);
 }
 
+.load-order-row.is-added .load-order-row-index,
+.load-order-row.is-added .load-order-row-name {
+  color: var(--success-dark);
+}
+
+.load-order-row.is-added .load-order-row-title {
+  color: var(--success-dark);
+}
+
+.load-order-row.is-added .load-order-row-location {
+  border-color: rgba(16, 185, 129, 0.38);
+  background-color: rgba(16, 185, 129, 0.16);
+  color: var(--success-dark);
+}
+
+.load-order-row.is-added .load-order-drag-handle,
+.load-order-row.is-added .load-order-action:not(:disabled) {
+  color: var(--success-dark);
+}
+
+.load-order-row.is-invalid .load-order-row-index,
+.load-order-row.is-invalid .load-order-row-name,
+.load-order-row.is-invalid .load-order-row-title {
+  color: var(--danger-dark);
+}
+
+.load-order-row.is-invalid .load-order-row-location {
+  border-color: rgba(239, 68, 68, 0.38);
+  background-color: rgba(239, 68, 68, 0.16);
+  color: var(--danger-dark);
+}
+
+.load-order-row.is-invalid .load-order-drag-handle,
+.load-order-row.is-invalid .load-order-action:disabled {
+  color: var(--danger-dark);
+}
+
 .load-order-row-actions {
   flex: 0 0 auto;
   display: flex;
@@ -166,6 +231,43 @@
   border-color: rgba(79, 70, 229, 0.32);
   background: var(--primary-50);
   color: var(--primary);
+}
+
+.load-order-action:disabled,
+.load-order-action:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+html.dark-mode .load-order-row.is-added {
+  border-color: rgba(52, 211, 153, 0.5);
+  background-color: rgba(16, 185, 129, 0.19);
+}
+
+html.dark-mode .load-order-row.is-invalid {
+  border-color: rgba(248, 113, 113, 0.5);
+  background-color: rgba(239, 68, 68, 0.18);
+}
+
+html.dark-mode .load-order-row.is-added .load-order-row-index,
+html.dark-mode .load-order-row.is-added .load-order-row-name,
+html.dark-mode .load-order-row.is-added .load-order-row-title,
+html.dark-mode .load-order-row.is-added .load-order-row-location,
+html.dark-mode .load-order-row.is-added .load-order-drag-handle,
+html.dark-mode .load-order-row.is-added .load-order-action:not(:disabled) {
+  color: var(--success-light);
+}
+
+html.dark-mode .load-order-row.is-invalid .load-order-row-index,
+html.dark-mode .load-order-row.is-invalid .load-order-row-name,
+html.dark-mode .load-order-row.is-invalid .load-order-row-title,
+html.dark-mode .load-order-row.is-invalid .load-order-row-location,
+html.dark-mode .load-order-row.is-invalid .load-order-drag-handle,
+html.dark-mode .load-order-row.is-invalid .load-order-action:disabled {
+  color: var(--danger-light);
 }
 
 .load-order-index-popover {

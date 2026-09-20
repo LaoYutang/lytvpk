@@ -12,6 +12,14 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const LOCATION_LABELS = {
   root: "addons",
   workshop: "工坊",
+  disabled: "已禁用",
+  missing: "文件不存在",
+};
+
+const ENTRY_STATUS = {
+  existing: "existing",
+  added: "added",
+  invalid: "invalid",
 };
 
 const ICON_SHAPES = {
@@ -81,54 +89,67 @@ function createSvgIcon(shapes) {
 }
 
 // 只列出会参与加载的 VPK：addons 根目录与 workshop，disabled 不参与排序
-function buildEditorEntries() {
-  const byName = new Map();
+// addonlist.txt 中对应 disabled 或无文件的条目作为失效项放在最后
+function buildEditorEntries(orderNames) {
+  const activeByName = new Map();
+  const disabledByName = new Map();
   const candidates = appState.allVpkFiles
     .filter((file) => file.location === "root" || file.location === "workshop")
     .sort((a, b) => (a.location === "root" ? 0 : 1) - (b.location === "root" ? 0 : 1));
 
   candidates.forEach((file) => {
     const key = String(file.name || "").toLowerCase();
-    if (!key || byName.has(key)) return;
+    if (!key || activeByName.has(key)) return;
 
-    byName.set(key, {
+    activeByName.set(key, {
       name: file.name,
       title: file.title || file.name,
       location: file.location,
     });
   });
 
-  return Array.from(byName.values());
-}
+  appState.allVpkFiles.forEach((file) => {
+    if (file.location !== "disabled") return;
+    const key = String(file.name || "").toLowerCase();
+    if (key && !disabledByName.has(key)) {
+      disabledByName.set(key, file);
+    }
+  });
 
-function orderEditorEntries(entries, orderNames) {
-  const position = new Map();
-  orderNames.forEach((name, index) => {
+  const existing = [];
+  const invalid = [];
+  const seen = new Set();
+
+  orderNames.forEach((name) => {
     const key = String(name || "").toLowerCase();
-    if (key && !position.has(key)) {
-      position.set(key, index);
+    if (!key || seen.has(key)) return;
+
+    const active = activeByName.get(key);
+    if (active) {
+      existing.push({ ...active, status: ENTRY_STATUS.existing });
+      seen.add(key);
+      return;
     }
+
+    seen.add(key);
+    const disabledFile = disabledByName.get(key);
+    invalid.push({
+      name,
+      title: name,
+      location: disabledFile ? "disabled" : "missing",
+      status: ENTRY_STATUS.invalid,
+    });
   });
 
-  const known = [];
-  const rest = [];
+  const added = Array.from(activeByName.entries())
+    .filter(([key]) => !seen.has(key))
+    .map(([, entry]) => ({ ...entry, status: ENTRY_STATUS.added }));
 
-  entries.forEach((entry) => {
-    if (position.has(entry.name.toLowerCase())) {
-      known.push(entry);
-    } else {
-      rest.push(entry);
-    }
-  });
-
-  known.sort(
-    (a, b) => position.get(a.name.toLowerCase()) - position.get(b.name.toLowerCase())
-  );
-  rest.sort((a, b) =>
+  added.sort((a, b) =>
     a.name.localeCompare(b.name, "zh-CN", { numeric: true, sensitivity: "accent" })
   );
 
-  return known.concat(rest);
+  return existing.concat(added, invalid);
 }
 
 function createActionButton(action, label, shapes, index, entry) {
@@ -139,28 +160,45 @@ function createActionButton(action, label, shapes, index, entry) {
   button.dataset.index = String(index);
   button.title = label;
   button.setAttribute("aria-label", `${label} ${entry.title}`);
+  if (entry.status === ENTRY_STATUS.invalid) {
+    button.disabled = true;
+    button.title = "失效条目不可操作";
+  }
   button.appendChild(createSvgIcon(shapes));
   return button;
 }
 
 function createRow(entry, index) {
+  const isInvalid = entry.status === ENTRY_STATUS.invalid;
   const row = document.createElement("div");
   row.className = "load-order-row";
+  if (entry.status === ENTRY_STATUS.added) {
+    row.classList.add("is-added");
+  } else if (isInvalid) {
+    row.classList.add("is-invalid");
+  }
   row.dataset.index = String(index);
   row.dataset.name = entry.name.toLowerCase();
+  row.dataset.status = entry.status;
 
   // 用 span 而不是 button：拖动由指针事件实现，避免表单控件的默认行为
   const handle = document.createElement("span");
   handle.className = "load-order-drag-handle";
   handle.setAttribute("role", "button");
-  handle.setAttribute("tabindex", "0");
-  handle.title = "拖动排序";
-  handle.setAttribute("aria-label", `拖动排序 ${entry.title}`);
+  if (isInvalid) {
+    handle.classList.add("is-disabled");
+    handle.setAttribute("aria-disabled", "true");
+    handle.title = "失效条目不可排序";
+  } else {
+    handle.setAttribute("tabindex", "0");
+    handle.title = "拖动排序";
+    handle.setAttribute("aria-label", `拖动排序 ${entry.title}`);
+  }
   handle.appendChild(createSvgIcon(ICON_SHAPES.grip));
 
   const order = document.createElement("span");
   order.className = "load-order-row-index";
-  order.textContent = String(index + 1);
+  order.textContent = isInvalid ? "-" : String(index + 1);
 
   const info = document.createElement("div");
   info.className = "load-order-row-info";
@@ -178,7 +216,7 @@ function createRow(entry, index) {
   info.append(title, name);
 
   const location = document.createElement("span");
-  location.className = "load-order-row-location";
+  location.className = `load-order-row-location load-order-row-location-${entry.location}`;
   location.textContent = LOCATION_LABELS[entry.location] || entry.location;
 
   const actions = document.createElement("div");
@@ -205,10 +243,16 @@ function renderEditorList() {
   container.scrollTop = scrollTop;
 }
 
-function moveEntryTo(from, to) {
-  if (from < 0 || from >= workingOrder.length) return;
+function getEditableEntryCount() {
+  return workingOrder.filter((entry) => entry.status !== ENTRY_STATUS.invalid).length;
+}
 
-  const target = Math.max(0, Math.min(to, workingOrder.length - 1));
+function moveEntryTo(from, to) {
+  const editableCount = getEditableEntryCount();
+  if (from < 0 || from >= editableCount || editableCount === 0) return;
+
+  // 所有排序操作都限制在有效条目范围内，失效条目始终停留在最下方
+  const target = Math.max(0, Math.min(to, editableCount - 1));
   if (from === target) return;
 
   const [entry] = workingOrder.splice(from, 1);
@@ -227,7 +271,7 @@ function handleListClick(event) {
   if (action === "top") {
     moveEntryTo(index, 0);
   } else if (action === "bottom") {
-    moveEntryTo(index, workingOrder.length - 1);
+    moveEntryTo(index, getEditableEntryCount() - 1);
   } else if (action === "index") {
     openIndexPopover(index);
   }
@@ -266,12 +310,12 @@ function updateDragShifts() {
 function updateDragPosition(contentY) {
   if (!dragState) return;
 
-  const { row, rows, fromIndex, pitch } = dragState;
+  const { row, fromIndex, pitch, editableCount } = dragState;
   const offset = contentY - dragState.startContentY;
   row.style.transform = `translate3d(0, ${offset}px, 0)`;
 
   const step = pitch > 0 ? Math.round(offset / pitch) : 0;
-  const toIndex = Math.max(0, Math.min(fromIndex + step, rows.length - 1));
+  const toIndex = Math.max(0, Math.min(fromIndex + step, editableCount - 1));
   if (toIndex === dragState.toIndex) return;
 
   dragState.toIndex = toIndex;
@@ -290,6 +334,7 @@ function handleListPointerDown(event) {
 
   const index = Number(row.dataset.index);
   if (!Number.isInteger(index)) return;
+  if (row.dataset.status === ENTRY_STATUS.invalid) return;
 
   event.preventDefault();
 
@@ -301,6 +346,7 @@ function handleListPointerDown(event) {
     rows,
     fromIndex: index,
     toIndex: index,
+    editableCount: getEditableEntryCount(),
     startClientY: event.clientY,
     startContentY: event.clientY + list.scrollTop,
     lastClientY: event.clientY,
@@ -406,10 +452,12 @@ function openIndexPopover(index) {
   const popover = byId("load-order-index-popover");
   const input = byId("load-order-index-input");
   if (!popover || !input) return;
+  if (workingOrder[index]?.status === ENTRY_STATUS.invalid) return;
 
+  const editableCount = getEditableEntryCount();
   indexPopoverTarget = index;
   input.min = "1";
-  input.max = String(workingOrder.length);
+  input.max = String(editableCount);
   input.value = String(index + 1);
   popover.classList.remove("hidden");
   input.focus();
@@ -426,9 +474,10 @@ function confirmIndexPopover() {
 
   const input = byId("load-order-index-input");
   const value = Number.parseInt(input?.value ?? "", 10);
+  const editableCount = getEditableEntryCount();
 
-  if (!Number.isFinite(value) || value < 1 || value > workingOrder.length) {
-    showError(`请输入 1 - ${workingOrder.length} 之间的序号`);
+  if (!Number.isFinite(value) || value < 1 || value > editableCount) {
+    showError(`请输入 1 - ${editableCount} 之间的序号`);
     return;
   }
 
@@ -452,12 +501,6 @@ function highlightFocusedRow() {
 }
 
 export async function openLoadOrderEditor(fileName = "") {
-  const entries = buildEditorEntries();
-  if (!entries.length) {
-    showError("当前目录没有可排序的 VPK 文件");
-    return;
-  }
-
   let info = null;
   try {
     info = await GetAddonListOrderInfo();
@@ -467,7 +510,11 @@ export async function openLoadOrderEditor(fileName = "") {
     return;
   }
 
-  workingOrder = orderEditorEntries(entries, info?.order || []);
+  workingOrder = buildEditorEntries(info?.order || []);
+  if (!workingOrder.length) {
+    showError("当前目录没有可排序的 VPK 文件");
+    return;
+  }
   focusedName = String(fileName || "").toLowerCase();
   closeIndexPopover();
   renderEditorList();
@@ -491,12 +538,17 @@ export function closeLoadOrderEditor() {
 export async function saveLoadOrderEditor() {
   if (isSaving || !workingOrder.length) return;
 
+  const validEntries = workingOrder.filter(
+    (entry) => entry.status !== ENTRY_STATUS.invalid
+  );
+  const invalidCount = workingOrder.length - validEntries.length;
+
   const button = byId("save-load-order-editor-btn");
   isSaving = true;
   if (button) button.disabled = true;
 
   try {
-    await SetAddonListOrder(workingOrder.map((entry) => entry.name));
+    await SetAddonListOrder(validEntries.map((entry) => entry.name));
     await refreshLoadOrderMap();
 
     if (appState.sortType === "loadOrder") {
@@ -504,7 +556,12 @@ export async function saveLoadOrderEditor() {
       renderFileList();
     }
 
-    showNotification("加载顺序已保存", "success");
+    showNotification(
+      invalidCount > 0
+        ? `加载顺序已保存，已删除 ${invalidCount} 个失效条目`
+        : "加载顺序已保存",
+      "success"
+    );
     closeLoadOrderEditor();
   } catch (err) {
     console.error("保存加载顺序失败:", err);

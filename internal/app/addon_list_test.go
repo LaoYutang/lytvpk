@@ -241,15 +241,25 @@ func TestGetAddonListOrderInfoReadsGBK(t *testing.T) {
 	}
 }
 
-func TestSetAddonListOrderKeepsEncodingValuesAndUnlistedEntries(t *testing.T) {
-	text := "\"AddonList\"\n{\n\t\"星雪特效平台整合版.vpk\"\t\t\"1\"\n\t\"Leek Crowbar.vpk\"\t\t\"0\"\n\t\"old.vpk\"\t\t\"1\"\n}\n"
+func TestSetAddonListOrderKeepsEncodingValuesAndDeletesInvalidEntries(t *testing.T) {
+	text := "\"AddonList\"\n{\n\t\"星雪特效平台整合版.vpk\"\t\t\"1\"\n\t\"Leek Crowbar.vpk\"\t\t\"0\"\n\t\"disabled-only.vpk\"\t\t\"0\"\n\t\"root-unlisted.vpk\"\t\t\"0\"\n\t\"old.vpk\"\t\t\"1\"\n}\n"
 
 	app, path := newAddonListTestApp(t)
 	if err := os.WriteFile(path, encodeAddonListFixture(t, text, addonListEncodingANSI), 0644); err != nil {
 		t.Fatalf("写入测试文件失败: %v", err)
 	}
+	disabledDir := filepath.Join(app.rootDir, "disabled")
+	if err := os.MkdirAll(disabledDir, 0755); err != nil {
+		t.Fatalf("创建 disabled 目录失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(disabledDir, "disabled-only.vpk"), []byte("disabled"), 0644); err != nil {
+		t.Fatalf("创建 disabled 文件失败: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(app.rootDir, "root-unlisted.vpk"), []byte("vpk"), 0644); err != nil {
+		t.Fatalf("创建根目录文件失败: %v", err)
+	}
 
-	// old.vpk 不在新顺序里，应原样追加到末尾
+	// disabled-only.vpk 和 old.vpk 已失效，应删除；root-unlisted.vpk 仍在有效位置，应保留
 	if err := app.SetAddonListOrder([]string{"Leek Crowbar.vpk", "星雪特效平台整合版.vpk"}); err != nil {
 		t.Fatalf("SetAddonListOrder 失败: %v", err)
 	}
@@ -270,7 +280,7 @@ func TestSetAddonListOrderKeepsEncodingValuesAndUnlistedEntries(t *testing.T) {
 	assertAddonListEntries(t, string(decoded), []AddonListItem{
 		{Name: "Leek Crowbar.vpk", Value: "0"},
 		{Name: "星雪特效平台整合版.vpk", Value: "1"},
-		{Name: "old.vpk", Value: "1"},
+		{Name: "root-unlisted.vpk", Value: "0"},
 	})
 }
 
@@ -305,6 +315,9 @@ func TestSetAddonListOrderDedupesCaseInsensitively(t *testing.T) {
 	if err := os.WriteFile(path, encodeAddonListFixture(t, addonListTestText, addonListEncodingUTF8), 0644); err != nil {
 		t.Fatalf("写入测试文件失败: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(app.rootDir, "星雪特效平台整合版.vpk"), []byte("vpk"), 0644); err != nil {
+		t.Fatalf("创建中文测试文件失败: %v", err)
+	}
 
 	if err := app.SetAddonListOrder([]string{"leek crowbar.vpk", "LEEK CROWBAR.VPK"}); err != nil {
 		t.Fatalf("SetAddonListOrder 失败: %v", err)
@@ -322,22 +335,45 @@ func TestSetAddonListOrderDedupesCaseInsensitively(t *testing.T) {
 	})
 }
 
-func TestSetAddonListOrderRejectsEmptyNames(t *testing.T) {
+func TestSetAddonListOrderDeletesAllInvalidEntries(t *testing.T) {
 	app, path := newAddonListTestApp(t)
-	fixture := encodeAddonListFixture(t, addonListTestText, addonListEncodingANSI)
-	if err := os.WriteFile(path, fixture, 0644); err != nil {
+	if err := os.WriteFile(path, encodeAddonListFixture(t, addonListTestText, addonListEncodingANSI), 0644); err != nil {
 		t.Fatalf("写入测试文件失败: %v", err)
 	}
 
-	if err := app.SetAddonListOrder(nil); err == nil {
-		t.Fatalf("空顺序应返回错误")
+	if err := app.SetAddonListOrder(nil); err != nil {
+		t.Fatalf("删除全部失效条目失败: %v", err)
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("读取结果失败: %v", err)
 	}
-	if !bytes.Equal(data, fixture) {
-		t.Fatalf("空顺序不应修改文件")
+	decoded, err := simplifiedchinese.GBK.NewDecoder().Bytes(data)
+	if err != nil {
+		t.Fatalf("结果不是合法 GBK: %v", err)
+	}
+	if items := parseAddonList(string(decoded)); len(items) != 0 {
+		t.Fatalf("失效条目应全部删除, got %#v", items)
+	}
+
+	order, err := app.GetAddonListOrder()
+	if err != nil {
+		t.Fatalf("读取空加载顺序失败: %v", err)
+	}
+	if len(order) != 0 {
+		t.Fatalf("空加载顺序 = %#v", order)
+	}
+}
+
+func TestSetAddonListOrderRejectsEmptyNewFile(t *testing.T) {
+	app, path := newAddonListTestApp(t)
+
+	if err := app.SetAddonListOrder(nil); err == nil {
+		t.Fatalf("文件不存在且顺序为空时应返回错误")
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("空顺序不应创建 addonlist.txt, err=%v", err)
 	}
 }

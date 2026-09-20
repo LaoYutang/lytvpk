@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -277,10 +278,6 @@ func (a *App) GetAddonListOrder() ([]string, error) {
 		order = append(order, item.Name)
 	}
 
-	if len(order) == 0 {
-		return nil, fmt.Errorf("解析 addonlist.txt 失败或未找到任何条目")
-	}
-
 	return order, nil
 }
 
@@ -311,12 +308,9 @@ func (a *App) GetAddonListOrderInfo() (AddonListOrderInfo, error) {
 
 // SetAddonListOrder 按给定顺序重写 addonlist.txt
 // 已存在的条目沿用原值（"1"/"0" 都保留），新条目写 "1"；
-// 未出现在 names 中的既有条目原样追加到末尾，避免丢数据
+// 未出现在 names 中但仍在 addons 根目录或 workshop 中存在的条目会原样追加到末尾；
+// 无对应文件以及 disabled 中的失效条目会在保存时删除
 func (a *App) SetAddonListOrder(names []string) error {
-	if len(names) == 0 {
-		return fmt.Errorf("加载顺序为空，已取消保存")
-	}
-
 	file, err := a.readAddonList()
 	if err != nil {
 		if !errors.Is(err, errAddonListNotFound) {
@@ -362,19 +356,65 @@ func (a *App) SetAddonListOrder(names []string) error {
 		finalList = append(finalList, item)
 	}
 
-	if len(finalList) == 0 {
+	// 原有条目全部失效时允许写空列表；文件本来就没有条目时仍拒绝误写
+	if len(finalList) == 0 && len(file.Items) == 0 {
 		return fmt.Errorf("加载顺序为空，已取消保存")
 	}
 
-	// 没有出现在新顺序里的既有条目保留在末尾，值和相对顺序不变
+	// 没有出现在新顺序里的既有条目：仅保留仍在有效位置的文件
 	for _, item := range file.Items {
 		key := strings.ToLower(filepath.Base(item.Name))
 		if used[key] {
 			continue
 		}
 		used[key] = true
-		finalList = append(finalList, item)
+		if a.addonListEntryFileExists(item.Name) {
+			finalList = append(finalList, item)
+		}
 	}
 
 	return a.writeAddonList(file.Path, finalList, file.Encoding)
+}
+
+// addonListEntryFileExists 判断 addonlist.txt 条目是否仍对应有效位置的 VPK。
+// disabled 中的文件不再参与加载，其条目按失效处理。
+func (a *App) addonListEntryFileExists(name string) bool {
+	if a.rootDir == "" {
+		return false
+	}
+
+	baseName := filepath.Base(strings.TrimSpace(name))
+	if baseName == "" || baseName == "." {
+		return false
+	}
+
+	rootPath := filepath.Join(a.rootDir, baseName)
+	if info, err := os.Stat(rootPath); err == nil && !info.IsDir() {
+		return true
+	}
+
+	workshopDir := filepath.Join(a.rootDir, "workshop")
+	if _, err := os.Stat(workshopDir); err != nil {
+		// 扫描错误时保守保留条目，避免因为权限问题误删顺序
+		return !os.IsNotExist(err)
+	}
+
+	found := false
+	var walkErr error
+	_ = filepath.WalkDir(workshopDir, func(_ string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			walkErr = err
+			return fs.SkipAll
+		}
+		if !entry.IsDir() && strings.EqualFold(entry.Name(), baseName) {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+
+	if walkErr != nil {
+		return true
+	}
+	return found
 }
