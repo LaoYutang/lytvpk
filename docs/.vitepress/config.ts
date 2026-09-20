@@ -54,6 +54,7 @@ export default defineConfig({
               { text: "VPK 打包", link: "/toolbox/vpk-pack" },
               { text: "崩溃转储查看器", link: "/toolbox/mdmp-report" },
               { text: "喷漆制作", link: "/toolbox/spray-tool" },
+              { text: "Mod 快照", link: "/toolbox/snapshot" },
             ],
           },
           { text: "设置", link: "/features/settings" },

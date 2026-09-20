@@ -40,6 +40,11 @@
     <strong>喷漆制作</strong>
     <span>导入图片或动画，生成 L4D2 可用的 VTF/VMT。</span>
   </a>
+  <a class="tool-card" href="/toolbox/snapshot">
+    <span class="tool-card-mark">08</span>
+    <strong>Mod 快照</strong>
+    <span>保存 Mod 启用状态和加载顺序，或制作可恢复文件内容的完整备份。</span>
+  </a>
 </div>
 
 ## 使用建议
@@ -50,3 +55,4 @@
 - 需要查看或修改 VPK 内容时，用解包和打包。
 - 有 `.mdmp` 或 `.dmp` 文件时，用崩溃转储查看器。
 - 想制作喷漆时，用喷漆制作工具。
+- 准备批量调整、更新或整理 Mod 时，先用 Mod 快照留下可恢复状态。
