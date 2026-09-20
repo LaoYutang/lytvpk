@@ -10,7 +10,8 @@ import {
   unpackFile,
 } from "./operations.js";
 import { openSetTagsModal } from "./tags.js";
-import { openLoadOrderModal } from "../modals/load-order.js";
+import { appState } from "../state.js";
+import { openLoadOrderEditor } from "../modals/load-order-editor.js";
 import { openWorkshopModal, checkWorkshopUrl } from "../downloads/workshop-modal.js";
 import { showContextMenu, hideContextMenu, showServerSubmenu, hideServerSubmenu } from "./context-menu.js";
 import { shareWorkshopFileByPath } from "./share.js";
@@ -289,7 +290,9 @@ export function setupFileListEventDelegation() {
         e.preventDefault();
         e.stopPropagation();
         closeAllDropdowns();
-        openLoadOrderModal(filePath);
+        const file = appState.vpkFiles.find((item) => item.path === filePath)
+          || appState.allVpkFiles.find((item) => item.path === filePath);
+        openLoadOrderEditor(file?.name || "");
       }
     }
     const unpackBtn = e.target.closest('.unpack-btn[data-action="unpack"]');

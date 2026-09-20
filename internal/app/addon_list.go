@@ -283,3 +283,98 @@ func (a *App) GetAddonListOrder() ([]string, error) {
 
 	return order, nil
 }
+
+// AddonListOrderInfo 加载顺序编辑器需要的现状信息
+type AddonListOrderInfo struct {
+	Exists bool     `json:"exists"`
+	Order  []string `json:"order"`
+}
+
+// GetAddonListOrderInfo 返回 addonlist.txt 是否存在以及其中的条目顺序
+// 文件不存在时返回 Exists=false，让前端仍能打开编辑器
+func (a *App) GetAddonListOrderInfo() (AddonListOrderInfo, error) {
+	file, err := a.readAddonList()
+	if err != nil {
+		if errors.Is(err, errAddonListNotFound) {
+			return AddonListOrderInfo{Exists: false, Order: []string{}}, nil
+		}
+		return AddonListOrderInfo{}, err
+	}
+
+	order := make([]string, 0, len(file.Items))
+	for _, item := range file.Items {
+		order = append(order, item.Name)
+	}
+
+	return AddonListOrderInfo{Exists: true, Order: order}, nil
+}
+
+// SetAddonListOrder 按给定顺序重写 addonlist.txt
+// 已存在的条目沿用原值（"1"/"0" 都保留），新条目写 "1"；
+// 未出现在 names 中的既有条目原样追加到末尾，避免丢数据
+func (a *App) SetAddonListOrder(names []string) error {
+	if len(names) == 0 {
+		return fmt.Errorf("加载顺序为空，已取消保存")
+	}
+
+	file, err := a.readAddonList()
+	if err != nil {
+		if !errors.Is(err, errAddonListNotFound) {
+			return err
+		}
+
+		// 文件不存在时从空列表开始，按游戏自身的 ANSI 编码新建
+		path, pathErr := a.addonListPath()
+		if pathErr != nil {
+			return pathErr
+		}
+		file = &addonListFile{Path: path, Encoding: addonListEncodingANSI}
+	}
+
+	// 记录既有条目的值，按小写文件名索引
+	existing := make(map[string]AddonListItem, len(file.Items))
+	for _, item := range file.Items {
+		key := strings.ToLower(filepath.Base(item.Name))
+		if _, ok := existing[key]; !ok {
+			existing[key] = item
+		}
+	}
+
+	finalList := make([]AddonListItem, 0, len(file.Items)+len(names))
+	used := make(map[string]bool, len(names))
+
+	for _, name := range names {
+		target := filepath.Base(strings.TrimSpace(name))
+		if target == "" || target == "." {
+			continue
+		}
+
+		key := strings.ToLower(target)
+		if used[key] {
+			continue
+		}
+		used[key] = true
+
+		item, ok := existing[key]
+		if !ok {
+			item = AddonListItem{Name: target, Value: "1"}
+		}
+		finalList = append(finalList, item)
+	}
+
+	if len(finalList) == 0 {
+		return fmt.Errorf("加载顺序为空，已取消保存")
+	}
+
+	// 没有出现在新顺序里的既有条目保留在末尾，值和相对顺序不变
+	for _, item := range file.Items {
+		key := strings.ToLower(filepath.Base(item.Name))
+		if used[key] {
+			continue
+		}
+		used[key] = true
+		finalList = append(finalList, item)
+	}
+
+	return a.writeAddonList(file.Path, finalList, file.Encoding)
+}

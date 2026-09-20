@@ -77,6 +77,8 @@ export function ForceExit():Promise<void>;
 
 export function GetAddonListOrder():Promise<Array<string>>;
 
+export function GetAddonListOrderInfo():Promise<app.AddonListOrderInfo>;
+
 export function GetAppConfig():Promise<app.ConfigFile>;
 
 export function GetAppVersion():Promise<string>;
@@ -230,6 +232,8 @@ export function SelectVPKPackSourceDirectory():Promise<string>;
 export function SelectVPKUnpackOutputDirectory():Promise<string>;
 
 export function SendPanelRconCommand(arg1:string,arg2:string):Promise<string>;
+
+export function SetAddonListOrder(arg1:Array<string>):Promise<void>;
 
 export function SetModRotation(arg1:app.RotationConfig):Promise<void>;
 

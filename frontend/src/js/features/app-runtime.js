@@ -145,10 +145,9 @@ import { showExitModal, closeExitModal, confirmExit } from "./modals/exit.js";
 import { showInfoModal, closeInfoModal } from "./modals/info.js";
 import { closeModal, showFileDetail } from "./modals/detail.js";
 import {
-  openLoadOrderModal,
-  closeLoadOrderModal,
-  saveLoadOrder,
-} from "./modals/load-order.js";
+  openLoadOrderEditor,
+  setupLoadOrderEditor,
+} from "./modals/load-order-editor.js";
 import {
   checkInitialDirectory,
   selectDirectory,
@@ -667,6 +666,7 @@ function setupEventListeners() {
 
   // 排序功能
   setupSortEvents();
+  setupLoadOrderEditor();
   setupFilterDropdownEvents();
 
   // 批量操作按钮
@@ -1009,16 +1009,6 @@ function setupBatchActionEvents() {
   document
     .getElementById("close-info-modal-btn")
     ?.addEventListener("click", closeInfoModal);
-  document
-    .getElementById("close-load-order-modal-btn")
-    ?.addEventListener("click", closeLoadOrderModal);
-  document
-    .getElementById("cancel-load-order-btn")
-    ?.addEventListener("click", closeLoadOrderModal);
-  document
-    .getElementById("confirm-load-order-btn")
-    ?.addEventListener("click", saveLoadOrder);
-
   // 创意工坊按钮
   document
     .getElementById("workshop-btn")
@@ -1112,14 +1102,6 @@ function setupBatchActionEvents() {
     ?.addEventListener("click", function (e) {
       if (e.target === this) {
         closeInfoModal();
-      }
-    });
-
-  document
-    .getElementById("load-order-modal")
-    ?.addEventListener("click", function (e) {
-      if (e.target === this) {
-        closeLoadOrderModal();
       }
     });
 
@@ -1235,7 +1217,7 @@ window.moveFileToAddons = moveFileToAddons;
 window.deleteFile = deleteFile;
 window.renameFile = renameFile;
 window.openSetTagsModal = openSetTagsModal;
-window.openLoadOrderModal = openLoadOrderModal;
+window.openLoadOrderEditor = openLoadOrderEditor;
 window.openWorkshopModal = openWorkshopModal;
 window.closeWorkshopModal = closeWorkshopModal;
 window.checkWorkshopUrl = checkWorkshopUrl;

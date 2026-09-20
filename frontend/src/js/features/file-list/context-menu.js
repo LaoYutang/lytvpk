@@ -13,7 +13,7 @@ import {
 } from "./operations.js";
 import { openSetTagsModal } from "./tags.js";
 import { openBatchSetTagsModal } from "./batch-tags.js";
-import { openLoadOrderModal } from "../modals/load-order.js";
+import { openLoadOrderEditor } from "../modals/load-order-editor.js";
 import {
   enableSelected,
   disableSelected,
@@ -200,7 +200,9 @@ function buildSingleMenu(menu, file) {
   }
 
   menu.appendChild(createMenuItem("重命名", iconSvg("edit"), () => renameFile(file.path)));
-  menu.appendChild(createMenuItem("加载顺序", loadOrderIconSvg, () => openLoadOrderModal(file.path)));
+  menu.appendChild(
+    createMenuItem("加载顺序", loadOrderIconSvg, () => openLoadOrderEditor(file.name))
+  );
   menu.appendChild(createMenuItem("解包", iconSvg("package"), () => unpackFile(file.path)));
 
   menu.appendChild(createMenuItem("打开位置", iconSvg("folderOpen"), () => openFileLocation(file.path)));

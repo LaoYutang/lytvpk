@@ -238,7 +238,8 @@ html.dark-mode .multi-select-menu {
 
 .filter-select,
 .multi-select-trigger,
-.sort-container #sort-btn {
+.sort-container #sort-btn,
+.sort-container #load-order-editor-btn {
   height: 2.5rem;
   border: 1px solid var(--border-light);
   border-radius: 0.85rem;
@@ -267,14 +268,16 @@ html.dark-mode .multi-select-menu {
 
 .filter-select:hover,
 .multi-select-trigger:hover,
-.sort-container #sort-btn:hover {
+.sort-container #sort-btn:hover,
+.sort-container #load-order-editor-btn:hover {
   border-color: rgba(79, 70, 229, 0.38);
   background-color: var(--bg-app);
 }
 
 .filter-select:focus,
 .multi-select-trigger:focus,
-.sort-container #sort-btn:focus-visible {
+.sort-container #sort-btn:focus-visible,
+.sort-container #load-order-editor-btn:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
@@ -516,6 +519,9 @@ html.dark-mode .multi-select-menu {
 
 .sort-container {
   margin-left: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .sort-container .batch-actions-dropdown-container {
@@ -549,6 +555,15 @@ html.dark-mode .mod-management-page .select-menu,
 html.dark-mode .multi-select-menu,
 html.dark-mode .dropdown-content {
   background: var(--bg-surface);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: var(--text-primary);
+  box-shadow: none;
+}
+
+/* 暗色模式下统计区右侧按钮与左侧刷新/重置保持同色 */
+html.dark-mode .sort-container #sort-btn,
+html.dark-mode .sort-container #load-order-editor-btn {
+  background-color: var(--bg-surface);
   border-color: rgba(148, 163, 184, 0.18);
   color: var(--text-primary);
   box-shadow: none;

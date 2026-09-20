@@ -146,6 +146,10 @@ export function GetAddonListOrder() {
   return window['go']['app']['App']['GetAddonListOrder']();
 }
 
+export function GetAddonListOrderInfo() {
+  return window['go']['app']['App']['GetAddonListOrderInfo']();
+}
+
 export function GetAppConfig() {
   return window['go']['app']['App']['GetAppConfig']();
 }
@@ -452,6 +456,10 @@ export function SelectVPKUnpackOutputDirectory() {
 
 export function SendPanelRconCommand(arg1, arg2) {
   return window['go']['app']['App']['SendPanelRconCommand'](arg1, arg2);
+}
+
+export function SetAddonListOrder(arg1) {
+  return window['go']['app']['App']['SetAddonListOrder'](arg1);
 }
 
 export function SetModRotation(arg1) {

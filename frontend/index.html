@@ -323,6 +323,34 @@
               </label>
             </div>
             <div class="sort-container">
+              <button
+                id="load-order-editor-btn"
+                class="btn btn-small btn-outline"
+                title="编辑加载顺序"
+              >
+                <span class="icon">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="icon-svg"
+                  >
+                    <path d="M10 6h11" />
+                    <path d="M10 12h11" />
+                    <path d="M10 18h11" />
+                    <path d="M4 6h1v4" />
+                    <path d="M4 10h2" />
+                    <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+                  </svg>
+                </span>
+                <span id="load-order-editor-btn-text">加载顺序</span>
+              </button>
               <div class="batch-actions-dropdown-container">
                 <button
                   id="sort-btn"
@@ -1819,78 +1847,58 @@
         </div>
       </div>
 
-      <!-- 加载顺序编辑弹窗 -->
-      <div id="load-order-modal" class="modal hidden">
-        <div class="modal-content load-order-modal-content">
+      <!-- 加载顺序编辑器弹窗 -->
+      <div id="load-order-editor-modal" class="modal hidden">
+        <div class="modal-content load-order-editor-content">
           <div class="load-order-header">
             <h2>编辑加载顺序</h2>
-            <button id="close-load-order-modal-btn" class="close-btn">
+            <button id="close-load-order-editor-btn" class="close-btn">
               &times;
             </button>
           </div>
-          <div class="load-order-body">
-            <div class="load-order-section">
-              <label class="load-order-label">当前文件</label>
-              <div id="load-order-filename" class="load-order-filename"></div>
-            </div>
-
-            <div class="load-order-grid">
-              <div class="load-order-input-wrapper">
-                <label class="load-order-label">当前序号</label>
-                <div class="load-order-current-box">
-                  <div id="load-order-current" class="load-order-current-value">
-                    未生成
-                  </div>
-                </div>
-              </div>
-
-              <div class="load-order-input-wrapper">
-                <label for="load-order-input" class="load-order-label"
-                  >新序号</label
-                >
-                <div class="input-group" style="flex: 1">
-                  <input
-                    type="number"
-                    id="load-order-input"
-                    class="load-order-input no-arrow"
-                    placeholder="输入"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="load-order-tips">
-              <div class="load-order-tips-content">
-                <div class="load-order-tips-icon">💡</div>
-                <div class="load-order-tips-text">
-                  <p class="load-order-tips-title">加载顺序说明</p>
-                  <ul class="load-order-tips-list">
-                    <li>
-                      数值
-                      <span class="load-order-tips-highlight">越小</span
-                      >，加载优先级
-                      <span class="load-order-tips-highlight">越高</span>。
-                    </li>
-                    <li>若文件未在列表中，将按此序号插入。</li>
-                    <li>若已存在，将移动到此位置。</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div id="load-order-editor-list" class="load-order-editor-list"></div>
           <div class="load-order-footer">
             <button
-              id="cancel-load-order-btn"
+              id="cancel-load-order-editor-btn"
               class="btn btn-secondary load-order-btn-cancel"
             >
               取消
             </button>
             <button
-              id="confirm-load-order-btn"
+              id="save-load-order-editor-btn"
               class="btn btn-primary load-order-btn-confirm"
             >
-              保存更改
+              保存
             </button>
+          </div>
+          <div
+            id="load-order-index-popover"
+            class="load-order-index-popover hidden"
+          >
+            <label for="load-order-index-input" class="load-order-index-label">
+              设置序号
+            </label>
+            <input
+              type="number"
+              id="load-order-index-input"
+              class="load-order-index-input no-arrow"
+              min="1"
+              placeholder="输入序号"
+            />
+            <div class="load-order-index-actions">
+              <button
+                id="cancel-load-order-index-btn"
+                class="btn btn-secondary btn-small"
+              >
+                取消
+              </button>
+              <button
+                id="confirm-load-order-index-btn"
+                class="btn btn-primary btn-small"
+              >
+                确定
+              </button>
+            </div>
           </div>
         </div>
       </div>

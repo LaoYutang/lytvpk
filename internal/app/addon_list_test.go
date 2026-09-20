@@ -192,3 +192,152 @@ func TestParseAddonListAcceptsBraceOnSameLine(t *testing.T) {
 		t.Fatalf("items = %#v", items)
 	}
 }
+
+func assertAddonListEntries(t *testing.T, text string, want []AddonListItem) {
+	t.Helper()
+
+	items := parseAddonList(text)
+	if len(items) != len(want) {
+		t.Fatalf("条目数 = %d, want %d, 内容: %q", len(items), len(want), text)
+	}
+
+	for i, wantItem := range want {
+		if items[i].Name != wantItem.Name || items[i].Value != wantItem.Value {
+			t.Fatalf("第 %d 条 = {%q %q}, want {%q %q}", i+1, items[i].Name, items[i].Value, wantItem.Name, wantItem.Value)
+		}
+	}
+}
+
+func TestGetAddonListOrderInfoMissingFile(t *testing.T) {
+	app, _ := newAddonListTestApp(t)
+
+	info, err := app.GetAddonListOrderInfo()
+	if err != nil {
+		t.Fatalf("GetAddonListOrderInfo 失败: %v", err)
+	}
+	if info.Exists {
+		t.Fatalf("文件不存在时 Exists 应为 false")
+	}
+	if len(info.Order) != 0 {
+		t.Fatalf("文件不存在时 Order 应为空, got %#v", info.Order)
+	}
+}
+
+func TestGetAddonListOrderInfoReadsGBK(t *testing.T) {
+	app, path := newAddonListTestApp(t)
+	if err := os.WriteFile(path, encodeAddonListFixture(t, addonListTestText, addonListEncodingANSI), 0644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	info, err := app.GetAddonListOrderInfo()
+	if err != nil {
+		t.Fatalf("GetAddonListOrderInfo 失败: %v", err)
+	}
+	if !info.Exists {
+		t.Fatalf("文件存在时 Exists 应为 true")
+	}
+	if len(info.Order) != 2 || info.Order[0] != "星雪特效平台整合版.vpk" || info.Order[1] != "Leek Crowbar.vpk" {
+		t.Fatalf("Order = %#v", info.Order)
+	}
+}
+
+func TestSetAddonListOrderKeepsEncodingValuesAndUnlistedEntries(t *testing.T) {
+	text := "\"AddonList\"\n{\n\t\"星雪特效平台整合版.vpk\"\t\t\"1\"\n\t\"Leek Crowbar.vpk\"\t\t\"0\"\n\t\"old.vpk\"\t\t\"1\"\n}\n"
+
+	app, path := newAddonListTestApp(t)
+	if err := os.WriteFile(path, encodeAddonListFixture(t, text, addonListEncodingANSI), 0644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	// old.vpk 不在新顺序里，应原样追加到末尾
+	if err := app.SetAddonListOrder([]string{"Leek Crowbar.vpk", "星雪特效平台整合版.vpk"}); err != nil {
+		t.Fatalf("SetAddonListOrder 失败: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("读取结果失败: %v", err)
+	}
+	if utf8.Valid(data) {
+		t.Fatalf("期望保持 ANSI(GBK) 编码")
+	}
+
+	decoded, err := simplifiedchinese.GBK.NewDecoder().Bytes(data)
+	if err != nil {
+		t.Fatalf("结果不是合法 GBK: %v", err)
+	}
+
+	assertAddonListEntries(t, string(decoded), []AddonListItem{
+		{Name: "Leek Crowbar.vpk", Value: "0"},
+		{Name: "星雪特效平台整合版.vpk", Value: "1"},
+		{Name: "old.vpk", Value: "1"},
+	})
+}
+
+func TestSetAddonListOrderAddsNewNames(t *testing.T) {
+	app, path := newAddonListTestApp(t)
+	if err := os.WriteFile(path, encodeAddonListFixture(t, addonListTestText, addonListEncodingUTF8), 0644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	// 新条目按传入位置写入并取值 "1"，既有条目保留原值
+	if err := app.SetAddonListOrder([]string{"new.vpk", "Leek Crowbar.vpk", "星雪特效平台整合版.vpk"}); err != nil {
+		t.Fatalf("SetAddonListOrder 失败: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("读取结果失败: %v", err)
+	}
+	if !utf8.Valid(data) {
+		t.Fatalf("期望保持 UTF-8 编码")
+	}
+
+	assertAddonListEntries(t, string(data), []AddonListItem{
+		{Name: "new.vpk", Value: "1"},
+		{Name: "Leek Crowbar.vpk", Value: "1"},
+		{Name: "星雪特效平台整合版.vpk", Value: "1"},
+	})
+}
+
+func TestSetAddonListOrderDedupesCaseInsensitively(t *testing.T) {
+	app, path := newAddonListTestApp(t)
+	if err := os.WriteFile(path, encodeAddonListFixture(t, addonListTestText, addonListEncodingUTF8), 0644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	if err := app.SetAddonListOrder([]string{"leek crowbar.vpk", "LEEK CROWBAR.VPK"}); err != nil {
+		t.Fatalf("SetAddonListOrder 失败: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("读取结果失败: %v", err)
+	}
+
+	// 保留文件里原本的大小写，且不会写出重复条目
+	assertAddonListEntries(t, string(data), []AddonListItem{
+		{Name: "Leek Crowbar.vpk", Value: "1"},
+		{Name: "星雪特效平台整合版.vpk", Value: "1"},
+	})
+}
+
+func TestSetAddonListOrderRejectsEmptyNames(t *testing.T) {
+	app, path := newAddonListTestApp(t)
+	fixture := encodeAddonListFixture(t, addonListTestText, addonListEncodingANSI)
+	if err := os.WriteFile(path, fixture, 0644); err != nil {
+		t.Fatalf("写入测试文件失败: %v", err)
+	}
+
+	if err := app.SetAddonListOrder(nil); err == nil {
+		t.Fatalf("空顺序应返回错误")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("读取结果失败: %v", err)
+	}
+	if !bytes.Equal(data, fixture) {
+		t.Fatalf("空顺序不应修改文件")
+	}
+}

@@ -37,13 +37,7 @@ export async function handleLoadOrderSort() {
   document.getElementById("sort-dropdown-content")?.classList.add("hidden");
 
   try {
-    const orderList = await GetAddonListOrder();
-    console.log("获取到加载顺序:", orderList.length, "个条目");
-
-    appState.loadOrderMap.clear();
-    orderList.forEach((name, index) => {
-      appState.loadOrderMap.set(name.toLowerCase(), index);
-    });
+    await refreshLoadOrderMap();
 
     appState.sortType = "loadOrder";
     appState.sortOrder = "asc";
@@ -57,6 +51,18 @@ export async function handleLoadOrderSort() {
     console.error("获取加载顺序失败:", err);
     showError("addonlist.txt 错误: " + err);
   }
+}
+
+// 重新读取 addonlist.txt 并刷新内存中的加载顺序映射
+export async function refreshLoadOrderMap() {
+  const orderList = await GetAddonListOrder();
+
+  appState.loadOrderMap.clear();
+  orderList.forEach((name, index) => {
+    appState.loadOrderMap.set(String(name).toLowerCase(), index);
+  });
+
+  return orderList;
 }
 
 export function handleSortChange(type) {

@@ -1,5 +1,19 @@
 export namespace app {
 	
+	export class AddonListOrderInfo {
+	    exists: boolean;
+	    order: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AddonListOrderInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exists = source["exists"];
+	        this.order = source["order"];
+	    }
+	}
 	export class WindowState {
 	    width: number;
 	    height: number;
