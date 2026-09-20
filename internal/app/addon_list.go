@@ -2,15 +2,15 @@ package app
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 type AddonListItem struct {
@@ -18,82 +18,120 @@ type AddonListItem struct {
 	Value string
 }
 
-// readAddonList 读取并解析 addonlist.txt
-func (a *App) readAddonList() ([]AddonListItem, string, error) {
+// addonListEncoding 表示 addonlist.txt 在磁盘上的编码。
+// 游戏按系统 ANSI（简体中文系统为 GBK）读写该文件，如果被改成 UTF-8，
+// 游戏会认为列表失效并按自己的顺序重写整个文件，因此写回时必须沿用原编码。
+type addonListEncoding int
+
+const (
+	addonListEncodingANSI addonListEncoding = iota
+	addonListEncodingUTF8
+	addonListEncodingUTF8BOM
+)
+
+var (
+	errAddonListNotFound = errors.New("addonlist.txt 不存在")
+	addonListKVRegex     = regexp.MustCompile(`"([^"]+)"\s+"([^"]+)"`)
+)
+
+// addonListFile 是一次读取的结果：路径、条目和原始编码
+type addonListFile struct {
+	Path     string
+	Items    []AddonListItem
+	Encoding addonListEncoding
+}
+
+// addonListPath 返回 addonlist.txt 路径（位于 addons 目录的上一级）
+func (a *App) addonListPath() (string, error) {
 	if a.rootDir == "" {
-		return nil, "", fmt.Errorf("未选择L4D2目录")
+		return "", fmt.Errorf("未选择L4D2目录")
 	}
 
-	parentDir := filepath.Dir(a.rootDir)
-	addonListPath := filepath.Join(parentDir, "addonlist.txt")
+	return filepath.Join(filepath.Dir(a.rootDir), "addonlist.txt"), nil
+}
 
-	if _, err := os.Stat(addonListPath); os.IsNotExist(err) {
-		return nil, addonListPath, fmt.Errorf("addonlist.txt 不存在")
-	}
-
-	content, err := os.ReadFile(addonListPath)
+// readAddonList 读取并解析 addonlist.txt，同时记录原始编码
+func (a *App) readAddonList() (*addonListFile, error) {
+	path, err := a.addonListPath()
 	if err != nil {
-		return nil, addonListPath, fmt.Errorf("无法读取 addonlist.txt: %v", err)
+		return nil, err
 	}
 
-	// 处理 BOM
-	if len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
-		content = content[3:]
-	}
-
-	// 转码
-	var contentStr string
-	if !utf8.Valid(content) {
-		reader := transform.NewReader(bytes.NewReader(content), simplifiedchinese.GBK.NewDecoder())
-		decoded, err := io.ReadAll(reader)
-		if err == nil {
-			contentStr = string(decoded)
-		} else {
-			contentStr = string(content)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, errAddonListNotFound
 		}
-	} else {
-		contentStr = string(content)
+		return nil, fmt.Errorf("无法读取 addonlist.txt: %v", err)
 	}
 
-	// 解析
+	encoding := addonListEncodingANSI
+	switch {
+	case bytes.HasPrefix(content, []byte{0xEF, 0xBB, 0xBF}):
+		encoding = addonListEncodingUTF8BOM
+		content = content[3:]
+	case utf8.Valid(content):
+		encoding = addonListEncodingUTF8
+	}
+
+	return &addonListFile{
+		Path:     path,
+		Items:    parseAddonList(decodeAddonListText(content, encoding)),
+		Encoding: encoding,
+	}, nil
+}
+
+// decodeAddonListText 把文件字节解码成 UTF-8 文本
+func decodeAddonListText(content []byte, encoding addonListEncoding) string {
+	if encoding != addonListEncodingANSI {
+		return string(content)
+	}
+
+	decoded, err := simplifiedchinese.GBK.NewDecoder().Bytes(content)
+	if err != nil {
+		// 解码失败时保留原始字节，避免直接丢内容
+		return string(content)
+	}
+
+	return string(decoded)
+}
+
+// parseAddonList 解析 AddonList 块内的键值对
+func parseAddonList(text string) []AddonListItem {
 	var list []AddonListItem
-	lines := strings.Split(contentStr, "\n")
-	kvRegex := regexp.MustCompile(`"([^"]+)"\s+"([^"]+)"`)
 	inBlock := false
 
-	for _, line := range lines {
+	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "//") {
-			continue
-		}
-		if strings.Contains(line, "\"AddonList\"") {
-			continue
-		}
-		if strings.Contains(line, "{") {
-			inBlock = true
 			continue
 		}
 		if strings.Contains(line, "}") {
 			inBlock = false
 			continue
 		}
+		if strings.Contains(line, "{") {
+			inBlock = true
+			continue
+		}
+		if !inBlock {
+			continue
+		}
 
-		if inBlock {
-			matches := kvRegex.FindStringSubmatch(line)
-			if len(matches) == 3 {
-				list = append(list, AddonListItem{
-					Name:  matches[1],
-					Value: matches[2],
-				})
-			}
+		matches := addonListKVRegex.FindStringSubmatch(line)
+		if len(matches) == 3 {
+			list = append(list, AddonListItem{
+				Name:  matches[1],
+				Value: matches[2],
+			})
 		}
 	}
 
-	return list, addonListPath, nil
+	return list
 }
 
-// writeAddonList 写入 addonlist.txt
-func (a *App) writeAddonList(path string, list []AddonListItem) error {
+// writeAddonList 按指定编码写入 addonlist.txt
+func (a *App) writeAddonList(path string, list []AddonListItem, encoding addonListEncoding) error {
 	var buf bytes.Buffer
 	buf.WriteString("\"AddonList\"\n{\n")
 	for _, item := range list {
@@ -103,14 +141,43 @@ func (a *App) writeAddonList(path string, list []AddonListItem) error {
 	}
 	buf.WriteString("}\n")
 
-	// 写入文件 (使用 UTF-8)
-	return os.WriteFile(path, buf.Bytes(), 0644)
+	data, err := encodeAddonListText(buf.String(), encoding)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, 0644)
+}
+
+// encodeAddonListText 把文本编码成文件字节，保持原有编码与 BOM
+func encodeAddonListText(text string, encoding addonListEncoding) ([]byte, error) {
+	raw := []byte(text)
+
+	switch encoding {
+	case addonListEncodingUTF8BOM:
+		return append([]byte{0xEF, 0xBB, 0xBF}, raw...), nil
+	case addonListEncodingUTF8:
+		return raw, nil
+	}
+
+	encoded, err := simplifiedchinese.GBK.NewEncoder().Bytes(raw)
+	if err != nil {
+		return nil, fmt.Errorf("无法按 ANSI(GBK) 编码写回 addonlist.txt: %v", err)
+	}
+
+	// GBK 无法表示的字符会被静默替换成问号，往返校验一次避免写坏文件名
+	decoded, err := simplifiedchinese.GBK.NewDecoder().Bytes(encoded)
+	if err != nil || string(decoded) != text {
+		return nil, fmt.Errorf("addonlist.txt 中存在 GBK 无法表示的字符，无法按原编码写回")
+	}
+
+	return encoded, nil
 }
 
 // GetVPKLoadOrder 获取 VPK 文件的加载顺序 (1-based index)
 // 如果文件不在列表中，返回 -1
 func (a *App) GetVPKLoadOrder(filename string) (int, error) {
-	list, _, err := a.readAddonList()
+	file, err := a.readAddonList()
 	if err != nil {
 		// 如果文件不存在，必须返回错误，而不是吞掉错误
 		// 这样前端才能区分是"文件不存在"还是"文件不在列表中"
@@ -118,7 +185,7 @@ func (a *App) GetVPKLoadOrder(filename string) (int, error) {
 	}
 
 	targetName := strings.ToLower(filepath.Base(filename))
-	for i, item := range list {
+	for i, item := range file.Items {
 		if strings.ToLower(item.Name) == targetName {
 			return i + 1, nil // 1-based
 		}
@@ -129,19 +196,18 @@ func (a *App) GetVPKLoadOrder(filename string) (int, error) {
 
 // SetVPKLoadOrder 设置 VPK 文件的加载顺序
 func (a *App) SetVPKLoadOrder(filename string, newOrder int) error {
-	list, path, err := a.readAddonList()
-
-	// 如果文件不存在，初始化为空列表，准备新建
-	if err != nil && strings.Contains(err.Error(), "不存在") {
-		list = []AddonListItem{}
-		// 重新计算路径，因为 readAddonList 出错时可能返回了空路径或正确路径
-		// 既然 readAddonList 返回了 path，我们就用它
-		if path == "" {
-			parentDir := filepath.Dir(a.rootDir)
-			path = filepath.Join(parentDir, "addonlist.txt")
+	file, err := a.readAddonList()
+	if err != nil {
+		if !errors.Is(err, errAddonListNotFound) {
+			return err
 		}
-	} else if err != nil {
-		return err
+
+		// 文件不存在时从空列表开始，按游戏自身的 ANSI 编码新建
+		path, pathErr := a.addonListPath()
+		if pathErr != nil {
+			return pathErr
+		}
+		file = &addonListFile{Path: path, Encoding: addonListEncodingANSI}
 	}
 
 	targetName := filepath.Base(filename)
@@ -150,9 +216,9 @@ func (a *App) SetVPKLoadOrder(filename string, newOrder int) error {
 	// 1. 先查找并移除已存在的条目
 	var existingItem AddonListItem
 	found := false
-	cleanList := make([]AddonListItem, 0, len(list))
+	cleanList := make([]AddonListItem, 0, len(file.Items))
 
-	for _, item := range list {
+	for _, item := range file.Items {
 		if strings.ToLower(item.Name) == lowerTargetName {
 			existingItem = item
 			found = true
@@ -187,98 +253,28 @@ func (a *App) SetVPKLoadOrder(filename string, newOrder int) error {
 	finalList = append(finalList, existingItem)
 	finalList = append(finalList, cleanList[index:]...)
 
-	// 4. 写入文件
-	return a.writeAddonList(path, finalList)
+	// 4. 写入文件，沿用原编码
+	return a.writeAddonList(file.Path, finalList, file.Encoding)
 }
 
 // GetAddonListOrder 读取并解析 addonlist.txt 获取加载顺序
 func (a *App) GetAddonListOrder() ([]string, error) {
-	if a.rootDir == "" {
-		return nil, fmt.Errorf("未选择L4D2目录")
-	}
-
-	// 1. 尝试在 addons 文件夹同级查找 (优先，根据用户要求)
-	// a.rootDir 是 addons 目录
-	parentDir := filepath.Dir(a.rootDir)
-	addonListPath := filepath.Join(parentDir, "addonlist.txt")
-
-	// 检查同级文件是否存在
-	if _, err := os.Stat(addonListPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("找不到 addonlist.txt 文件 (在 %s)", addonListPath)
-	}
-
-	content, err := os.ReadFile(addonListPath)
+	file, err := a.readAddonList()
 	if err != nil {
-		return nil, fmt.Errorf("无法读取 addonlist.txt: %v", err)
-	}
-
-	// 处理 BOM (UTF-8 BOM: EF BB BF)
-	if len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
-		content = content[3:]
-	}
-
-	// 尝试转码：如果不是有效的 UTF-8，尝试 GBK
-	var contentStr string
-	if !utf8.Valid(content) {
-		// 尝试 GBK 解码
-		reader := transform.NewReader(bytes.NewReader(content), simplifiedchinese.GBK.NewDecoder())
-		decoded, err := io.ReadAll(reader)
-		if err == nil {
-			contentStr = string(decoded)
-		} else {
-			// 如果 GBK 解码也失败，就回退到原始字节转换（虽然可能是乱码）
-			contentStr = string(content)
-		}
-	} else {
-		contentStr = string(content)
-	}
-
-	// 解析文件
-	var order []string
-	lines := strings.Split(contentStr, "\n")
-
-	// 正则表达式匹配键值对: "key" "value"
-	kvRegex := regexp.MustCompile(`"([^"]+)"\s+"([^"]+)"`)
-
-	inBlock := false
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "//") {
-			continue
-		}
-
-		// 简单的状态机处理 AddonList 块
-		if strings.Contains(line, "\"AddonList\"") {
-			continue
-		}
-		if strings.Contains(line, "{") {
-			inBlock = true
-			continue
-		}
-		if strings.Contains(line, "}") {
-			inBlock = false
-			continue
-		}
-
-		if inBlock {
-			matches := kvRegex.FindStringSubmatch(line)
-			if len(matches) == 3 {
-				filename := matches[1]
-				// 只有启用的插件("1")才会被计入顺序？
-				// 用户只给了文件格式，没说只排启用的。
-				// 通常 addonlist.txt 包含所有插件的状态。
-				// 既然是"按加载顺序排序"，那就是文件在 addonlist.txt 中出现的顺序。
-				// 不管值是 "1" 还是 "0"。
-				// 但通常 addonlist.txt 的顺序就是加载顺序吗？
-				// L4D2 实际上是按字母顺序加载 VPK 的，除非 addonlist.txt 指定了顺序？
-				// 实际上 addonlist.txt 主要是开关。
-				// 但是用户想"按加载顺序排序"，可能用户认为 addonlist.txt 的顺序就是加载顺序，或者想要这个特定的顺序。
-				// 我就按文件里出现的顺序返回。
-
-				order = append(order, filename)
+		if errors.Is(err, errAddonListNotFound) {
+			path, pathErr := a.addonListPath()
+			if pathErr != nil {
+				return nil, pathErr
 			}
+			return nil, fmt.Errorf("找不到 addonlist.txt 文件 (在 %s)", path)
 		}
+		return nil, err
+	}
+
+	// 按文件里的出现顺序返回，"1"（启用）和"0"（禁用）都计入
+	order := make([]string, 0, len(file.Items))
+	for _, item := range file.Items {
+		order = append(order, item.Name)
 	}
 
 	if len(order) == 0 {
