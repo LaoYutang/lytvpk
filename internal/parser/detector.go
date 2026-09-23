@@ -22,13 +22,8 @@ func DetermineVPKType(archive *vpk.Archive) string {
 			break // 发现地图就直接确定类型
 		}
 
-		// 检测角色文件 - 排除UI/HUD文件
-		if (strings.Contains(filename, "survivor") ||
-			strings.Contains(filename, "infected") ||
-			strings.Contains(filename, "zombie")) &&
-			!strings.Contains(filename, "resource/ui/") &&
-			!strings.Contains(filename, "scripts/") &&
-			!strings.Contains(filename, ".res") {
+		// 检测角色文件 - 界面/HUD 资源不作为角色证据
+		if isCharacterAssetPath(filename) {
 			hasCharacter = true
 		}
 

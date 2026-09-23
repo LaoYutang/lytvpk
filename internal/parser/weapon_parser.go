@@ -139,70 +139,75 @@ func DetectWeaponType(filename string, secondaryTags map[string]bool) {
 	lowerFilename := strings.ToLower(filename)
 
 	// Left 4 Dead 2 特定武器检测（最高优先级）
-	l4d2SpecificWeapons := map[string]string{
+	// 顺序即优先级：同一路径可能命中多个关键词，更具体的必须排在前面
+	l4d2SpecificWeapons := []keywordTag{
+		// 沙鹰（马格南）：路径 w_desert_eagle 同时含沙漠步枪的 desert，故排在其前
+		{"w_desert_eagle", "马格南"},
+
 		// 步枪
-		"ak47":         "AK47",
-		"desert":       "三连发",
-		"desert_rifle": "三连发",
-		"m16":          "M16",
-		"m16a2":        "M16",
-		"sg552":        "sg552",
-		"m60":          "M60",
+		{"ak47", "AK47"},
+		{"desert_rifle", "三连发"},
+		{"desert", "三连发"},
+		{"m16a2", "M16"},
+		{"m16", "M16"},
+		{"sg552", "sg552"},
+		{"m60", "M60"},
 
 		// 狙击枪
-		"awp":             "大狙",
-		"sniper_military": "军狙",
-		"sniper_a":        "军狙",
-		"hunting_rifle":   "猎枪",
-		"w_sniper_mini14": "猎枪",
-		"sniper_scout":    "鸟狙",
+		{"awp", "大狙"},
+		{"sniper_military", "军狙"},
+		{"sniper_a", "军狙"},
+		{"hunting_rifle", "猎枪"},
+		{"w_sniper_mini14", "猎枪"},
+		{"sniper_scout", "鸟狙"},
 
-		// 霰弹枪
-		"chrome":      "铁喷",
-		"m1014":       "铁喷",
-		"w_shotgun":   "木喷",
-		"autoshotgun": "一代连喷",
-		"spas":        "二代连喷",
+		// 霰弹枪：w_shotgun 是所有霰弹枪的通用前缀，必须排在具体型号之后
+		// SPAS-12 在引擎里的音效目录是 auto_shotgun_spas（sound/weapons/auto_shotgun_spas/），
+		// 路径会同时含 spas 与 autoshotgun，故 spas 必须排在 autoshotgun 之前
+		{"chrome", "铁喷"},
+		{"m1014", "铁喷"},
+		{"spas", "二代连喷"},
+		{"autoshotgun", "一代连喷"},
+		{"w_shotgun", "木喷"},
 
 		// 冲锋枪
-		"uzi":          "乌兹",
-		"smg_a":        "消音",
-		"smg_silenced": "消音",
-		"mp5":          "MP5",
+		{"uzi", "乌兹"},
+		{"smg_a", "消音"},
+		{"smg_silenced", "消音"},
+		{"mp5", "MP5"},
 
 		// 手枪
-		"magnum":         "马格南",
-		"w_desert_eagle": "马格南",
-		"pistol_glock":   "小手枪",
-		"w_pistol_glock": "小手枪",
-		"w_pistol_b":     "小手枪",
+		{"magnum", "马格南"},
+		{"w_pistol_glock", "小手枪"},
+		{"pistol_glock", "小手枪"},
+		{"w_pistol_b", "小手枪"},
 
 		// 发射器
-		"grenade_launcher": "榴弹",
+		{"grenade_launcher", "榴弹"},
 
 		// 近战武器
-		"machete":         "砍刀",
-		"katana":          "武士刀",
-		"baseball_bat":    "棒球棍",
-		"w_bat":           "棒球棍",
-		"knife":           "匕首",
-		"chainsaw":        "电锯",
-		"crowbar":         "撬棍",
-		"fireaxe":         "消防斧",
-		"frying_pan":      "平底锅",
-		"electric_guitar": "吉他",
-		"w_guitar":        "吉他",
-		"cricket_bat":     "板球拍",
-		"tonfa":           "警棍",
-		"golf_club":       "高尔夫球杆",
-		"shovel":          "铁铲",
-		"pitchfork":       "草叉",
+		{"machete", "砍刀"},
+		{"katana", "武士刀"},
+		{"baseball_bat", "棒球棍"},
+		{"w_bat", "棒球棍"},
+		{"knife", "匕首"},
+		{"chainsaw", "电锯"},
+		{"crowbar", "撬棍"},
+		{"fireaxe", "消防斧"},
+		{"frying_pan", "平底锅"},
+		{"electric_guitar", "吉他"},
+		{"w_guitar", "吉他"},
+		{"cricket_bat", "板球拍"},
+		{"tonfa", "警棍"},
+		{"golf_club", "高尔夫球杆"},
+		{"shovel", "铁铲"},
+		{"pitchfork", "草叉"},
 	}
 
 	// 检测L4D2特定武器
-	for keyword, weaponCode := range l4d2SpecificWeapons {
-		if strings.Contains(lowerFilename, keyword) {
-			secondaryTags[weaponCode] = true
+	for _, rule := range l4d2SpecificWeapons {
+		if strings.Contains(lowerFilename, rule.keyword) {
+			secondaryTags[rule.tag] = true
 			return
 		}
 	}
