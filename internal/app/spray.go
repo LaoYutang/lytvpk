@@ -364,6 +364,7 @@ func sanitizeSprayFileName(value string) string {
 	value = sanitizeVPKOutputDirName(value)
 	value = strings.TrimSpace(value)
 	value = strings.TrimRight(value, ". ")
+	value = strings.ReplaceAll(value, "..", "_")
 	return value
 }
 
