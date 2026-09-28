@@ -102,6 +102,12 @@
   margin-bottom: var(--spacing-4);
 }
 
+.server-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
 .server-data-section {
   margin-top: var(--spacing-4);
   padding: var(--spacing-4);
@@ -240,6 +246,11 @@
   .server-toolbar,
   .server-item {
     flex-direction: column;
+  }
+
+  .server-toolbar-group {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .server-actions {

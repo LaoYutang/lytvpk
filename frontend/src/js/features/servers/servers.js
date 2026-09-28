@@ -16,6 +16,10 @@ import {
 } from "./panel-modal.js";
 import { normalizePanelUrl } from "./panel-url.js";
 import { normalizeServerAddress } from "./address.js";
+import {
+  configureDirectConnect,
+  setupDirectConnectListeners,
+} from "./direct-connect.js";
 
 let showError;
 let showNotification;
@@ -91,6 +95,11 @@ export function configureServers(deps) {
     renderServers,
     renderLaunchServerMenu,
     fetchServerInfo,
+  });
+
+  configureDirectConnect({
+    showError,
+    connectServer,
   });
 
   configureDetailsModal({
@@ -422,9 +431,12 @@ function recordRecentServer(address) {
   const saved = getServers().find(
     (server) => normalizeAddress(server.address) === normalizedAddress
   );
+  // 未收藏的地址不会出现在最近列表中，记录只会挤掉有效的最近条目
+  if (!saved) return;
+
   const nextServer = {
-    name: saved?.name || normalizedAddress,
-    address: saved?.address || normalizedAddress,
+    name: saved.name,
+    address: saved.address,
     lastConnectedAt: Date.now(),
   };
   const nextRecent = [
@@ -943,6 +955,7 @@ export function setupServerModalListeners() {
   setupFormListeners();
   setupDetailsListeners();
   setupPanelListeners();
+  setupDirectConnectListeners();
 
   // 数据导入导出
   document

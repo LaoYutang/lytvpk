@@ -1176,22 +1176,44 @@
         <div class="modal-content server-modal-content">
           <div class="modal-body">
             <div class="server-toolbar">
-              <button id="open-add-server-modal-btn" class="btn btn-primary">
-                <svg
-                  class="icon-svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
+              <div class="server-toolbar-group">
+                <button id="open-add-server-modal-btn" class="btn btn-primary">
+                  <svg
+                    class="icon-svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14"></path>
+                    <path d="M12 5v14"></path>
+                  </svg>
+                  添加服务器
+                </button>
+                <button
+                  id="open-direct-connect-modal-btn"
+                  class="btn btn-secondary"
+                  title="输入 IP/域名和端口直接连接"
                 >
-                  <path d="M5 12h14"></path>
-                  <path d="M12 5v14"></path>
-                </svg>
-                添加服务器
-              </button>
+                  <svg
+                    class="icon-svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                  </svg>
+                  IP 直连
+                </button>
+              </div>
               <button
                 id="refresh-all-servers-btn"
                 class="btn btn-secondary"
@@ -1776,6 +1798,53 @@
               class="btn btn-primary btn-padding-lg"
             >
               保存
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- IP 直连对话框 -->
+      <div id="direct-connect-modal" class="modal hidden z-1060">
+        <div class="modal-content server-form-modal-content">
+          <div class="modal-header server-form-header">
+            <h2 class="server-form-title">IP 直连</h2>
+            <button id="close-direct-connect-modal-btn" class="close-btn">
+              &times;
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group mb-20">
+              <label for="direct-connect-address" class="form-label"
+                >服务器地址 (IP/域名，端口可选)</label
+              >
+              <input
+                type="text"
+                id="direct-connect-address"
+                class="form-input w-100"
+                autocomplete="off"
+                placeholder="例如: 127.0.0.1:27015 或 example.com"
+              />
+            </div>
+            <p class="text-sm-tertiary mt-8">
+              端口用「:」拼接，未填写时默认 27015。
+            </p>
+            <p class="text-sm-tertiary mt-8">
+              支持粘贴 connect 127.0.0.1:27015 或
+              steam://connect/127.0.0.1:27015。
+            </p>
+          </div>
+          <div class="modal-footer server-form-footer">
+            <button
+              id="cancel-direct-connect-btn"
+              class="btn btn-secondary btn-padding-lg"
+            >
+              取消
+            </button>
+            <button
+              id="confirm-direct-connect-btn"
+              class="btn btn-primary btn-padding-lg"
+            >
+              连接
             </button>
           </div>
         </div>

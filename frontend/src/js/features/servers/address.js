@@ -1,5 +1,40 @@
 export const DEFAULT_SERVER_PORT = 27015;
 
+// 直连输入除纯地址外，还允许直接粘贴控制台命令或 Steam 链接
+const CONNECT_PREFIXES = [/^steam:\/\/connect\//iu, /^connect[\s:]+/iu];
+
+// parseServerInput 解析 IP 直连输入，兼容以下写法：
+//   127.0.0.1、127.0.0.1:27015、[::1]:27015
+//   connect 127.0.0.1:27015、steam://connect/127.0.0.1:27015
+export function parseServerInput(rawInput) {
+  let address = String(rawInput || "").trim();
+  if (!address) {
+    throw new Error("请输入服务器 IP 或域名");
+  }
+
+  for (const prefix of CONNECT_PREFIXES) {
+    if (prefix.test(address)) {
+      address = address.replace(prefix, "").trim();
+      break;
+    }
+  }
+
+  address = stripWrappingQuotes(address);
+  if (isMissingHost(address)) {
+    throw new Error("请输入服务器 IP 或域名");
+  }
+  return normalizeServerAddress(address);
+}
+
+// 只写了 connect 而没写地址时，提示用户补全而不是拿它当主机名
+function isMissingHost(address) {
+  return !address || /^connect$/iu.test(address);
+}
+
+function stripWrappingQuotes(value) {
+  return value.replace(/^["'](.*)["']$/su, "$1").trim();
+}
+
 export function normalizeServerAddress(rawAddress) {
   const address = String(rawAddress || "").trim();
   if (!address) {
