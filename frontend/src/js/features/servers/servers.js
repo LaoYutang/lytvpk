@@ -33,6 +33,7 @@ let GetMapName;
 let GetServerStorage;
 let SaveServerStorage;
 let BrowserOpenURL;
+let ClipboardGetText;
 let FetchPanelServerStatus;
 let RestartPanelServer;
 let FetchPanelMapList;
@@ -66,6 +67,7 @@ export function configureServers(deps) {
     GetServerStorage,
     SaveServerStorage,
     BrowserOpenURL,
+    ClipboardGetText,
     FetchPanelServerStatus,
     RestartPanelServer,
     FetchPanelMapList,
@@ -100,6 +102,7 @@ export function configureServers(deps) {
   configureDirectConnect({
     showError,
     connectServer,
+    ClipboardGetText,
   });
 
   configureDetailsModal({

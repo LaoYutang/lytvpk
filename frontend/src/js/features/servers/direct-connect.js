@@ -1,10 +1,14 @@
-import { parseServerInput } from "./address.js";
+import { parseClipboardAddress, parseServerInput } from "./address.js";
 
 let showError;
 let connectServer;
+let ClipboardGetText;
+
+// 每次打开弹窗递增，用于丢弃过期剪贴板读取结果
+let openToken = 0;
 
 export function configureDirectConnect(deps) {
-  ({ showError, connectServer } = deps);
+  ({ showError, connectServer, ClipboardGetText } = deps);
 }
 
 export function openDirectConnectModal() {
@@ -16,6 +20,29 @@ export function openDirectConnectModal() {
   modal.classList.remove("hidden");
   document.getElementById("global-dropdown").classList.add("hidden");
   addressInput.focus();
+  void prefillFromClipboard(++openToken);
+}
+
+// 剪贴板里如果有可用的服务器地址就自动填入，读不到或格式不符时保持为空
+async function prefillFromClipboard(token) {
+  const address = parseClipboardAddress(await readClipboardText());
+  const modal = document.getElementById("direct-connect-modal");
+  const addressInput = document.getElementById("direct-connect-address");
+  if (!address || !modal || !addressInput) return;
+  if (token !== openToken || modal.classList.contains("hidden")) return;
+  if (addressInput.value) return;
+
+  addressInput.value = address;
+  addressInput.select();
+}
+
+async function readClipboardText() {
+  try {
+    return await ClipboardGetText();
+  } catch (err) {
+    console.error("读取剪贴板失败:", err);
+    return "";
+  }
 }
 
 export function closeDirectConnectModal() {
