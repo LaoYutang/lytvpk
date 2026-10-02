@@ -254,6 +254,10 @@ export function GetWorkshopBrowserTarget() {
   return window['go']['app']['App']['GetWorkshopBrowserTarget']();
 }
 
+export function GetWorkshopDNSConfig() {
+  return window['go']['app']['App']['GetWorkshopDNSConfig']();
+}
+
 export function GetWorkshopDetails(arg1) {
   return window['go']['app']['App']['GetWorkshopDetails'](arg1);
 }
@@ -516,6 +520,10 @@ export function SetVPKTags(arg1, arg2, arg3) {
 
 export function SetWorkshopBrowserTarget(arg1) {
   return window['go']['app']['App']['SetWorkshopBrowserTarget'](arg1);
+}
+
+export function SetWorkshopDNSConfig(arg1) {
+  return window['go']['app']['App']['SetWorkshopDNSConfig'](arg1);
 }
 
 export function SetWorkshopFixedIP(arg1) {

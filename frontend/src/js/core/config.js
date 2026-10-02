@@ -20,6 +20,7 @@ const DEFAULT_CONFIG = {
     enableWeapons: false,
   },
   workshopPreferredIP: true,
+  workshopDNS: { mode: "dnspod", customAddress: "" },
   workshopFixedIP: "",
   workshopMetaEnabled: true,
   workshopUpdateCheckEnabled: false,
@@ -112,6 +113,10 @@ function normalizeConfig(config = {}) {
   next.modRotationConfig = {
     ...DEFAULT_CONFIG.modRotationConfig,
     ...(config.modRotationConfig || {}),
+  };
+  next.workshopDNS = {
+    ...DEFAULT_CONFIG.workshopDNS,
+    ...(config.workshopDNS || {}),
   };
   next.savedDirectories = Array.isArray(config.savedDirectories)
     ? config.savedDirectories

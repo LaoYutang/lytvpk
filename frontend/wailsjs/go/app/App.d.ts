@@ -131,6 +131,8 @@ export function GetVPKPreviewImage(arg1:string):Promise<string>;
 
 export function GetWorkshopBrowserTarget():Promise<string>;
 
+export function GetWorkshopDNSConfig():Promise<app.WorkshopDNSConfig>;
+
 export function GetWorkshopDetails(arg1:string):Promise<Array<app.WorkshopFileDetails>>;
 
 export function GetWorkshopDetailsGrouped(arg1:string):Promise<app.WorkshopDetailsResult>;
@@ -262,6 +264,8 @@ export function SetVPKLoadOrder(arg1:string,arg2:number):Promise<void>;
 export function SetVPKTags(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
 export function SetWorkshopBrowserTarget(arg1:string):Promise<void>;
+
+export function SetWorkshopDNSConfig(arg1:app.WorkshopDNSConfig):Promise<void>;
 
 export function SetWorkshopFixedIP(arg1:string):Promise<void>;
 

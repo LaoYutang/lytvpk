@@ -58,7 +58,22 @@ export namespace app {
 	        this.enableWeapons = source["enableWeapons"];
 	    }
 	}
+	export class WorkshopDNSConfig {
+	    mode: string;
+	    customAddress: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkshopDNSConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.customAddress = source["customAddress"];
+	    }
+	}
 	export class ConfigFile {
+	    workshopDNS?: WorkshopDNSConfig;
 	    modRotationConfig: RotationConfig;
 	    workshopPreferredIP?: boolean;
 	    workshopFixedIP?: string;
@@ -89,6 +104,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workshopDNS = this.convertValues(source["workshopDNS"], WorkshopDNSConfig);
 	        this.modRotationConfig = this.convertValues(source["modRotationConfig"], RotationConfig);
 	        this.workshopPreferredIP = source["workshopPreferredIP"];
 	        this.workshopFixedIP = source["workshopFixedIP"];
@@ -1373,6 +1389,7 @@ export namespace app {
 	        this.file_type = source["file_type"];
 	    }
 	}
+	
 	export class  {
 	    preview_url: string;
 	    preview_type: number;

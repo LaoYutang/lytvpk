@@ -183,6 +183,29 @@
   margin-top: 16px;
 }
 
+.settings-dns-custom {
+  margin-top: 16px;
+}
+
+.settings-dns-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.settings-dns-error {
+  color: var(--danger, #ef4444);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
+.settings-dns-card .btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .setting-card-title {
   font-size: 1rem;
   font-weight: 600;

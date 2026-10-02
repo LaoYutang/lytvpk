@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -60,13 +59,9 @@ func addWorkshopMoveTestFile(t *testing.T, app *App, filePath string, location s
 func resetWorkshopDetailTestClient(t *testing.T, serverURL string) {
 	t.Helper()
 	WorkshopWorkerURL = serverURL
-	workshopClient = nil
-	workshopClientOnce = sync.Once{}
 	clearWorkshopDetailTestCache()
 	t.Cleanup(func() {
 		WorkshopWorkerURL = "https://l4d2-workshop.laoyutang.cn"
-		workshopClient = nil
-		workshopClientOnce = sync.Once{}
 		clearWorkshopDetailTestCache()
 	})
 }

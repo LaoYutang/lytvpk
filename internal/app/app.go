@@ -63,6 +63,7 @@ type App struct {
 	ctx                    context.Context
 	vpkCache               sync.Map // map[string]*VPKFileCache, key是文件路径
 	mu                     sync.RWMutex
+	configWriteMu          sync.Mutex
 	rootDir                string
 	goroutinePool          *ants.Pool
 	conflictCheckMu        sync.Mutex
@@ -83,6 +84,8 @@ type App struct {
 	// 配置项
 	modRotationConfig              RotationConfig
 	workshopPreferredIP            bool
+	workshopDNSConfig              WorkshopDNSConfig
+	workshopNetwork                *workshopNetworkClients
 	workshopFixedIP                string
 	workshopMetaEnabled            bool
 	workshopUpdateCheckEnabled     bool
@@ -114,29 +117,30 @@ type App struct {
 
 // ConfigFile 定义配置文件结构
 type ConfigFile struct {
-	ModRotationConfig              RotationConfig   `json:"modRotationConfig"`
-	WorkshopPreferredIP            *bool            `json:"workshopPreferredIP,omitempty"`
-	WorkshopFixedIP                *string          `json:"workshopFixedIP,omitempty"`
-	WorkshopMetaEnabled            *bool            `json:"workshopMetaEnabled,omitempty"`
-	WorkshopUpdateCheckEnabled     *bool            `json:"workshopUpdateCheckEnabled,omitempty"`
-	WorkshopBrowserTarget          *string          `json:"workshopBrowserTarget,omitempty"`
-	WorkshopTranslateProvider      *string          `json:"workshopTranslateProvider,omitempty"`
-	WorkshopTranslateCustomBaseURL string           `json:"workshopTranslateCustomBaseURL,omitempty"`
-	WorkshopTranslateCustomAPIKey  string           `json:"workshopTranslateCustomAPIKey,omitempty"`
-	WorkshopTranslateCustomModelId string           `json:"workshopTranslateCustomModelId,omitempty"`
-	DefaultDirectory               string           `json:"defaultDirectory"`
-	SavedDirectories               []SavedDirectory `json:"savedDirectories"`
-	LastActiveDirectory            string           `json:"lastActiveDirectory"`
-	DisplayMode                    string           `json:"displayMode"`
-	FilterLayoutMode               string           `json:"filterLayoutMode"`
-	BoxSelectionEnabled            *bool            `json:"boxSelectionEnabled,omitempty"`
-	CtrlClickSelectionEnabled      *bool            `json:"ctrlClickSelectionEnabled,omitempty"`
-	Theme                          string           `json:"theme"`
-	IgnoredVersion                 string           `json:"ignoredVersion"`
-	LastUpdateCheckTime            string           `json:"lastUpdateCheckTime"`
-	WindowState                    *WindowState     `json:"windowState,omitempty"`
-	SnapshotDirectory              string           `json:"snapshotDirectory,omitempty"`
-	// migrationVersion=2 表示前端 localStorage 配置已迁移到配置目录。
+	WorkshopDNS                    *WorkshopDNSConfig `json:"workshopDNS,omitempty"`
+	ModRotationConfig              RotationConfig     `json:"modRotationConfig"`
+	WorkshopPreferredIP            *bool              `json:"workshopPreferredIP,omitempty"`
+	WorkshopFixedIP                *string            `json:"workshopFixedIP,omitempty"`
+	WorkshopMetaEnabled            *bool              `json:"workshopMetaEnabled,omitempty"`
+	WorkshopUpdateCheckEnabled     *bool              `json:"workshopUpdateCheckEnabled,omitempty"`
+	WorkshopBrowserTarget          *string            `json:"workshopBrowserTarget,omitempty"`
+	WorkshopTranslateProvider      *string            `json:"workshopTranslateProvider,omitempty"`
+	WorkshopTranslateCustomBaseURL string             `json:"workshopTranslateCustomBaseURL,omitempty"`
+	WorkshopTranslateCustomAPIKey  string             `json:"workshopTranslateCustomAPIKey,omitempty"`
+	WorkshopTranslateCustomModelId string             `json:"workshopTranslateCustomModelId,omitempty"`
+	DefaultDirectory               string             `json:"defaultDirectory"`
+	SavedDirectories               []SavedDirectory   `json:"savedDirectories"`
+	LastActiveDirectory            string             `json:"lastActiveDirectory"`
+	DisplayMode                    string             `json:"displayMode"`
+	FilterLayoutMode               string             `json:"filterLayoutMode"`
+	BoxSelectionEnabled            *bool              `json:"boxSelectionEnabled,omitempty"`
+	CtrlClickSelectionEnabled      *bool              `json:"ctrlClickSelectionEnabled,omitempty"`
+	Theme                          string             `json:"theme"`
+	IgnoredVersion                 string             `json:"ignoredVersion"`
+	LastUpdateCheckTime            string             `json:"lastUpdateCheckTime"`
+	WindowState                    *WindowState       `json:"windowState,omitempty"`
+	SnapshotDirectory              string             `json:"snapshotDirectory,omitempty"`
+	// v2: localStorage migrated; v3: workshop DNS settings added.
 	MigrationVersion int `json:"migrationVersion"`
 }
 
@@ -254,7 +258,8 @@ func NewApp() *App {
 		workshopWatchLaterPath:    workshopWatchLaterPath,
 		problemScanPath:           problemScanPath,
 		workshopHistoryPath:       workshopHistoryPath,
-		workshopPreferredIP:       true,     // 默认开启优选IP
+		workshopPreferredIP:       true, // 默认开启优选IP
+		workshopDNSConfig:         defaultWorkshopDNSConfig(),
 		workshopMetaEnabled:       true,     // 默认开启工坊meta信息存储
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站
 		workshopTranslateProvider: workshopTranslateProviderMicrosoft,

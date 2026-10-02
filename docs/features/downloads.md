@@ -75,6 +75,7 @@ https://steamcommunity.com/sharedfiles/filedetails/?id=123456
 
 - 重新解析工坊链接或工坊 ID。
 - 检查网络正常。
+- 在“设置” → “网络设置” → “工坊 DNS”中更换 DNS，点击“保存”后重新解析。具体说明见 [工坊 DNS 设置](/features/settings#工坊-dns)。
 - 稍后重试。
 - 提交问题反馈。
 

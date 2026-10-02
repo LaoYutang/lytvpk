@@ -1,17 +1,14 @@
 package app
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -104,30 +101,7 @@ type WorkshopCacheItem struct {
 	ExpiresAt time.Time
 }
 
-var (
-	workshopClient     *resty.Client
-	workshopClientOnce sync.Once
-	workshopCache      sync.Map
-)
-
-func getWorkshopClient() *resty.Client {
-	workshopClientOnce.Do(func() {
-		dialer := &net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}
-		transport := &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(ctx, "tcp4", addr)
-			},
-		}
-		workshopClient = resty.New()
-		workshopClient.SetTimeout(15 * time.Second)
-		workshopClient.SetRetryCount(2)
-		workshopClient.SetTransport(transport)
-	})
-	return workshopClient
-}
+var workshopCache sync.Map
 
 func getWorkshopCache(key string) (interface{}, bool) {
 	val, ok := workshopCache.Load(key)
@@ -163,7 +137,7 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 		}
 	}
 
-	client := getWorkshopClient()
+	client := a.getWorkshopClient()
 
 	req := client.R().
 		SetQueryParam("page", strconv.Itoa(opts.Page)).
@@ -247,7 +221,7 @@ func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool, withPreviews 
 		}
 	}
 
-	client := getWorkshopClient()
+	client := a.getWorkshopClient()
 
 	req := client.R().
 		SetQueryParam("id", id).

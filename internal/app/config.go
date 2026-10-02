@@ -18,7 +18,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const configMigrationVersion = 2
+const (
+	configMigrationVersion       = 3
+	localStorageMigrationVersion = 2
+)
 
 type legacyFrontendConfig struct {
 	DefaultDirectory          *string          `json:"defaultDirectory"`
@@ -78,6 +81,14 @@ func (a *App) loadConfig() {
 
 	a.mu.Lock()
 	a.modRotationConfig = config.ModRotationConfig
+	if config.WorkshopDNS != nil {
+		if dnsConfig, err := normalizeWorkshopDNSConfig(*config.WorkshopDNS); err == nil {
+			a.workshopDNSConfig = dnsConfig
+		} else {
+			log.Printf("读取工坊 DNS 配置失败，使用默认设置: %v", err)
+			a.workshopDNSConfig = defaultWorkshopDNSConfig()
+		}
+	}
 	if config.WorkshopPreferredIP != nil {
 		a.workshopPreferredIP = *config.WorkshopPreferredIP
 	}
@@ -125,7 +136,14 @@ func (a *App) loadConfig() {
 		a.windowState = *config.WindowState
 	}
 	a.migrationVersion = config.MigrationVersion
+	upgradeDNS := a.migrationVersion >= localStorageMigrationVersion && a.migrationVersion < configMigrationVersion
+	if upgradeDNS {
+		a.migrationVersion = configMigrationVersion
+	}
 	a.mu.Unlock()
+	if upgradeDNS {
+		a.saveConfig()
+	}
 
 	log.Printf("已加载配置: 优选IP=%v, 固定IP=%s, 轮换=%v, 迁移版本=%d, meta存储=%v, 浏览器目标=%s", a.workshopPreferredIP, a.workshopFixedIP, a.modRotationConfig, a.migrationVersion, a.workshopMetaEnabled, a.workshopBrowserTarget)
 }
@@ -139,6 +157,15 @@ func (a *App) saveConfig() {
 func (a *App) snapshotConfig() ConfigFile {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+	return a.snapshotConfigLocked()
+}
+
+// snapshotConfigLocked requires the caller to hold a.mu.
+func (a *App) snapshotConfigLocked() ConfigFile {
+	dnsConfig := a.workshopDNSConfig
+	if dnsConfig.Mode == "" {
+		dnsConfig.Mode = "dnspod"
+	}
 
 	preferredIP := a.workshopPreferredIP
 	fixedIP := a.workshopFixedIP
@@ -158,6 +185,7 @@ func (a *App) snapshotConfig() ConfigFile {
 	}
 
 	return ConfigFile{
+		WorkshopDNS:                    &dnsConfig,
 		ModRotationConfig:              a.modRotationConfig,
 		WorkshopPreferredIP:            &preferredIP,
 		WorkshopFixedIP:                &fixedIP,
@@ -185,6 +213,24 @@ func (a *App) snapshotConfig() ConfigFile {
 }
 
 func (a *App) writeConfigFile(config ConfigFile) error {
+	a.configWriteMu.Lock()
+	defer a.configWriteMu.Unlock()
+	// A snapshot may predate a DNS change. Always retain the active DNS setting.
+	a.mu.RLock()
+	dnsConfig := a.workshopDNSConfig
+	if dnsConfig.Mode == "" {
+		dnsConfig.Mode = "dnspod"
+	}
+	config.WorkshopDNS = &dnsConfig
+	if config.MigrationVersion < a.migrationVersion {
+		config.MigrationVersion = a.migrationVersion
+	}
+	a.mu.RUnlock()
+	return a.writeConfigFileLocked(config)
+}
+
+// writeConfigFileLocked requires the caller to hold configWriteMu.
+func (a *App) writeConfigFileLocked(config ConfigFile) error {
 	a.ensureConfigPaths()
 	if a.configDir != "" {
 		if err := os.MkdirAll(a.configDir, 0755); err != nil {
@@ -196,7 +242,19 @@ func (a *App) writeConfigFile(config ConfigFile) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(a.configPath, data, 0644)
+	file, err := os.CreateTemp(filepath.Dir(a.configPath), ".config-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), a.configPath)
 }
 
 func (a *App) GetConfigMigrationVersion() int {
@@ -247,7 +305,7 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) error {
 	a.ensureConfigPaths()
 	a.mu.RLock()
-	alreadyMigrated := a.migrationVersion >= configMigrationVersion
+	alreadyMigrated := a.migrationVersion >= localStorageMigrationVersion
 	a.mu.RUnlock()
 	if alreadyMigrated {
 		return nil

@@ -10,6 +10,7 @@ require (
 	github.com/nwaples/rardecode v1.1.3
 	github.com/panjf2000/ants/v2 v2.11.4
 	github.com/wailsapp/wails/v2 v2.10.2
+	golang.org/x/net v0.48.0
 	golang.org/x/sys v0.40.0
 	golang.org/x/text v0.33.0
 	l4d2-manager-next v0.0.0-20260729080826-da389d5401a9
@@ -51,7 +52,6 @@ require (
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/mod v0.31.0 // indirect
-	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/tools v0.40.0 // indirect
 )

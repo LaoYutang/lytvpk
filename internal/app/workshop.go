@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"vpk-manager/internal/platform/protocol"
 
@@ -364,18 +363,14 @@ func buildWorkshopDetailsGroup(rootID string, main WorkshopFileDetails, children
 }
 
 func (a *App) fetchWorkshopDetails(payload string) ([]WorkshopFileDetails, error) {
-	apiUrl := "https://l4d2-workshop-parse.laoyutang.cn"
-
-	req, err := http.NewRequest("POST", apiUrl, bytes.NewBuffer([]byte(payload)))
+	req, err := http.NewRequest("POST", workshopParseWorkerURL, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
+	client := a.getWorkshopNetworkClients().parser
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

@@ -1,3 +1,5 @@
+import { appendWorkshopDNSSettings } from "./workshop-dns.js";
+
 const SETTINGS_NAV_ICONS = {
   network: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>`,
   interface: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/></svg>`,
@@ -19,6 +21,8 @@ export async function renderSettingsPage({
   SetSnapshotDirectory,
   OpenSnapshotDirectory,
   GetWorkshopPreferredIP,
+  GetWorkshopDNSConfig,
+  SetWorkshopDNSConfig,
   GetWorkshopFixedIP,
   GetWorkshopIPOptions,
   GetWorkshopMetaEnabled,
@@ -257,6 +261,12 @@ export async function renderSettingsPage({
       </div>
     </div>
   `;
+
+  await appendWorkshopDNSSettings(container, {
+    GetWorkshopDNSConfig,
+    SetWorkshopDNSConfig,
+    showNotification,
+  });
 
   await appendSnapshotStoragePanel(container, {
     SelectDirectory,
