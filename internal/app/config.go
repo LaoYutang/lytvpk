@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	configMigrationVersion       = 3
+	configMigrationVersion       = 4
 	localStorageMigrationVersion = 2
 )
 
@@ -119,6 +119,7 @@ func (a *App) loadConfig() {
 	if config.DisplayMode != "" {
 		a.displayMode = config.DisplayMode
 	}
+	a.sortType, a.sortOrder = normalizeFileSort(config.SortType, config.SortOrder)
 	if config.FilterLayoutMode != "" {
 		a.filterLayoutMode = config.FilterLayoutMode
 	}
@@ -136,12 +137,12 @@ func (a *App) loadConfig() {
 		a.windowState = *config.WindowState
 	}
 	a.migrationVersion = config.MigrationVersion
-	upgradeDNS := a.migrationVersion >= localStorageMigrationVersion && a.migrationVersion < configMigrationVersion
-	if upgradeDNS {
+	upgradeConfig := a.migrationVersion >= localStorageMigrationVersion && a.migrationVersion < configMigrationVersion
+	if upgradeConfig {
 		a.migrationVersion = configMigrationVersion
 	}
 	a.mu.Unlock()
-	if upgradeDNS {
+	if upgradeConfig {
 		a.saveConfig()
 	}
 
@@ -178,6 +179,7 @@ func (a *App) snapshotConfigLocked() ConfigFile {
 	}
 	boxSelectionEnabled := a.boxSelectionEnabled
 	ctrlClickSelectionEnabled := a.ctrlClickSelectionEnabled
+	sortType, sortOrder := normalizeFileSort(a.sortType, a.sortOrder)
 	var windowState *WindowState
 	if a.windowState.Width > 0 && a.windowState.Height > 0 {
 		state := a.windowState
@@ -200,6 +202,8 @@ func (a *App) snapshotConfigLocked() ConfigFile {
 		SavedDirectories:               cloneSavedDirectories(a.savedDirectories),
 		LastActiveDirectory:            a.lastActiveDirectory,
 		DisplayMode:                    defaultString(a.displayMode, "list"),
+		SortType:                       sortType,
+		SortOrder:                      sortOrder,
 		FilterLayoutMode:               defaultString(a.filterLayoutMode, "compact"),
 		BoxSelectionEnabled:            &boxSelectionEnabled,
 		CtrlClickSelectionEnabled:      &ctrlClickSelectionEnabled,
@@ -273,6 +277,7 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.savedDirectories = cloneSavedDirectories(config.SavedDirectories)
 	a.lastActiveDirectory = config.LastActiveDirectory
 	a.displayMode = defaultString(config.DisplayMode, "list")
+	a.sortType, a.sortOrder = normalizeFileSort(config.SortType, config.SortOrder)
 	a.filterLayoutMode = defaultString(config.FilterLayoutMode, "compact")
 	if config.BoxSelectionEnabled != nil {
 		a.boxSelectionEnabled = *config.BoxSelectionEnabled
@@ -300,6 +305,21 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.mu.Unlock()
 
 	return a.writeConfigFile(a.snapshotConfig())
+}
+
+func normalizeFileSort(sortType, sortOrder string) (string, string) {
+	switch sortType {
+	case "name", "date", "loadOrder":
+	default:
+		sortType = "name"
+	}
+	if sortOrder != "asc" && sortOrder != "desc" {
+		sortOrder = "asc"
+		if sortType == "date" {
+			sortOrder = "desc"
+		}
+	}
+	return sortType, sortOrder
 }
 
 func (a *App) MigrateLocalStorageConfig(payload LocalStorageMigrationPayload) error {

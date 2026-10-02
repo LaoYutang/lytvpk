@@ -24,8 +24,8 @@ export const appState = {
   currentDirectory: "",
   isLoading: false,
   showHidden: false,
-  sortType: "name",
-  sortOrder: "asc",
+  sortType: getConfig().sortType,
+  sortOrder: getConfig().sortOrder,
   loadOrderMap: new Map(),
   displayMode: getConfig().displayMode || "list",
   boxSelectionEnabled: getConfig().boxSelectionEnabled || false,
@@ -35,6 +35,8 @@ export const appState = {
 };
 
 export function applyConfigToAppState(config = getConfig()) {
+  appState.sortType = config.sortType || "name";
+  appState.sortOrder = config.sortOrder || "asc";
   appState.displayMode = config.displayMode || "list";
   appState.boxSelectionEnabled = config.boxSelectionEnabled || false;
   appState.ctrlClickSelectionEnabled =

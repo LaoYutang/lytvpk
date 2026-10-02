@@ -30,6 +30,8 @@ const DEFAULT_CONFIG = {
   savedDirectories: [],
   lastActiveDirectory: "",
   displayMode: "list",
+  sortType: "name",
+  sortOrder: "asc",
   filterLayoutMode: "compact",
   boxSelectionEnabled: true,
   ctrlClickSelectionEnabled: true,
@@ -122,6 +124,12 @@ function normalizeConfig(config = {}) {
     ? config.savedDirectories
     : [];
   next.displayMode = next.displayMode || DEFAULT_CONFIG.displayMode;
+  next.sortType = ["name", "date", "loadOrder"].includes(next.sortType)
+    ? next.sortType
+    : DEFAULT_CONFIG.sortType;
+  next.sortOrder = ["asc", "desc"].includes(next.sortOrder)
+    ? next.sortOrder
+    : next.sortType === "date" ? "desc" : "asc";
   next.filterLayoutMode =
     next.filterLayoutMode || DEFAULT_CONFIG.filterLayoutMode;
   next.workshopBrowserTarget =

@@ -100,7 +100,7 @@ func TestWorkshopDNSConfigVersionTwoUpgradeDoesNotRepeatLegacyMigration(t *testi
 	})
 	app.loadConfig()
 	config := app.GetAppConfig()
-	if config.MigrationVersion != 3 || config.WorkshopDNS == nil || config.WorkshopDNS.Mode != "dnspod" || config.Theme != "dark" || config.SnapshotDirectory != "D:/Snapshots" || config.DefaultDirectory != "D:/Current" {
+	if config.MigrationVersion != configMigrationVersion || config.WorkshopDNS == nil || config.WorkshopDNS.Mode != "dnspod" || config.Theme != "dark" || config.SnapshotDirectory != "D:/Snapshots" || config.DefaultDirectory != "D:/Current" {
 		t.Fatalf("unexpected upgraded config: %+v", config)
 	}
 	var stored ConfigFile
@@ -111,7 +111,7 @@ func TestWorkshopDNSConfigVersionTwoUpgradeDoesNotRepeatLegacyMigration(t *testi
 	if err := json.Unmarshal(data, &stored); err != nil {
 		t.Fatal(err)
 	}
-	if stored.MigrationVersion != 3 || stored.WorkshopDNS == nil {
+	if stored.MigrationVersion != configMigrationVersion || stored.WorkshopDNS == nil {
 		t.Fatal("DNS migration was not persisted")
 	}
 	// Version 2 is already a completed localStorage migration, even when a

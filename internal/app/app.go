@@ -99,6 +99,8 @@ type App struct {
 	savedDirectories               []SavedDirectory
 	lastActiveDirectory            string
 	displayMode                    string
+	sortType                       string
+	sortOrder                      string
 	filterLayoutMode               string
 	boxSelectionEnabled            bool
 	ctrlClickSelectionEnabled      bool
@@ -132,6 +134,8 @@ type ConfigFile struct {
 	SavedDirectories               []SavedDirectory   `json:"savedDirectories"`
 	LastActiveDirectory            string             `json:"lastActiveDirectory"`
 	DisplayMode                    string             `json:"displayMode"`
+	SortType                       string             `json:"sortType"`
+	SortOrder                      string             `json:"sortOrder"`
 	FilterLayoutMode               string             `json:"filterLayoutMode"`
 	BoxSelectionEnabled            *bool              `json:"boxSelectionEnabled,omitempty"`
 	CtrlClickSelectionEnabled      *bool              `json:"ctrlClickSelectionEnabled,omitempty"`
@@ -140,7 +144,7 @@ type ConfigFile struct {
 	LastUpdateCheckTime            string             `json:"lastUpdateCheckTime"`
 	WindowState                    *WindowState       `json:"windowState,omitempty"`
 	SnapshotDirectory              string             `json:"snapshotDirectory,omitempty"`
-	// v2: localStorage migrated; v3: workshop DNS settings added.
+	// v2: localStorage migrated; v3: workshop DNS settings; v4: VPK list sorting.
 	MigrationVersion int `json:"migrationVersion"`
 }
 
@@ -264,6 +268,8 @@ func NewApp() *App {
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站
 		workshopTranslateProvider: workshopTranslateProviderMicrosoft,
 		displayMode:               "list",
+		sortType:                  "name",
+		sortOrder:                 "asc",
 		filterLayoutMode:          "compact",
 		boxSelectionEnabled:       true,
 		ctrlClickSelectionEnabled: true,

@@ -1,4 +1,5 @@
 import { appState } from "../state.js";
+import { saveConfig } from "../../core/config.js";
 import { showNotification, showError } from "../../core/toast.js";
 import { renderFileList } from "./render.js";
 import { GetAddonListOrder } from "../../../../wailsjs/go/app/App";
@@ -41,6 +42,7 @@ export async function handleLoadOrderSort() {
 
     appState.sortType = "loadOrder";
     appState.sortOrder = "asc";
+    saveSortPreference();
 
     updateSortButtonUI();
     applySort(appState.vpkFiles);
@@ -65,6 +67,27 @@ export async function refreshLoadOrderMap() {
   return orderList;
 }
 
+export async function refreshSortData() {
+  if (appState.sortType !== "loadOrder") return;
+
+  try {
+    await refreshLoadOrderMap();
+  } catch (err) {
+    appState.loadOrderMap.clear();
+    console.error("获取加载顺序失败:", err);
+    showError("addonlist.txt 错误: " + err);
+  }
+}
+
+export function saveSortPreference() {
+  return saveConfig({
+    sortType: appState.sortType,
+    sortOrder: appState.sortOrder,
+  }).catch((err) => {
+    showError("保存排序设置失败: " + err);
+  });
+}
+
 export function handleSortChange(type) {
   if (appState.sortType === type) {
     appState.sortOrder = appState.sortOrder === "asc" ? "desc" : "asc";
@@ -73,6 +96,7 @@ export function handleSortChange(type) {
     appState.sortOrder = type === "date" ? "desc" : "asc";
   }
 
+  saveSortPreference();
   updateSortButtonUI();
   document.getElementById("sort-dropdown-content")?.classList.add("hidden");
 

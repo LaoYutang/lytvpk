@@ -2,7 +2,7 @@ import { appState, updateStatusBar, showFileListLoading, hideFileListLoading } f
 import { showError } from "../../core/toast.js";
 import { renderFileList } from "./render.js";
 import { getLocationDisplayName, escapeHtml } from "../../core/utils.js";
-import { applySort, updateSortButtonUI } from "./sorting.js";
+import { applySort, refreshSortData, saveSortPreference, updateSortButtonUI } from "./sorting.js";
 import { resetBoxSelection } from "./box-selection.js";
 import { GetPrimaryTags, GetSecondaryTags, SearchVPKFiles, ScanVPKFiles, GetVPKFiles } from "../../../../wailsjs/go/app/App";
 
@@ -607,6 +607,7 @@ export async function resetFilters() {
 
     appState.sortType = "name";
     appState.sortOrder = "asc";
+    saveSortPreference();
     updateSortButtonUI();
 
     await performSearch();
@@ -719,6 +720,7 @@ export async function refreshFilesKeepFilter() {
       GetPrimaryTags(),
     ]);
 
+    await refreshSortData();
     applySort(files);
 
     appState.allVpkFiles = files;

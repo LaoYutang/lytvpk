@@ -24,6 +24,8 @@ func newConfigTestApp(t *testing.T) *App {
 		workshopBrowserTarget:     "mirror",
 		workshopTranslateProvider: workshopTranslateProviderMicrosoft,
 		displayMode:               "list",
+		sortType:                  "name",
+		sortOrder:                 "asc",
 		filterLayoutMode:          "compact",
 		boxSelectionEnabled:       true,
 		ctrlClickSelectionEnabled: true,
@@ -51,6 +53,9 @@ func TestConfigDefaultsWithoutFile(t *testing.T) {
 	if config.DisplayMode != "list" {
 		t.Fatalf("expected display mode list, got %q", config.DisplayMode)
 	}
+	if config.SortType != "name" || config.SortOrder != "asc" {
+		t.Fatalf("expected default file sort name/asc, got %q/%q", config.SortType, config.SortOrder)
+	}
 	if config.FilterLayoutMode != "compact" {
 		t.Fatalf("expected filter layout compact, got %q", config.FilterLayoutMode)
 	}
@@ -65,6 +70,58 @@ func TestConfigDefaultsWithoutFile(t *testing.T) {
 	}
 	if config.CtrlClickSelectionEnabled == nil || !*config.CtrlClickSelectionEnabled {
 		t.Fatalf("expected ctrl click selection to default to true")
+	}
+}
+
+func TestFileSortConfigSurvivesRestart(t *testing.T) {
+	for _, preference := range []struct{ sortType, sortOrder string }{
+		{"name", "asc"}, {"name", "desc"},
+		{"date", "asc"}, {"date", "desc"},
+		{"loadOrder", "asc"},
+	} {
+		t.Run(preference.sortType+"/"+preference.sortOrder, func(t *testing.T) {
+			app := newConfigTestApp(t)
+			config := app.GetAppConfig()
+			config.SortType = preference.sortType
+			config.SortOrder = preference.sortOrder
+			config.Theme = "dark"
+			if err := app.SaveAppConfig(config); err != nil {
+				t.Fatalf("save file sort preference: %v", err)
+			}
+
+			restarted := &App{configPath: app.configPath}
+			restarted.loadConfig()
+			restored := restarted.GetAppConfig()
+			if restored.SortType != preference.sortType || restored.SortOrder != preference.sortOrder {
+				t.Fatalf("expected restored file sort %s/%s, got %s/%s", preference.sortType, preference.sortOrder, restored.SortType, restored.SortOrder)
+			}
+			if restored.Theme != "dark" {
+				t.Fatalf("sorting save lost theme: %q", restored.Theme)
+			}
+		})
+	}
+}
+
+func TestFileSortConfigUpgradesVersionThree(t *testing.T) {
+	app := newConfigTestApp(t)
+	if err := os.WriteFile(app.configPath, []byte(`{"migrationVersion":3,"theme":"dark","displayMode":"card"}`), 0644); err != nil {
+		t.Fatalf("write previous config: %v", err)
+	}
+	app.loadConfig()
+
+	data, err := os.ReadFile(app.configPath)
+	if err != nil {
+		t.Fatalf("read upgraded config: %v", err)
+	}
+	var upgraded ConfigFile
+	if err := json.Unmarshal(data, &upgraded); err != nil {
+		t.Fatalf("decode upgraded config: %v", err)
+	}
+	if upgraded.MigrationVersion != configMigrationVersion || upgraded.SortType != "name" || upgraded.SortOrder != "asc" {
+		t.Fatalf("unexpected upgraded sorting config: %#v", upgraded)
+	}
+	if upgraded.Theme != "dark" || upgraded.DisplayMode != "card" {
+		t.Fatalf("upgrade lost existing preferences: %#v", upgraded)
 	}
 }
 
