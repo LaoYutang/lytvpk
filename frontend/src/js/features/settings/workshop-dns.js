@@ -31,6 +31,7 @@ function isDNSAddress(address) {
 }
 
 export async function appendWorkshopDNSSettings(container, {
+  isCurrentRender = () => true,
   GetWorkshopDNSConfig,
   SetWorkshopDNSConfig,
   showNotification,
@@ -38,7 +39,7 @@ export async function appendWorkshopDNSSettings(container, {
   const panel = container.querySelector("#settings-panel-network");
   if (!panel) return;
   let savedConfig = await GetWorkshopDNSConfig();
-  if (!panel.isConnected) return;
+  if (!panel.isConnected || !isCurrentRender()) return;
 
   const form = element("form", "setting-card settings-dns-card");
   form.id = "settings-workshop-dns-form";

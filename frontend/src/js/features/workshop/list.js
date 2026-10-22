@@ -1,4 +1,3 @@
-import { showGlobalSettings } from "../settings/settings.js";
 import { workshopDeps } from "./deps.js";
 import { openWorkshopDetail, resetWorkshopDetailView } from "./detail.js";
 import { setupWorkshopIdJump } from "./id-jump.js";
@@ -312,11 +311,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   setupWatchLaterDrawerListeners();
   setupWorkshopIdJump();
-
-  const settingsBtn = document.getElementById("global-settings-btn");
-  if (settingsBtn) {
-    settingsBtn.addEventListener("click", showGlobalSettings);
-  }
 
   const browseBtn = document.getElementById("browse-workshop-btn");
   if (browseBtn) {

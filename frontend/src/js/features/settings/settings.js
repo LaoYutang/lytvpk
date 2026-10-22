@@ -38,6 +38,8 @@ let SetWorkshopTranslateCustomAPIKey;
 let CheckModUpdates;
 let EventsOn;
 let switchAppPage;
+let settingsRenderGeneration = 0;
+let pendingSettingsRender = null;
 
 export function configureSettings(deps) {
   ({ GetWorkshopDNSConfig, SetWorkshopDNSConfig } = deps);
@@ -49,9 +51,30 @@ export async function showGlobalSettings() {
   await renderSettingsPageWithDeps();
 }
 
-export async function renderSettingsPageWithDeps() {
+export function invalidateSettingsPageRender() {
+  settingsRenderGeneration++;
+  pendingSettingsRender = null;
+}
+
+export function renderSettingsPageWithDeps() {
+  if (pendingSettingsRender) return pendingSettingsRender;
+
+  const generation = ++settingsRenderGeneration;
+  const isCurrentRender = () => generation === settingsRenderGeneration;
+  const pending = Promise.resolve()
+    .then(() => renderCurrentSettingsPage(isCurrentRender))
+    .finally(() => {
+      if (pendingSettingsRender === pending) pendingSettingsRender = null;
+    });
+  pendingSettingsRender = pending;
+  return pending;
+}
+
+async function renderCurrentSettingsPage(isCurrentRender) {
+  if (!isCurrentRender()) return;
   try {
     await renderSettingsPage({
+      isCurrentRender,
       appState,
       getConfig,
       saveConfig,
@@ -92,6 +115,6 @@ export async function renderSettingsPageWithDeps() {
       EventsOn,
     });
   } catch (error) {
-    console.error("设置页面渲染失败:", error);
+    if (isCurrentRender()) console.error("设置页面渲染失败:", error);
   }
 }
