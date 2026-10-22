@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -248,6 +249,39 @@ func TestWorkshopDNSCallerTimeoutAndCancellation(t *testing.T) {
 	cancel()
 	if _, err := dialer.lookupIPv4(ctx, "workshop.example"); !errors.Is(err, context.Canceled) || calls != 1 {
 		t.Fatalf("error=%v calls=%d", err, calls)
+	}
+}
+
+// Model the interval after the connection deadline fires but before the
+// context timer sets Err, without relying on scheduler timing in this test.
+type pendingDNSDeadlineContext struct {
+	context.Context
+	deadline time.Time
+}
+
+func (c pendingDNSDeadlineContext) Deadline() (time.Time, bool) { return c.deadline, true }
+
+func TestWorkshopDNSErrorDeadlineOrdering(t *testing.T) {
+	timeout := &net.OpError{Op: "write", Net: "pipe", Err: os.ErrDeadlineExceeded}
+	pending := pendingDNSDeadlineContext{Context: context.Background(), deadline: time.Now().Add(-time.Second)}
+	if err := workshopDNSError(pending, timeout); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expired deadline: %v", err)
+	}
+	pending.deadline = time.Now().Add(time.Hour)
+	if err := workshopDNSError(pending, timeout); err != timeout {
+		t.Fatalf("early connection timeout changed: %v", err)
+	}
+	pending.deadline = time.Now().Add(-time.Second)
+	if err := workshopDNSError(pending, io.ErrUnexpectedEOF); err != io.ErrUnexpectedEOF {
+		t.Fatalf("unrelated I/O error changed: %v", err)
+	}
+	if err := workshopDNSError(context.Background(), timeout); err != timeout {
+		t.Fatalf("timeout without context deadline changed: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := workshopDNSError(ctx, timeout); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation: %v", err)
 	}
 }
 

@@ -250,6 +250,7 @@ func (a *App) downloadWorker(
 
 	// One client per worker so connections can be reused across blocks via HTTP keep-alive
 	transport := buildDownloadTransport(bestIP, downloadUrl)
+	defer transport.CloseIdleConnections()
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   0,
@@ -306,7 +307,7 @@ func (a *App) downloadBlock(
 	client *http.Client,
 	downloadUrl string,
 	bm *BlockManager,
-) error {
+) (resultErr error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
 	if err != nil {
 		return err
@@ -331,11 +332,22 @@ func (a *App) downloadBlock(
 	}
 
 	offset := block.StartByte
+	expected := block.EndByte - block.StartByte + 1
+	// A failed attempt is retried from the start of the block. Its partial
+	// bytes must not be counted again when the retry succeeds.
+	defer func() {
+		if resultErr != nil {
+			bm.completedBytes.Add(-(offset - block.StartByte))
+		}
+	}()
 	buf := make([]byte, 256*1024) // 256KB buffer
 
 	for {
 		n, readErr := resp.Body.Read(buf)
 		if n > 0 {
+			if int64(n) > block.EndByte-offset+1 {
+				return fmt.Errorf("block %d response exceeds requested range", block.Index)
+			}
 			written, writeErr := file.WriteAt(buf[:n], offset)
 			if writeErr != nil {
 				return fmt.Errorf("write at offset %d failed: %w", offset, writeErr)
@@ -351,7 +363,6 @@ func (a *App) downloadBlock(
 		}
 	}
 
-	expected := block.EndByte - block.StartByte + 1
 	actual := offset - block.StartByte
 	if actual != expected {
 		return fmt.Errorf("block %d size mismatch: expected %d, got %d", block.Index, expected, actual)
