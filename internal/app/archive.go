@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/bodgit/sevenzip"
-	"github.com/nwaples/rardecode"
+	"github.com/nwaples/rardecode/v2"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 	"io"
@@ -16,6 +16,29 @@ import (
 	"sync"
 )
 
+// Bound RAR decoding memory instead of accepting the library's 4 GiB default.
+// Archives needing a larger dictionary must be repacked with a smaller one.
+const maxRARDictionarySize = 256 << 20
+
+// Archives are flattened into destDir. Root also prevents an existing symlink
+// in that directory from redirecting a write outside it.
+func createArchiveFile(destDir, name string) (*os.File, error) {
+	root, err := os.OpenRoot(destDir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	base := filepath.Base(name)
+	if info, err := root.Lstat(base); err == nil {
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("拒绝覆盖非普通文件: %s", base)
+		}
+	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
+	return root.Create(base)
+}
+
 func extractZipFile(file *zip.File, decodedName string, destDir string) error {
 	rc, err := file.Open()
 	if err != nil {
@@ -23,9 +46,7 @@ func extractZipFile(file *zip.File, decodedName string, destDir string) error {
 	}
 	defer rc.Close()
 
-	targetPath := filepath.Join(destDir, filepath.Base(decodedName))
-
-	outFile, err := os.Create(targetPath)
+	outFile, err := createArchiveFile(destDir, decodedName)
 	if err != nil {
 		return err
 	}
@@ -174,10 +195,10 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 		return fmt.Errorf("无法打开RAR文件: %v", err)
 	}
 
-	r, err := rardecode.NewReader(f, "")
+	r, err := rardecode.NewReader(f, rardecode.MaxDictionarySize(maxRARDictionarySize))
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("无法创建RAR读取器: %v", err)
+		return fmt.Errorf("无法创建RAR读取器: %w", err)
 	}
 
 	var allNames []string
@@ -188,7 +209,7 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 		}
 		if err != nil {
 			f.Close()
-			return fmt.Errorf("读取RAR内容失败: %v", err)
+			return fmt.Errorf("读取RAR内容失败: %w", err)
 		}
 		if header.IsDir {
 			continue
@@ -231,9 +252,9 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 	}
 	defer f.Close()
 
-	r, err = rardecode.NewReader(f, "")
+	r, err = rardecode.NewReader(f, rardecode.MaxDictionarySize(maxRARDictionarySize))
 	if err != nil {
-		return fmt.Errorf("无法创建RAR读取器: %v", err)
+		return fmt.Errorf("无法创建RAR读取器: %w", err)
 	}
 
 	extractedCount := 0
@@ -243,7 +264,7 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("读取RAR内容失败: %v", err)
+			return fmt.Errorf("读取RAR内容失败: %w", err)
 		}
 
 		if header.IsDir {
@@ -256,7 +277,7 @@ func (a *App) ExtractVPKFromRar(rarPath string, destDir string) error {
 
 		targetPath := filepath.Join(destDir, filepath.Base(header.Name))
 
-		outFile, err := os.Create(targetPath)
+		outFile, err := createArchiveFile(destDir, header.Name)
 		if err != nil {
 			log.Printf("无法创建目标文件 %s: %v", targetPath, err)
 			continue
@@ -401,9 +422,7 @@ func extract7zFile(file *sevenzip.File, name string, destDir string) error {
 	}
 	defer rc.Close()
 
-	targetPath := filepath.Join(destDir, filepath.Base(name))
-
-	outFile, err := os.Create(targetPath)
+	outFile, err := createArchiveFile(destDir, name)
 	if err != nil {
 		return err
 	}

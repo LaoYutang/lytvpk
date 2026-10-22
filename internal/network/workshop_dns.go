@@ -171,13 +171,10 @@ func (d *WorkshopDialer) exchange(ctx context.Context, protocol string, request 
 		copy(packet[2:], request)
 	}
 	if n, err := conn.Write(packet); err != nil || n != len(packet) {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
 		if err == nil {
 			err = io.ErrShortWrite
 		}
-		return nil, err
+		return nil, workshopDNSError(ctx, err)
 	}
 	response := make([]byte, 65535)
 	var n int
@@ -191,10 +188,22 @@ func (d *WorkshopDialer) exchange(ctx context.Context, protocol string, request 
 	} else {
 		n, err = conn.Read(response)
 	}
+	return response[:n], workshopDNSError(ctx, err)
+}
+
+// The connection and context have independent deadline timers. The connection
+// can time out before the context's timer has recorded DeadlineExceeded.
+func workshopDNSError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return ctx.Err()
 	}
-	return response[:n], err
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+			return context.DeadlineExceeded
+		}
+	}
+	return err
 }
 
 func parseWorkshopDNSAnswer(packet []byte, id uint16, question dnsmessage.Question) (workshopDNSAnswer, bool, error) {

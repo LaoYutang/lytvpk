@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/bodgit/sevenzip"
-	"github.com/nwaples/rardecode"
+	"github.com/nwaples/rardecode/v2"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -384,9 +384,9 @@ func extractVPKFromRarWithProgress(rarPath string, destDir string, progress arch
 	}
 	defer f.Close()
 
-	r, err := rardecode.NewReader(f, "")
+	r, err := rardecode.NewReader(f, rardecode.MaxDictionarySize(maxRARDictionarySize))
 	if err != nil {
-		return fmt.Errorf("无法创建RAR读取器: %v", err)
+		return fmt.Errorf("无法创建RAR读取器: %w", err)
 	}
 
 	totalBytes := totalRarEntryBytes(selected)
@@ -399,7 +399,7 @@ func extractVPKFromRarWithProgress(rarPath string, destDir string, progress arch
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("读取RAR内容失败: %v", err)
+			return fmt.Errorf("读取RAR内容失败: %w", err)
 		}
 		if header.IsDir {
 			continue
@@ -615,9 +615,9 @@ func listRarEntries(rarPath string) ([]dropRarEntry, error) {
 	}
 	defer f.Close()
 
-	r, err := rardecode.NewReader(f, "")
+	r, err := rardecode.NewReader(f, rardecode.MaxDictionarySize(maxRARDictionarySize))
 	if err != nil {
-		return nil, fmt.Errorf("无法创建RAR读取器: %v", err)
+		return nil, fmt.Errorf("无法创建RAR读取器: %w", err)
 	}
 
 	var entries []dropRarEntry
@@ -627,7 +627,7 @@ func listRarEntries(rarPath string) ([]dropRarEntry, error) {
 			break
 		}
 		if err != nil {
-			return nil, fmt.Errorf("读取RAR内容失败: %v", err)
+			return nil, fmt.Errorf("读取RAR内容失败: %w", err)
 		}
 		if header.IsDir {
 			continue
@@ -657,7 +657,7 @@ func extract7zEntryWithProgress(file *sevenzip.File, name string, destDir string
 
 func extractReaderEntryWithProgress(reader io.Reader, name string, destDir string, onDelta func(int64)) error {
 	targetPath := filepath.Join(destDir, filepath.Base(name))
-	outFile, err := os.Create(targetPath)
+	outFile, err := createArchiveFile(destDir, name)
 	if err != nil {
 		return err
 	}
