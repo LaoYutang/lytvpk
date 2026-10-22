@@ -66,6 +66,7 @@ import {
   configureSettings,
   showGlobalSettings,
   renderSettingsPageWithDeps,
+  invalidateSettingsPageRender,
 } from "./settings/settings.js";
 import {
   initProblemModScanAutoRestore,
@@ -601,6 +602,7 @@ function setupSettingsAndAboutListeners() {
   document.addEventListener("app:page-change", (event) => {
     const page = event.detail.page;
 
+    if (page !== "settings") invalidateSettingsPageRender();
     if (page === "settings") {
       renderSettingsPageWithDeps();
     } else if (page === "diagnostics") {

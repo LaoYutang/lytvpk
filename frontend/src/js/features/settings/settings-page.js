@@ -8,6 +8,7 @@ const SETTINGS_NAV_ICONS = {
 };
 
 export async function renderSettingsPage({
+  isCurrentRender = () => true,
   appState,
   getConfig,
   saveConfig,
@@ -48,7 +49,7 @@ export async function renderSettingsPage({
   EventsOn,
 }) {
   const container = document.getElementById("settings-page-content");
-  if (!container) return;
+  if (!container || !isCurrentRender()) return;
 
   const enabled = await GetWorkshopPreferredIP();
   const fixedIP = await GetWorkshopFixedIP();
@@ -77,6 +78,7 @@ export async function renderSettingsPage({
     }
   }
 
+  if (!isCurrentRender() || !container.isConnected) return;
   container.innerHTML = `
     <div class="settings-layout embedded-settings">
       <div class="settings-sidebar">
@@ -262,13 +264,19 @@ export async function renderSettingsPage({
     </div>
   `;
 
-  await appendWorkshopDNSSettings(container, {
+  // Each async continuation belongs to this layout, never a newer render's DOM.
+  const layout = container.firstElementChild;
+  const isCurrentPage = () => isCurrentRender() && layout.isConnected;
+  await appendWorkshopDNSSettings(layout, {
+    isCurrentRender: isCurrentPage,
     GetWorkshopDNSConfig,
     SetWorkshopDNSConfig,
     showNotification,
   });
+  if (!isCurrentPage()) return;
 
-  await appendSnapshotStoragePanel(container, {
+  await appendSnapshotStoragePanel(layout, {
+    isCurrentRender: isCurrentPage,
     SelectDirectory,
     GetSnapshotDirectory,
     SetSnapshotDirectory,
@@ -279,6 +287,7 @@ export async function renderSettingsPage({
     showError,
     EventsOn,
   });
+  if (!isCurrentPage()) return;
 
   bindSettingsPage({
     enabled,
@@ -840,7 +849,8 @@ function enhanceSettingsNav() {
 async function appendSnapshotStoragePanel(container, deps) {
   const sidebar = container.querySelector(".settings-sidebar");
   const track = container.querySelector(".settings-panels-track");
-  if (!sidebar || !track) return;
+  if (!sidebar || !track || !deps.isCurrentRender()) return;
+  if (track.querySelector("#settings-panel-storage")) return;
 
   const nav = document.createElement("button");
   nav.className = "settings-nav-item";
@@ -895,8 +905,10 @@ async function appendSnapshotStoragePanel(container, deps) {
   const refreshPath = async () => {
     try {
       const path = await deps.GetSnapshotDirectory();
+      if (!deps.isCurrentRender()) return;
       pathText.textContent = path || "尚未设置";
     } catch (error) {
+      if (!deps.isCurrentRender()) return;
       pathText.textContent = "无法读取快照目录";
       deps.showError?.("读取快照目录失败: " + formatError(error));
     }
