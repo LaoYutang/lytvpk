@@ -42,11 +42,6 @@
   margin-bottom: 10px;
 }
 
-.download-tasks-list {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
 .empty-tasks {
   text-align: center;
   color: #888;

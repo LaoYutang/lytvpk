@@ -6,16 +6,7 @@ export async function handleProtocolParse(workshopId) {
   console.log("处理协议解析:", workshopId);
 
   workshopDeps.showNotification(`正在解析工坊ID: ${workshopId}`, "info");
-  workshopDeps.openWorkshopModal();
-
-  document.getElementById("workshop-url").value = workshopId;
-
-  setTimeout(() => {
-    const checkBtn = document.getElementById("check-workshop-btn");
-    if (checkBtn) {
-      checkBtn.click();
-    }
-  }, 300);
+  return workshopDeps.openWorkshopParse(workshopId);
 }
 
 export async function handleProtocolWorkshop(workshopId) {

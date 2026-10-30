@@ -159,8 +159,82 @@
   flex-direction: column;
 }
 
+.downloads-page .embedded-page-content {
+  transform: none !important;
+}
+
 .downloads-page .modal-body {
   padding: var(--spacing-4);
+}
+
+.downloads-page .downloads-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.downloads-page .downloads-layout {
+  flex: 1;
+  min-width: 0;
+}
+
+.downloads-content {
+  min-width: 0;
+}
+
+.downloads-panels .downloads-panel {
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+
+.downloads-panel[hidden] {
+  display: none !important;
+}
+
+.downloads-panels #downloads-panel-tasks.active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.downloads-panel .task-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
+  flex-shrink: 0;
+}
+
+.downloads-panel .task-list-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.downloads-panel .task-list-container {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.downloads-panel .download-tasks-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .downloads-panels .downloads-panel.active {
+    animation: none;
+  }
+
+  .downloads-tabs .settings-active-indicator {
+    transition: none;
+  }
 }
 
 .downloads-page .input-group.mt-15,

@@ -11,6 +11,7 @@ export const workshopDeps = {
   IsSelectingIP: undefined,
   closeModal: undefined,
   openWorkshopModal: undefined,
+  openWorkshopParse: undefined,
   EventsOn: undefined,
   GetWorkshopWatchLaterStorage: undefined,
   SaveWorkshopWatchLaterStorage: undefined,

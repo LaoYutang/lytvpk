@@ -817,11 +817,7 @@ function descriptionToPlainText(text) {
 
 function startDownloadFromBrowser(id) {
   document.getElementById("browser-modal").classList.add("hidden");
-  workshopDeps.switchAppPage("downloads");
-
-  const urlInput = document.getElementById("workshop-url");
-  urlInput.value = `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`;
-
-  const checkBtn = document.getElementById("check-workshop-btn");
-  if (checkBtn) checkBtn.click();
+  return workshopDeps.openWorkshopParse(
+    `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`
+  );
 }

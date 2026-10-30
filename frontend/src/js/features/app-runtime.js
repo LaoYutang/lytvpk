@@ -124,12 +124,15 @@ import {
 } from "./mods/mod-rotation.js";
 import {
   openWorkshopModal,
+  openWorkshopParse,
   closeWorkshopModal,
   checkWorkshopUrl,
   downloadWorkshopFile,
+  updateDownloadButtonLabel,
   copyCurrentDownloadUrls,
   applyWorkshopGroups,
 } from "./downloads/workshop-modal.js";
+import { initDownloadsPage, selectDownloadsTab } from "./downloads/downloads-page.js";
 import {
   refreshTaskList,
   updateTaskInList,
@@ -390,6 +393,7 @@ configureWorkshopBrowser({
   IsSelectingIP,
   closeModal,
   openWorkshopModal,
+  openWorkshopParse,
   EventsOn,
   GetWorkshopWatchLaterStorage,
   SaveWorkshopWatchLaterStorage,
@@ -561,6 +565,7 @@ async function initializeApp() {
 
   initTheme();
   initAppShell();
+  initDownloadsPage();
   setupThemeToggle();
   setupPageChangeListeners();
   setupSettingsAndAboutListeners();
@@ -708,7 +713,10 @@ function setupEventListeners() {
 
   // 解析历史下拉（点击记录直接展示解析时的结果快照）
   setupWorkshopHistory({
-    onSelect: (item) => applyWorkshopGroups([item.group]),
+    onSelect: (item) => {
+      selectDownloadsTab("parse");
+      applyWorkshopGroups([item.group]);
+    },
   });
 
   // ESC 键取消所有 mod 选择
@@ -1082,6 +1090,7 @@ function setupBatchActionEvents() {
     });
 
   document.getElementById("download-url")?.addEventListener("input", (e) => {
+    updateDownloadButtonLabel();
     const val = e.target.value;
     const optimizedIpContainer = document.getElementById(
       "optimized-ip-container"

@@ -12,7 +12,7 @@ import {
 import { openSetTagsModal } from "./tags.js";
 import { appState } from "../state.js";
 import { openLoadOrderEditor } from "../modals/load-order-editor.js";
-import { openWorkshopModal, checkWorkshopUrl } from "../downloads/workshop-modal.js";
+import { openWorkshopParse } from "../downloads/workshop-modal.js";
 import { showContextMenu, hideContextMenu, showServerSubmenu, hideServerSubmenu } from "./context-menu.js";
 import { shareWorkshopFileByPath } from "./share.js";
 import { getServers } from "../servers/servers.js";
@@ -164,15 +164,7 @@ export function setupFileListEventDelegation() {
         e.preventDefault();
         e.stopPropagation();
         const workshopUrl = `https://steamcommunity.com/sharedfiles/filedetails/?id=${workshopId}`;
-        openWorkshopModal();
-        // 等待模态框打开后填入URL并自动解析
-        setTimeout(() => {
-          const urlInput = document.getElementById("workshop-url");
-          if (urlInput) {
-            urlInput.value = workshopUrl;
-            checkWorkshopUrl();
-          }
-        }, 300);
+        void openWorkshopParse(workshopUrl);
       }
     }
 

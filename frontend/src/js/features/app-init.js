@@ -19,6 +19,7 @@ import {
 import { renderTagFilters, performSearch } from "./file-list/filters.js";
 import { applySort, refreshSortData } from "./file-list/sorting.js";
 import { refreshTaskList } from "./downloads/task-list.js";
+import { focusDownloadsTab } from "./downloads/downloads-page.js";
 import { renderServers, refreshAllServers } from "./servers/servers.js";
 import { renderWorkshopSidebar, browserState, loadWorkshopList } from "./workshop/workshop-browser.js";
 import { handleDropImportPaths } from "./drop-import.js";
@@ -97,7 +98,8 @@ export async function checkInitialDirectory() {
     }
 
     if (dir) {
-      // 状态已提前设置，这里只更新显示
+      // 后端也可能直接恢复目录，完成下载后的文件刷新需要同步此状态。
+      appState.currentDirectory = dir;
       updateTriggerDisplay();
       renderDirectoryList(); // 渲染列表确保选中项正确
       showMainScreen();
@@ -227,7 +229,7 @@ export function setupPageChangeListeners() {
       }
     } else if (page === "downloads") {
       refreshTaskList();
-      document.getElementById("workshop-url")?.focus();
+      focusDownloadsTab();
     } else if (page === "servers") {
       renderServers();
       refreshAllServers();

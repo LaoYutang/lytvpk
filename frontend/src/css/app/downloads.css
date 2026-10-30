@@ -442,7 +442,97 @@
   border: 1px solid var(--border-light) !important;
   border-radius: var(--radius-md);
   margin-bottom: 8px;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Keep the icon visible while it flies from a download button into the task tab. */
+.downloads-task-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--primary-100);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.downloads-task-count[data-empty="true"] {
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+}
+
+.download-transfer {
+  position: fixed;
+  z-index: 8000;
+  width: 36px;
+  height: 36px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.download-transfer-badge {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 11px;
+  background: linear-gradient(145deg, var(--primary-light), var(--primary), #3b82f6);
+  box-shadow: 0 5px 16px rgba(79, 70, 229, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.download-transfer-badge > svg {
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+}
+
+.download-transfer-trail {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  box-shadow: 0 0 7px rgba(99, 102, 241, 0.3);
+  opacity: 0;
+}
+
+.download-transfer-trail-2 {
+  left: 15px;
+  top: 15px;
+  width: 6px;
+  height: 6px;
+}
+
+.download-transfer-trail-3 {
+  left: 16px;
+  top: 16px;
+  width: 4px;
+  height: 4px;
+}
+
+.download-tab-ripple {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--primary-light);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .task-item:hover {
