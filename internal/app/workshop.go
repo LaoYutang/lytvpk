@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,6 +72,7 @@ type DownloadTask struct {
 	CreatedAt      string             `json:"created_at"`
 	cancelFunc     context.CancelFunc `json:"-"`
 	transfer       *downloadTransferState
+	rootDir        string
 }
 
 // TaskManager manages download tasks
@@ -98,12 +100,15 @@ func (a *App) HasActiveDownloads() bool {
 
 // CancelDownloadTask cancels a download task
 func (a *App) CancelDownloadTask(taskID string) error {
+	a.downloadPersistMu.Lock()
 	taskManager.mu.Lock()
 	task, exists := taskManager.tasks[taskID]
 	if !exists {
 		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
 		return fmt.Errorf("download task not found")
 	}
+	var cleanupPath string
 	switch task.Status {
 	case "pending", "selecting_ip", "downloading", "pausing":
 		task.Status = "cancelling"
@@ -116,21 +121,76 @@ func (a *App) CancelDownloadTask(taskID string) error {
 		task.Error = "Cancelled by user"
 		task.Notice = ""
 		if task.transfer != nil {
-			os.Remove(task.transfer.tempPath)
-			task.transfer = nil
+			cleanupPath = task.transfer.tempPath
 		}
 	default:
+		status := task.Status
 		taskManager.mu.Unlock()
-		return fmt.Errorf("task cannot be cancelled while %s", task.Status)
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("task cannot be cancelled while %s", status)
 	}
 	taskManager.mu.Unlock()
+	// Commit the cancellation marker before deleting the partial file. On a
+	// crash between these steps, startup sees a cancelled task and cleans it.
+	if err := a.writeDownloadTaskStore(a.snapshotDownloadTasks()); err != nil {
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("保存取消状态失败: %w", err)
+	}
+	var cleanupErr error
+	if cleanupPath != "" {
+		if _, available := validPersistedDownloadRoot(task.rootDir); !available {
+			cleanupErr = fmt.Errorf("原下载目录不可用，暂存文件将在目录恢复后清理")
+		} else {
+			cleanupErr = os.Remove(cleanupPath)
+			if os.IsNotExist(cleanupErr) {
+				cleanupErr = nil
+			}
+		}
+		if cleanupErr == nil {
+			taskManager.mu.Lock()
+			task.transfer = nil
+			taskManager.mu.Unlock()
+		}
+	}
+	a.downloadPersistMu.Unlock()
 	a.emitDownloadTaskEvent("task_updated", task)
+	if cleanupErr != nil {
+		return fmt.Errorf("任务已取消，但清理暂存文件失败: %w", cleanupErr)
+	}
 	return nil
 }
 
 // PauseDownloadTask stops an active transfer. The worker publishes "paused"
 // only after all network requests and file writes have stopped.
 func (a *App) PauseDownloadTask(taskID string) error {
+	return a.pauseDownloadTask(taskID, false)
+}
+
+// ConfirmPauseDownloadTask is called only after the user accepts losing
+// progress if the active response has no reliable file identity.
+func (a *App) ConfirmPauseDownloadTask(taskID string) error {
+	return a.pauseDownloadTask(taskID, true)
+}
+
+const (
+	downloadPauseConfirmationKnown   = "DOWNLOAD_PAUSE_CONFIRMATION_REQUIRED_KNOWN"
+	downloadPauseConfirmationUnknown = "DOWNLOAD_PAUSE_CONFIRMATION_REQUIRED_UNKNOWN"
+)
+
+func pauseHasKnownUnverifiedBytes(task *DownloadTask) bool {
+	state := task.transfer
+	if state == nil || state.mode != "single" || state.validator != "" {
+		return false
+	}
+	if task.DownloadedSize > 0 {
+		return true
+	}
+	// Progress events are throttled, but a partial write may already be on disk.
+	info, err := os.Stat(state.tempPath)
+	return err == nil && info.Mode().IsRegular() && info.Size() > 0
+}
+
+func (a *App) pauseDownloadTask(taskID string, confirmed bool) error {
 	taskManager.mu.Lock()
 	task, exists := taskManager.tasks[taskID]
 	if !exists {
@@ -140,6 +200,19 @@ func (a *App) PauseDownloadTask(taskID string) error {
 	if task.Status != "pending" && task.Status != "selecting_ip" && task.Status != "downloading" {
 		taskManager.mu.Unlock()
 		return fmt.Errorf("task cannot be paused while %s", task.Status)
+	}
+	if !confirmed && task.Status == "downloading" &&
+		(task.transfer == nil || !validStrongDownloadETag(task.transfer.validator) ||
+			(task.transfer.mode == "single" && !task.transfer.responseConfirmed)) {
+		// An active request can write to its temp file after a progress snapshot
+		// (or even after a file-size check), so unknown validators also need
+		// consent before cancellation can discard those bytes.
+		code := downloadPauseConfirmationUnknown
+		if pauseHasKnownUnverifiedBytes(task) {
+			code = downloadPauseConfirmationKnown
+		}
+		taskManager.mu.Unlock()
+		return fmt.Errorf("%s", code)
 	}
 	task.Status = "pausing"
 	task.Speed = ""
@@ -153,34 +226,108 @@ func (a *App) PauseDownloadTask(taskID string) error {
 
 // ResumeDownloadTask starts a new worker only after the paused worker has exited.
 func (a *App) ResumeDownloadTask(taskID string) error {
+	currentRoot := a.GetRootDirectory()
+	a.downloadExitMu.Lock()
+	if a.downloadExitRequested {
+		a.downloadExitMu.Unlock()
+		return fmt.Errorf("程序正在保存任务并退出，无法继续下载")
+	}
+	gateUnlocked := false
+	defer func() {
+		if !gateUnlocked {
+			a.downloadExitMu.Unlock()
+		}
+	}()
+	a.downloadPersistMu.Lock()
 	taskManager.mu.Lock()
 	task, exists := taskManager.tasks[taskID]
 	if !exists {
 		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
 		return fmt.Errorf("download task not found")
 	}
 	if task.Status != "paused" {
 		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
 		return fmt.Errorf("task cannot be resumed while %s", task.Status)
+	}
+	if task.rootDir == "" || currentRoot == "" || !strings.EqualFold(filepath.Clean(currentRoot), filepath.Clean(task.rootDir)) {
+		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("请先切换到任务原来的下载目录再继续")
+	}
+	if _, available := validPersistedDownloadRoot(task.rootDir); !available {
+		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("任务原来的下载目录当前不可用，请恢复目录后再继续")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	task.cancelFunc = cancel
 	task.Status = "pending"
 	task.Error = ""
 	task.Speed = ""
+	task.Notice = ""
+	if task.transfer != nil {
+		// A saved ETag does not confirm the response to this new request yet.
+		task.transfer.responseConfirmed = false
+	}
+	if task.transfer == nil || task.transfer.validator == "" {
+		task.DownloadedSize = 0
+		task.Progress = 0
+	}
 	taskManager.mu.Unlock()
+	a.downloadPersistMu.Unlock()
+	a.downloadExitMu.Unlock()
+	gateUnlocked = true
 	a.emitDownloadTaskEvent("task_updated", task)
 	go a.processDownloadTask(ctx, task, task.FileUrl)
 	return nil
 }
 
 // RetryDownloadTask retries a failed or cancelled task
-func (a *App) RetryDownloadTask(taskID string) {
+func (a *App) RetryDownloadTask(taskID string) error {
+	currentRoot := a.GetRootDirectory()
+	a.downloadExitMu.Lock()
+	if a.downloadExitRequested {
+		a.downloadExitMu.Unlock()
+		return fmt.Errorf("程序正在保存任务并退出，无法重试下载")
+	}
+	gateUnlocked := false
+	defer func() {
+		if !gateUnlocked {
+			a.downloadExitMu.Unlock()
+		}
+	}()
+	a.downloadPersistMu.Lock()
 	taskManager.mu.Lock()
 	task, exists := taskManager.tasks[taskID]
-	if !exists || (task.Status != "failed" && task.Status != "cancelled") {
+	if !exists {
 		taskManager.mu.Unlock()
-		return
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("download task not found")
+	}
+	if task.Status != "failed" && task.Status != "cancelled" {
+		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("task cannot be retried while %s", task.Status)
+	}
+	if task.rootDir == "" || currentRoot == "" || !strings.EqualFold(filepath.Clean(currentRoot), filepath.Clean(task.rootDir)) {
+		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("请先切换到任务原来的下载目录再重试")
+	}
+	if _, available := validPersistedDownloadRoot(task.rootDir); !available {
+		taskManager.mu.Unlock()
+		a.downloadPersistMu.Unlock()
+		return fmt.Errorf("任务原来的下载目录当前不可用，请恢复目录后再重试")
+	}
+	if task.transfer != nil {
+		if err := os.Remove(task.transfer.tempPath); err != nil && !os.IsNotExist(err) {
+			taskManager.mu.Unlock()
+			a.downloadPersistMu.Unlock()
+			return fmt.Errorf("清理旧暂存文件失败: %w", err)
+		}
+		task.transfer = nil
 	}
 
 	// Reset task state
@@ -191,19 +338,19 @@ func (a *App) RetryDownloadTask(taskID string) {
 	task.Notice = ""
 	task.Speed = ""
 	task.FilePath = ""
-	if task.transfer != nil {
-		os.Remove(task.transfer.tempPath)
-		task.transfer = nil
-	}
 
 	// Create new context
 	ctx, cancel := context.WithCancel(context.Background())
 	task.cancelFunc = cancel
 	taskManager.mu.Unlock()
+	a.downloadPersistMu.Unlock()
+	a.downloadExitMu.Unlock()
+	gateUnlocked = true
 
 	a.emitDownloadTaskEvent("task_updated", task)
 
 	go a.processDownloadTask(ctx, task, task.FileUrl)
+	return nil
 }
 
 func parseFileSize(sizeStr string) int64 {

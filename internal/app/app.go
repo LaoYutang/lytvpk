@@ -64,6 +64,12 @@ type App struct {
 	vpkCache               sync.Map // map[string]*VPKFileCache, key是文件路径
 	mu                     sync.RWMutex
 	configWriteMu          sync.Mutex
+	downloadPersistMu      sync.Mutex
+	downloadPersistTimer   *time.Timer
+	downloadExitMu         sync.Mutex
+	downloadExitRequested  bool
+	exitMu                 sync.Mutex
+	exitInProgress         bool
 	rootDir                string
 	goroutinePool          *ants.Pool
 	conflictCheckMu        sync.Mutex
@@ -278,6 +284,9 @@ func NewApp() *App {
 
 	// 加载配置
 	app.loadConfig()
+	if err := app.loadDownloadTasks(); err != nil {
+		log.Printf("读取下载任务记录失败: %v", err)
+	}
 
 	return app
 }

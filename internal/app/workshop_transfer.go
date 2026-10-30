@@ -20,6 +20,9 @@ import (
 	"time"
 )
 
+var errRangeMissingStrongETag = errors.New("range response lacks a strong ETag")
+var errChunkResumeProbeNotConfirmed = errors.New("saved chunk download could not be verified")
+
 func (a *App) probeChunkRange(ctx context.Context, downloadURL, bestIP, validator string, expectedTotal int64) (string, error) {
 	transport := buildDownloadTransport(bestIP, downloadURL)
 	defer transport.CloseIdleConnections()
@@ -55,7 +58,7 @@ func (a *App) probeChunkRange(ctx context.Context, downloadURL, bestIP, validato
 	}
 	newValidator := strongETag(resp.Header)
 	if newValidator == "" {
-		return "", errRangeNotSupported
+		return "", fmt.Errorf("%w: %w", errRangeNotSupported, errRangeMissingStrongETag)
 	}
 	if validator != "" && newValidator != validator {
 		return "", errRangeNotSupported
@@ -68,8 +71,13 @@ func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, do
 	taskManager.mu.RLock()
 	state := task.transfer
 	taskManager.mu.RUnlock()
-	if state != nil && (state.mode != "chunk" || state.totalSize != totalSize || state.validator == "") {
-		a.restartDownloadFromZero(task, "暂存文件无法安全续传，已从头重新下载")
+	if state != nil && state.mode == "chunk" && state.validator != "" && state.totalSize != totalSize {
+		return "", fmt.Errorf("%w: file size differs from saved chunks", errChunkResumeProbeNotConfirmed)
+	}
+	if state != nil && (state.mode != "chunk" || state.validator == "") {
+		if err := a.restartDownloadFromZero(task, "暂存文件无法安全续传，已从头重新下载"); err != nil {
+			return "", err
+		}
 		state = nil
 	}
 	validator := ""
@@ -79,7 +87,7 @@ func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, do
 	probedValidator, err := a.probeChunkRange(ctx, downloadURL, bestIP, validator, totalSize)
 	if err != nil {
 		if state != nil && ctx.Err() == nil {
-			a.restartDownloadFromZero(task, "服务器未接受断点续传，已从头重新下载")
+			return "", fmt.Errorf("%w: %v", errChunkResumeProbeNotConfirmed, err)
 		}
 		return "", err
 	}
@@ -98,11 +106,19 @@ func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, do
 			if file != nil {
 				file.Close()
 			}
-			a.restartDownloadFromZero(task, "暂存文件无法安全续传，已从头重新下载")
+			if resetErr := a.restartDownloadFromZero(task, "暂存文件无法安全续传，已从头重新下载"); resetErr != nil {
+				return "", resetErr
+			}
 			state = nil
 		}
 	}
 	if state == nil {
+		// Record a cleanup marker before preallocating the potentially large
+		// file. A crash during creation then has a known, task-owned path.
+		taskManager.mu.Lock()
+		task.transfer = &downloadTransferState{mode: "chunk", tempPath: finalPath, validator: probedValidator, totalSize: totalSize}
+		taskManager.mu.Unlock()
+		a.emitDownloadTaskEvent("task_updated", task)
 		file, err = createPreallocatedFile(finalPath, totalSize)
 		if err != nil {
 			return "", err
@@ -126,7 +142,12 @@ func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, do
 	}
 	taskManager.mu.Lock()
 	task.transfer = &downloadTransferState{mode: "chunk", tempPath: finalPath, validator: probedValidator, totalSize: totalSize}
+	task.Notice = ""
+	if state != nil {
+		task.transfer.completedBlocks = append([]bool(nil), state.completedBlocks...)
+	}
 	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
 
 	stopReporter := make(chan struct{})
 	reporterDone := make(chan struct{})
@@ -159,22 +180,17 @@ func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, do
 	}
 	if fatalErr := bm.HasFatalError(); fatalErr != nil {
 		if errors.Is(fatalErr, errRangeNotSupported) {
-			a.restartDownloadFromZero(task, "服务器未接受断点续传，已从头重新下载")
-		} else {
-			os.Remove(finalPath)
-			taskManager.mu.Lock()
-			task.transfer = nil
-			taskManager.mu.Unlock()
+			if resetErr := a.restartDownloadFromZero(task, "服务器未接受断点续传，已从头重新下载"); resetErr != nil {
+				return "", resetErr
+			}
 		}
 		return "", fatalErr
 	}
 	if bm.completedBlocks.Load() != int32(len(bm.blocks)) {
-		os.Remove(finalPath)
 		return "", fmt.Errorf("incomplete chunked download")
 	}
 	stat, err := os.Stat(finalPath)
 	if err != nil || stat.Size() != totalSize {
-		os.Remove(finalPath)
 		return "", fmt.Errorf("final size mismatch for chunked download")
 	}
 	taskManager.mu.Lock()
@@ -287,11 +303,11 @@ func (a *App) downloadPreviewImage(task *DownloadTask, targetPath string) {
 }
 
 // handleArchiveExtraction handles auto extraction for archive files
-func (a *App) handleArchiveExtraction(task *DownloadTask, targetPath string, updateStatus func(string, string)) {
+func (a *App) handleArchiveExtraction(task *DownloadTask, targetPath string, downloadRoot string, updateStatus func(string, string)) {
 	ext := strings.ToLower(filepath.Ext(targetPath))
 	if strings.HasPrefix(task.WorkshopID, "direct-") && (ext == ".zip" || ext == ".rar" || ext == ".7z") {
 		updateStatus("downloading", "正在解压...")
-		err := a.ExtractVPKFromArchive(targetPath, a.rootDir)
+		err := a.ExtractVPKFromArchive(targetPath, downloadRoot)
 		if err != nil {
 			fmt.Printf("解压压缩包失败: %v\n", err)
 		} else {

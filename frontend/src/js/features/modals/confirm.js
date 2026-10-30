@@ -1,4 +1,4 @@
-export function showConfirmModal(title, message, onConfirm, useHtml = false, extraClass = "") {
+export function showConfirmModal(title, message, onConfirm, useHtml = false, extraClass = "", onDismiss = null) {
   const modal = document.getElementById("confirm-modal");
   const modalContent = modal.querySelector(".modal-content");
   const titleEl = document.getElementById("confirm-title");
@@ -38,6 +38,7 @@ export function showConfirmModal(title, message, onConfirm, useHtml = false, ext
     if (extraClass) {
       extraClass.split(" ").filter(Boolean).forEach((c) => modalContent.classList.remove(c));
     }
+    if (onDismiss) onDismiss();
   };
 
   okBtn.onclick = async () => {

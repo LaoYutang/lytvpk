@@ -53,10 +53,15 @@ func parseByteContentRange(value string) (start, end, total int64, err error) {
 	return
 }
 
-func (a *App) restartDownloadFromZero(task *DownloadTask, reason string) {
+func (a *App) restartDownloadFromZero(task *DownloadTask, reason string) error {
+	a.downloadPersistMu.Lock()
 	taskManager.mu.Lock()
 	if task.transfer != nil {
-		os.Remove(task.transfer.tempPath)
+		if err := os.Remove(task.transfer.tempPath); err != nil && !os.IsNotExist(err) {
+			taskManager.mu.Unlock()
+			a.downloadPersistMu.Unlock()
+			return fmt.Errorf("remove stale download temp: %w", err)
+		}
 		task.transfer = nil
 	}
 	task.DownloadedSize = 0
@@ -64,18 +69,33 @@ func (a *App) restartDownloadFromZero(task *DownloadTask, reason string) {
 	task.Speed = ""
 	task.Notice = reason
 	taskManager.mu.Unlock()
+	err := a.writeDownloadTaskStore(a.snapshotDownloadTasks())
+	a.downloadPersistMu.Unlock()
 	a.emitDownloadTaskEvent("task_updated", task)
+	return err
 }
 
-func (a *App) resetOpenSingleDownload(task *DownloadTask, reason string) {
+func (a *App) resetOpenSingleDownload(task *DownloadTask, out *os.File, reason string) error {
+	a.downloadPersistMu.Lock()
+	if err := out.Truncate(0); err != nil {
+		a.downloadPersistMu.Unlock()
+		return err
+	}
+	if _, err := out.Seek(0, io.SeekStart); err != nil {
+		a.downloadPersistMu.Unlock()
+		return err
+	}
 	taskManager.mu.Lock()
-	task.transfer = nil // caller owns the open file and truncates it
+	task.transfer = &downloadTransferState{mode: "single", tempPath: out.Name()}
 	task.DownloadedSize = 0
 	task.Progress = 0
 	task.Speed = ""
 	task.Notice = reason
 	taskManager.mu.Unlock()
+	err := a.writeDownloadTaskStore(a.snapshotDownloadTasks())
+	a.downloadPersistMu.Unlock()
 	a.emitDownloadTaskEvent("task_updated", task)
+	return err
 }
 
 func (a *App) downloadSingle(ctx context.Context, task *DownloadTask, downloadURL, bestIP, tempDir string) (string, string, error) {
@@ -84,18 +104,22 @@ func (a *App) downloadSingle(ctx context.Context, task *DownloadTask, downloadUR
 	state := task.transfer
 	taskManager.mu.RUnlock()
 	if state != nil && state.mode != "single" {
-		state = nil // a chunk transfer is reset by the caller before this fallback
-	}
-	if state != nil && state.validator == "" {
-		a.restartDownloadFromZero(task, "服务器未提供可验证的文件标识，已从头重新下载")
+		if err := a.restartDownloadFromZero(task, "下载方式已切换，旧分块暂存文件无法继续使用，已从头重新下载"); err != nil {
+			return "", "", err
+		}
 		state = nil
 	}
-
 	out, err := os.OpenFile(tempPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return "", "", err
 	}
 	defer out.Close()
+	if state != nil && state.validator == "" {
+		if err := a.resetOpenSingleDownload(task, out, "服务器未提供可验证的文件标识，已从头重新下载"); err != nil {
+			return "", "", err
+		}
+		state = nil
+	}
 	var offset int64
 	if state != nil {
 		info, statErr := out.Stat()
@@ -104,8 +128,12 @@ func (a *App) downloadSingle(ctx context.Context, task *DownloadTask, downloadUR
 		}
 		if info.Size() > 0 && (state.totalSize == 0 || info.Size() < state.totalSize) {
 			offset = info.Size()
+		} else if info.Size() == 0 {
+			state = nil
 		} else {
-			a.resetOpenSingleDownload(task, "暂存文件无法安全续传，已从头重新下载")
+			if err := a.resetOpenSingleDownload(task, out, "暂存文件无法安全续传，已从头重新下载"); err != nil {
+				return "", "", err
+			}
 			state = nil
 		}
 	}
@@ -122,73 +150,78 @@ func (a *App) downloadSingle(ctx context.Context, task *DownloadTask, downloadUR
 	if state != nil {
 		*task.transfer = *state
 	}
+	task.transfer.responseConfirmed = false
 	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
 
 	transport := buildDownloadTransport(bestIP, downloadURL)
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport}
 	var resp *http.Response
-	for attempt := 0; attempt < 3; attempt++ {
-		if attempt > 0 {
-			timer := time.NewTimer(2 * time.Second)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return "", "", ctx.Err()
-			case <-timer.C:
+	for {
+		for attempt := 0; attempt < 3; attempt++ {
+			if attempt > 0 {
+				timer := time.NewTimer(2 * time.Second)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					return "", "", ctx.Err()
+				case <-timer.C:
+				}
 			}
-		}
-		req, reqErr := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
-		if reqErr != nil {
-			return "", "", reqErr
-		}
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-		req.Header.Set("Referer", "https://steamcommunity.com/")
-		req.Header.Set("Accept", "*/*")
-		req.Header.Set("Accept-Encoding", "identity")
-		if offset > 0 {
-			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
-			req.Header.Set("If-Range", state.validator)
-		}
-		resp, reqErr = client.Do(req)
-		if reqErr != nil {
-			if ctx.Err() != nil {
-				return "", "", ctx.Err()
-			}
-			if attempt == 2 {
+			req, reqErr := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+			if reqErr != nil {
 				return "", "", reqErr
 			}
-			continue
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+			req.Header.Set("Referer", "https://steamcommunity.com/")
+			req.Header.Set("Accept", "*/*")
+			req.Header.Set("Accept-Encoding", "identity")
+			if offset > 0 && state.validator != "" {
+				req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+				req.Header.Set("If-Range", state.validator)
+			}
+			resp, reqErr = client.Do(req)
+			if reqErr != nil {
+				if ctx.Err() != nil {
+					return "", "", ctx.Err()
+				}
+				if attempt == 2 {
+					return "", "", reqErr
+				}
+				continue
+			}
+			if resp.StatusCode == http.StatusOK || (offset > 0 && state.validator != "" && resp.StatusCode == http.StatusPartialContent) {
+				break
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound || attempt == 2 {
+				return "", "", fmt.Errorf("HTTP status: %d", resp.StatusCode)
+			}
 		}
-		if resp.StatusCode == http.StatusOK || (offset > 0 && resp.StatusCode == http.StatusPartialContent) {
-			break
-		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusNotFound || attempt == 2 {
-			return "", "", fmt.Errorf("HTTP status: %d", resp.StatusCode)
-		}
-	}
-	defer resp.Body.Close()
-	if ctx.Err() != nil {
-		return "", "", ctx.Err()
-	}
-	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && !strings.EqualFold(encoding, "identity") {
-		return "", "", fmt.Errorf("unsupported content encoding: %s", encoding)
-	}
-
-	if offset > 0 && resp.StatusCode == http.StatusOK {
-		// The server ignored Range or If-Range rejected a changed file.
-		if err := out.Truncate(0); err != nil {
+		if err := ctx.Err(); err != nil {
+			resp.Body.Close()
 			return "", "", err
 		}
-		if _, err := out.Seek(0, io.SeekStart); err != nil {
+		if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && !strings.EqualFold(encoding, "identity") {
+			resp.Body.Close()
+			return "", "", fmt.Errorf("unsupported content encoding: %s", encoding)
+		}
+		contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+		if contentType == "text/html" || contentType == "application/json" {
+			resp.Body.Close()
+			return "", "", fmt.Errorf("invalid content type: %s", contentType)
+		}
+		break
+	}
+	defer resp.Body.Close()
+
+	if offset > 0 && state.validator != "" && resp.StatusCode == http.StatusOK {
+		// The server ignored Range or If-Range rejected a changed file.
+		if err := a.resetOpenSingleDownload(task, out, "服务器未接受断点续传，已从头重新下载"); err != nil {
 			return "", "", err
 		}
 		offset = 0
-		a.resetOpenSingleDownload(task, "服务器未接受断点续传，已从头重新下载")
-		taskManager.mu.Lock()
-		task.transfer = &downloadTransferState{mode: "single", tempPath: tempPath}
-		taskManager.mu.Unlock()
 	}
 
 	var total int64
@@ -209,14 +242,11 @@ func (a *App) downloadSingle(ctx context.Context, task *DownloadTask, downloadUR
 		total = task.TotalSize
 		taskManager.mu.RUnlock()
 	}
-	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
-	if contentType == "text/html" || contentType == "application/json" {
-		return "", "", fmt.Errorf("invalid content type: %s", contentType)
-	}
 	taskManager.mu.Lock()
 	task.TotalSize = total
 	task.transfer.validator = strongETag(resp.Header)
 	task.transfer.totalSize = total
+	task.transfer.responseConfirmed = true
 	if cd := resp.Header.Get("Content-Disposition"); cd != "" {
 		task.transfer.contentDisposition = cd
 	}

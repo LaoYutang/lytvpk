@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -12,6 +14,10 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+const exitPauseLossConfirmationRequired = "DOWNLOAD_PAUSE_LOSS_CONFIRMATION_REQUIRED"
+
+var errExitDownloadsBecameActive = errors.New("downloads became active before exit")
 
 type favoriteServerProtocolEvent struct {
 	ServerName    string `json:"serverName"`
@@ -151,11 +157,101 @@ func (a *App) HandleProtocolURL(url string) {
 	}
 }
 
-// ForceExit forces the application to exit
+// ForceExitWithPauseLossAccepted starts the confirmed exit sequence without
+// blocking the Wails event loop. The risk is rechecked and workers are stopped
+// under the same locks, before the confirmation result can become stale.
+func (a *App) ForceExitWithPauseLossAccepted(accepted bool) error {
+	_, err := a.beginExit(accepted, false)
+	return err
+}
+
+// ForceExit remains a safe entry point for callers that have not explicitly
+// acknowledged possible download progress loss.
 func (a *App) ForceExit() {
-	a.cleanupPausedDownloadTemps()
+	_ = a.ForceExitWithPauseLossAccepted(false)
+}
+
+func (a *App) beginExit(accepted bool, requireIdleDownloads bool) (DownloadExitRisk, error) {
+	a.exitMu.Lock()
+	if a.exitInProgress || a.forceClose {
+		a.exitMu.Unlock()
+		return DownloadExitRisk{}, nil
+	}
+	a.downloadExitMu.Lock()
+	taskManager.mu.Lock()
+	risk := downloadExitRiskLocked()
+	if requireIdleDownloads && risk.Downloads {
+		taskManager.mu.Unlock()
+		a.downloadExitMu.Unlock()
+		a.exitMu.Unlock()
+		return risk, errExitDownloadsBecameActive
+	}
+	if !accepted && (risk.DownloadLossRisk || risk.DownloadIdentityUnknown) {
+		taskManager.mu.Unlock()
+		a.downloadExitMu.Unlock()
+		a.exitMu.Unlock()
+		return risk, errors.New(exitPauseLossConfirmationRequired)
+	}
+	a.exitInProgress = true
+	a.downloadExitRequested = true
+	changed := requestPauseDownloadsForExitLocked()
+	taskManager.mu.Unlock()
+	a.downloadExitMu.Unlock()
+	a.exitMu.Unlock()
+
+	// Closing must not wait for a busy application worker pool. A timer runs
+	// this bounded shutdown callback independently of the Wails UI thread.
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	time.AfterFunc(0, func() {
+		defer cancel()
+		for _, task := range changed {
+			a.emitDownloadTaskEvent("task_updated", task)
+		}
+		a.finishExit(ctx)
+	})
+	return risk, nil
+}
+
+func (a *App) finishExit(ctx context.Context) {
+	if err := a.pauseDownloadsForExit(ctx); err != nil {
+		a.failExit(err)
+		return
+	}
+	if a.ctx == nil {
+		a.failExit(fmt.Errorf("窗口运行环境不可用"))
+		return
+	}
+	a.exitMu.Lock()
 	a.forceClose = true
+	a.exitMu.Unlock()
 	runtime.Quit(a.ctx)
+}
+
+func (a *App) failExit(err error) {
+	log.Printf("退出前保存下载任务失败: %v", err)
+	a.cancelDownloadExit()
+	a.exitMu.Lock()
+	a.exitInProgress = false
+	a.exitMu.Unlock()
+	if a.ctx != nil && a.ctx.Value("events") != nil {
+		runtime.EventsEmit(a.ctx, "exit_save_failed", err.Error())
+	}
+}
+
+// A paused download still has bytes to save, but it is no longer running and
+// needs no confirmation about being paused again.
+func (a *App) hasRunningDownloads() bool {
+	return a.GetDownloadExitRisk().Downloads
+}
+
+func (a *App) showExitConfirmation(risk DownloadExitRisk, uploads bool) {
+	if a.ctx != nil && a.ctx.Value("events") != nil {
+		runtime.EventsEmit(a.ctx, "show_exit_confirmation", map[string]bool{
+			"downloads": risk.Downloads, "uploads": uploads,
+			"downloadLossRisk":        risk.DownloadLossRisk,
+			"downloadIdentityUnknown": risk.DownloadIdentityUnknown,
+		})
+	}
 }
 
 // beforeClose is called when the application is about to close
@@ -163,7 +259,11 @@ func (a *App) beforeClose() (prevent bool) {
 	// 窗口此时尚未销毁，先记住当前尺寸
 	a.rememberWindowState()
 
-	if a.forceClose {
+	a.exitMu.Lock()
+	forceClose := a.forceClose
+	exitInProgress := a.exitInProgress
+	a.exitMu.Unlock()
+	if forceClose {
 		// 退出前同步落盘，进程随后即结束，异步写入没有机会完成
 		a.saveConfig()
 
@@ -173,22 +273,26 @@ func (a *App) beforeClose() (prevent bool) {
 		}
 		return false
 	}
-
-	if a.HasActiveDownloads() || a.HasActivePanelUploads() {
-		runtime.EventsEmit(a.ctx, "show_exit_confirmation", nil)
+	if exitInProgress {
 		return true
 	}
 
-	a.saveConfig()
-	if state := a.GetAppConfig().WindowState; state != nil {
-		log.Printf("已保存窗口尺寸: %dx%d 最大化=%v", state.Width, state.Height, state.Maximised)
+	risk := a.GetDownloadExitRisk()
+	uploads := a.HasActivePanelUploads()
+	if risk.Downloads || uploads {
+		a.showExitConfirmation(risk, uploads)
+		return true
 	}
-
-	// 关闭单例监听器
-	if a.singletonMgr != nil {
-		a.singletonMgr.Close()
+	// Recheck after acquiring the admission gate. A download may have been
+	// added between the initial read and this no-confirmation exit path.
+	if current, err := a.beginExit(false, true); err != nil {
+		if errors.Is(err, errExitDownloadsBecameActive) {
+			a.showExitConfirmation(current, uploads)
+		} else {
+			log.Printf("退出前检查下载任务失败: %v", err)
+		}
 	}
-	return false
+	return true
 }
 
 func (a *App) BeforeClose(ctx context.Context) (prevent bool) {

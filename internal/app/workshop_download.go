@@ -46,6 +46,7 @@ func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
+	rootDir := a.GetRootDirectory()
 
 	task := &DownloadTask{
 		ID:             taskID,
@@ -61,11 +62,34 @@ func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool
 		TotalSize:      totalSize,
 		CreatedAt:      time.Now().Format("2006-01-02 15:04:05"),
 		cancelFunc:     cancel,
+		rootDir:        rootDir,
 	}
 
+	a.downloadExitMu.Lock()
+	exitBlocked := a.downloadExitRequested
+	if exitBlocked {
+		cancel()
+		task.Status = "failed"
+		task.Error = "程序正在退出，无法开始新下载"
+	}
 	taskManager.mu.Lock()
 	taskManager.tasks[taskID] = task
 	taskManager.mu.Unlock()
+	a.downloadExitMu.Unlock()
+	if exitBlocked {
+		a.emitDownloadTaskEvent("task_updated", task)
+		return taskID
+	}
+	if err := a.persistDownloadTasksNow(); err != nil {
+		log.Printf("保存下载任务记录失败: %v", err)
+		cancel()
+		taskManager.mu.Lock()
+		task.Status = "failed"
+		task.Error = "无法保存下载任务记录: " + err.Error()
+		taskManager.mu.Unlock()
+		a.emitDownloadTaskEvent("task_updated", task)
+		return taskID
+	}
 
 	go a.processDownloadTask(ctx, task, details.FileUrl)
 
@@ -74,6 +98,10 @@ func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool
 
 func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downloadUrl string) {
 	defer a.finishDownloadRun(task)
+	downloadRoot := task.rootDir
+	if downloadRoot == "" {
+		downloadRoot = a.GetRootDirectory()
+	}
 	updateStatus := func(status string, err string) {
 		taskManager.mu.Lock()
 		if task.Status != "pausing" && task.Status != "cancelling" && ctx.Err() == nil {
@@ -97,7 +125,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 	updateStatus("downloading", "")
 
-	if a.rootDir == "" {
+	if downloadRoot == "" {
 		updateStatus("failed", "Root directory not set")
 		return
 	}
@@ -131,7 +159,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 
 	// Ensure temp directory exists
-	tempDir := filepath.Join(a.rootDir, "temp")
+	tempDir := filepath.Join(downloadRoot, "temp")
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		updateStatus("failed", "Failed to create temp dir: "+err.Error())
 		return
@@ -165,9 +193,24 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 
 		finalPath, err := a.processChunkedDownload(ctx, task, downloadUrl, bestIP, totalSize, threadCount, tempDir)
 		if err != nil {
-			// Check if server does not support Range, fallback to single-thread
-			if errors.Is(err, errRangeNotSupported) {
-				fmt.Printf("[Download] Server does not support Range, falling back to single-thread download\n")
+			// Parallel chunks need a strong file identity. If unavailable,
+			// start a fresh single-connection transfer.
+			if errors.Is(err, errChunkResumeProbeNotConfirmed) {
+				// One probe cannot establish that the old complete blocks are
+				// obsolete. Keep them paused for a later explicit retry.
+				taskManager.mu.Lock()
+				if ctx.Err() == nil && task.Status != "pausing" && task.Status != "cancelling" {
+					task.Status = "pausing"
+					task.Notice = "服务器暂未确认已有分块的版本，已保留进度；稍后可再试继续"
+				}
+				taskManager.mu.Unlock()
+				return
+			} else if errors.Is(err, errRangeNotSupported) {
+				if errors.Is(err, errRangeMissingStrongETag) {
+					fmt.Printf("[Download] Range response has no strong ETag; downloading from zero with a single connection\n")
+				} else {
+					fmt.Printf("[Download] Parallel byte-range download unavailable; using a single connection\n")
+				}
 				// Continue to single-thread download below
 			} else if ctx.Err() != nil {
 				return
@@ -180,7 +223,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			if !a.beginDownloadFinalizing(ctx, task) {
 				return
 			}
-			targetPath := filepath.Join(a.rootDir, filepath.Base(task.Filename))
+			targetPath := filepath.Join(downloadRoot, filepath.Base(task.Filename))
 
 			// For direct downloads, use timestamp for uniqueness
 			if strings.HasPrefix(task.WorkshopID, "direct-") {
@@ -190,7 +233,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 				taskManager.mu.Lock()
 				task.Filename = newFilename
 				taskManager.mu.Unlock()
-				targetPath = filepath.Join(a.rootDir, newFilename)
+				targetPath = filepath.Join(downloadRoot, newFilename)
 				a.emitDownloadTaskEvent("task_updated", task)
 			}
 
@@ -206,7 +249,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			a.downloadPreviewImage(task, targetPath)
 
 			// Auto extract for archives
-			a.handleArchiveExtraction(task, targetPath, updateStatus)
+			a.handleArchiveExtraction(task, targetPath, downloadRoot, updateStatus)
 
 			// Save meta file
 			if a.workshopMetaEnabled {
@@ -221,7 +264,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			}
 
 			// 替换同workshopId的旧mod
-			targetPath = a.replaceExistingMod(targetPath, task.WorkshopID)
+			targetPath = a.replaceExistingMod(targetPath, task.WorkshopID, downloadRoot)
 			setDownloadTaskFilePath(task, targetPath)
 
 			updateStatus("completed", "")
@@ -240,7 +283,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	if !a.beginDownloadFinalizing(ctx, task) {
 		return
 	}
-	targetPath := filepath.Join(a.rootDir, filepath.Base(task.Filename))
+	targetPath := filepath.Join(downloadRoot, filepath.Base(task.Filename))
 
 	// Prefer the filename supplied by the server for direct downloads.
 	if cd != "" {
@@ -256,7 +299,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 						task.Title = filename
 					}
 					taskManager.mu.Unlock()
-					targetPath = filepath.Join(a.rootDir, filename)
+					targetPath = filepath.Join(downloadRoot, filename)
 					a.emitDownloadTaskEvent("task_updated", task)
 				}
 			}
@@ -267,7 +310,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		taskManager.mu.Lock()
 		task.Filename = newFilename
 		taskManager.mu.Unlock()
-		targetPath = filepath.Join(a.rootDir, newFilename)
+		targetPath = filepath.Join(downloadRoot, newFilename)
 		a.emitDownloadTaskEvent("task_updated", task)
 	}
 
@@ -283,7 +326,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		// task.Title = newFilename // Keep original title for readability
 		taskManager.mu.Unlock()
 
-		targetPath = filepath.Join(a.rootDir, newFilename)
+		targetPath = filepath.Join(downloadRoot, newFilename)
 		a.emitDownloadTaskEvent("task_updated", task)
 	}
 
@@ -355,13 +398,13 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	}
 
 	// 替换名workshopId的旧mod
-	targetPath = a.replaceExistingMod(targetPath, task.WorkshopID)
+	targetPath = a.replaceExistingMod(targetPath, task.WorkshopID, downloadRoot)
 
 	// 如果是直连下载且是压缩文件，自动解压
 	ext := strings.ToLower(filepath.Ext(targetPath))
 	if strings.HasPrefix(task.WorkshopID, "direct-") && (ext == ".zip" || ext == ".rar" || ext == ".7z") {
 		updateStatus("downloading", "正在解压...")
-		err := a.ExtractVPKFromArchive(targetPath, a.rootDir)
+		err := a.ExtractVPKFromArchive(targetPath, downloadRoot)
 		if err != nil {
 			// 解压失败不影响下载成功的状态，但记录错误
 			fmt.Printf("解压压缩包失败: %v\n", err)
@@ -381,7 +424,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 
 // replaceExistingMod 下载完成后，查找同workshopId的旧mod并替换
 // 将新文件移动到旧mod所在目录，删才旧文件及其关联文件
-func (a *App) replaceExistingMod(newFilePath string, workshopID string) string {
+func (a *App) replaceExistingMod(newFilePath string, workshopID string, downloadRoot string) string {
 	if workshopID == "" || strings.HasPrefix(workshopID, "direct-") {
 		return newFilePath
 	}
@@ -391,7 +434,8 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string) string {
 
 	a.vpkCache.Range(func(key, value interface{}) bool {
 		cache := value.(*VPKFileCache)
-		if cache.File.WorkshopID == workshopID && cache.File.Path != newFilePath {
+		rel, relErr := filepath.Rel(downloadRoot, cache.File.Path)
+		if relErr == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && cache.File.WorkshopID == workshopID && cache.File.Path != newFilePath {
 			oldFilePath = cache.File.Path
 			oldLocation = cache.File.Location
 			return false
@@ -409,11 +453,11 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string) string {
 	var targetDir string
 	switch oldLocation {
 	case "disabled":
-		targetDir = filepath.Join(a.rootDir, "disabled")
+		targetDir = filepath.Join(downloadRoot, "disabled")
 	case "workshop":
-		targetDir = filepath.Join(a.rootDir, "workshop")
+		targetDir = filepath.Join(downloadRoot, "workshop")
 	default:
-		targetDir = a.rootDir
+		targetDir = downloadRoot
 	}
 
 	// 删才旧文件及其关联文件（.meta, 预览图）

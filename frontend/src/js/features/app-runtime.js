@@ -143,7 +143,12 @@ import {
   setupBatchTagsModalListeners,
 } from "./file-list/batch-tags.js";
 import { showConfirmModal } from "./modals/confirm.js";
-import { showExitModal, closeExitModal, confirmExit } from "./modals/exit.js";
+import {
+  showExitModal,
+  closeExitModal,
+  confirmExit,
+  showExitSaveError,
+} from "./modals/exit.js";
 import { showInfoModal, closeInfoModal } from "./modals/info.js";
 import { closeModal, showFileDetail } from "./modals/detail.js";
 import {
@@ -1156,8 +1161,12 @@ function setupWailsEvents() {
     handlePanelUploadTasksCleared();
   });
 
-  EventsOn("show_exit_confirmation", () => {
-    showExitModal();
+  EventsOn("show_exit_confirmation", (details) => {
+    showExitModal(details || {});
+  });
+
+  EventsOn("exit_save_failed", (message) => {
+    showExitSaveError(message);
   });
 
   OnFileDrop(async (x, y, paths) => {

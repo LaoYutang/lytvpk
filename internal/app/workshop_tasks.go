@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,7 @@ type downloadTransferState struct {
 	mode               string
 	tempPath           string
 	validator          string // strong ETag from the GET response
+	responseConfirmed  bool   // current single-connection response passed range/version checks
 	totalSize          int64
 	contentDisposition string
 	completedBlocks    []bool
@@ -25,18 +27,23 @@ type downloadTransferState struct {
 func (a *App) emitDownloadTaskEvent(name string, task *DownloadTask) {
 	// Wails supplies the events bus in its context. Tests and other headless
 	// callers have no bus; EventsEmit would terminate their process.
-	if a.ctx == nil || a.ctx.Value("events") == nil {
-		return
+	if a.ctx != nil && a.ctx.Value("events") != nil {
+		// Snapshot and enqueue under the same mutex so an earlier status cannot be
+		// delivered after a later one (for example pausing after paused).
+		taskManager.mu.Lock()
+		snapshot := *task
+		runtime.EventsEmit(a.ctx, name, &snapshot)
+		taskManager.mu.Unlock()
 	}
-	// Snapshot and enqueue under the same mutex so an earlier status cannot be
-	// delivered after a later one (for example pausing after paused).
-	taskManager.mu.Lock()
-	snapshot := *task
-	runtime.EventsEmit(a.ctx, name, &snapshot)
-	taskManager.mu.Unlock()
+	if name == "task_progress" {
+		a.scheduleDownloadTasksSave()
+	} else if err := a.persistDownloadTasksNow(); err != nil {
+		log.Printf("保存下载任务记录失败: %v", err)
+	}
 }
 
 func (a *App) finishDownloadRun(task *DownloadTask) {
+	a.downloadPersistMu.Lock()
 	taskManager.mu.Lock()
 	switch task.Status {
 	case "pausing":
@@ -44,25 +51,31 @@ func (a *App) finishDownloadRun(task *DownloadTask) {
 		task.Speed = ""
 		if state := task.transfer; state != nil {
 			if state.validator == "" {
-				hadBytes := task.DownloadedSize > 0
-				if state.mode == "single" {
-					if info, err := os.Stat(state.tempPath); err == nil && info.Size() > 0 {
-						hadBytes = true
-					}
+				var cleanupErr error
+				if _, available := validPersistedDownloadRoot(task.rootDir); !available {
+					cleanupErr = fmt.Errorf("原下载目录不可用")
+				} else {
+					cleanupErr = os.Remove(state.tempPath)
 				}
-				os.Remove(state.tempPath)
-				task.transfer = nil
+				if cleanupErr == nil || os.IsNotExist(cleanupErr) {
+					task.transfer = nil
+					task.Notice = "服务器未提供可验证的文件标识，继续时将从头下载"
+				} else {
+					log.Printf("清理不可续传的暂存文件失败: %v", cleanupErr)
+					task.Notice = "暂存文件清理失败，继续时会重新尝试并从头下载"
+				}
 				task.DownloadedSize = 0
 				task.Progress = 0
-				if hadBytes {
-					task.Notice = "服务器未提供可验证的文件标识，继续时将从头下载"
-				}
 			} else if state.mode == "single" {
-				if info, err := os.Stat(state.tempPath); err == nil {
+				if info, err := os.Stat(state.tempPath); err == nil && info.Mode().IsRegular() && (state.totalSize <= 0 || info.Size() <= state.totalSize) {
 					task.DownloadedSize = info.Size()
 					if state.totalSize > 0 {
 						task.Progress = int(100 * info.Size() / state.totalSize)
 					}
+				} else {
+					task.DownloadedSize = 0
+					task.Progress = 0
+					task.Notice = "暂存文件无法验证，继续时将从头下载"
 				}
 			}
 		}
@@ -75,11 +88,22 @@ func (a *App) finishDownloadRun(task *DownloadTask) {
 	}
 	if task.Status == "failed" || task.Status == "cancelled" {
 		if task.transfer != nil {
-			os.Remove(task.transfer.tempPath)
-			task.transfer = nil
+			var cleanupErr error
+			if _, available := validPersistedDownloadRoot(task.rootDir); !available {
+				cleanupErr = fmt.Errorf("原下载目录不可用")
+			} else {
+				cleanupErr = os.Remove(task.transfer.tempPath)
+			}
+			if cleanupErr == nil || os.IsNotExist(cleanupErr) {
+				task.transfer = nil
+			} else {
+				log.Printf("清理下载暂存文件失败: %v", cleanupErr)
+				task.Notice = "暂存文件清理失败，请稍后重试清理"
+			}
 		}
 	}
 	taskManager.mu.Unlock()
+	a.downloadPersistMu.Unlock()
 	a.emitDownloadTaskEvent("task_updated", task)
 }
 
@@ -94,17 +118,6 @@ func (a *App) beginDownloadFinalizing(ctx context.Context, task *DownloadTask) b
 	taskManager.mu.Unlock()
 	a.emitDownloadTaskEvent("task_updated", task)
 	return true
-}
-
-func (a *App) cleanupPausedDownloadTemps() {
-	taskManager.mu.Lock()
-	defer taskManager.mu.Unlock()
-	for _, task := range taskManager.tasks {
-		if task.Status == "paused" && task.transfer != nil {
-			os.Remove(task.transfer.tempPath)
-			task.transfer = nil
-		}
-	}
 }
 
 func (a *App) GetDownloadTasks() []*DownloadTask {
@@ -124,15 +137,33 @@ func (a *App) GetDownloadTasks() []*DownloadTask {
 
 // ClearCompletedTasks removes completed and failed tasks
 func (a *App) ClearCompletedTasks() {
+	a.downloadPersistMu.Lock()
 	taskManager.mu.Lock()
-	defer taskManager.mu.Unlock()
 
 	for id, t := range taskManager.tasks {
 		if t.Status == "completed" || t.Status == "failed" || t.Status == "cancelled" {
+			if t.transfer != nil {
+				if _, available := validPersistedDownloadRoot(t.rootDir); !available {
+					log.Printf("原下载目录不可用，保留任务供稍后清理: %s", t.ID)
+					continue
+				}
+				if err := os.Remove(t.transfer.tempPath); err != nil && !os.IsNotExist(err) {
+					log.Printf("清理下载暂存文件失败，保留任务以便重试: %v", err)
+					continue
+				}
+				t.transfer = nil
+			}
 			delete(taskManager.tasks, id)
 		}
 	}
-	runtime.EventsEmit(a.ctx, "tasks_cleared", nil)
+	taskManager.mu.Unlock()
+	if err := a.writeDownloadTaskStore(a.snapshotDownloadTasks()); err != nil {
+		log.Printf("清理下载任务记录失败: %v", err)
+	}
+	a.downloadPersistMu.Unlock()
+	if a.ctx != nil && a.ctx.Value("events") != nil {
+		runtime.EventsEmit(a.ctx, "tasks_cleared", nil)
+	}
 }
 
 func normalizeDownloadTaskPath(filePath string) string {
@@ -180,7 +211,7 @@ func (a *App) updateCompletedDownloadTaskPath(oldPath string, newPath string) {
 	taskManager.mu.Unlock()
 
 	for i := range updatedTasks {
-		runtime.EventsEmit(a.ctx, "task_updated", &updatedTasks[i])
+		a.emitDownloadTaskEvent("task_updated", &updatedTasks[i])
 	}
 }
 

@@ -401,6 +401,13 @@ func (a *App) progressReporter(bm *BlockManager, task *DownloadTask, stopChan <-
 			taskManager.mu.Lock()
 			task.DownloadedSize = downloaded
 			task.Progress = percent
+			if state := task.transfer; state != nil && state.mode == "chunk" {
+				completed := make([]bool, len(bm.blocks))
+				for i, block := range bm.blocks {
+					completed[i] = block.Status() == blockStatusCompleted
+				}
+				state.completedBlocks = completed
+			}
 			if speed != "" {
 				task.Speed = speed
 			}

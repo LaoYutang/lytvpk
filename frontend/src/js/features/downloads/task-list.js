@@ -14,7 +14,9 @@ import {
 // Wails generates these bindings during the build. Calling the runtime bridge
 // directly keeps generated files out of the source change.
 const pauseDownloadTask = (taskID) => window.go.app.App.PauseDownloadTask(taskID);
+const confirmPauseDownloadTask = (taskID) => window.go.app.App.ConfirmPauseDownloadTask(taskID);
 const resumeDownloadTask = (taskID) => window.go.app.App.ResumeDownloadTask(taskID);
+const pauseConfirmationRequired = "DOWNLOAD_PAUSE_CONFIRMATION_REQUIRED";
 const pendingTaskActions = new Set();
 
 export async function refreshTaskList() {
@@ -255,13 +257,39 @@ function createTransferControl(task, action) {
 
     pendingTaskActions.add(task.id);
     button.disabled = true;
+    let confirmationOpen = false;
     try {
-      await (paused ? pauseDownloadTask(task.id) : resumeDownloadTask(task.id));
+      if (paused) {
+        try {
+          await pauseDownloadTask(task.id);
+        } catch (err) {
+          const reason = String(err);
+          if (!reason.includes(pauseConfirmationRequired)) throw err;
+          const message = reason.includes(`${pauseConfirmationRequired}_KNOWN`)
+            ? "服务器未提供可靠的文件标识，暂停将清空已下载进度，继续时需重新下载。确定暂停吗？"
+            : "当前尚未确认服务器是否提供可靠的文件标识。暂停可能清空已下载进度，继续时可能需要重新下载。确定暂停吗？";
+          showConfirmModal("确认暂停下载", message, async () => {
+            try {
+              await confirmPauseDownloadTask(task.id);
+            } catch (confirmErr) {
+              showError(`暂停下载失败: ${confirmErr}`);
+            }
+          }, false, "", () => {
+            pendingTaskActions.delete(task.id);
+            void refreshTaskList();
+          });
+          confirmationOpen = true;
+        }
+      } else {
+        await resumeDownloadTask(task.id);
+      }
     } catch (err) {
       showError(`${paused ? "暂停" : "继续"}下载失败: ${err}`);
     } finally {
-      pendingTaskActions.delete(task.id);
-      await refreshTaskList();
+      if (!confirmationOpen) {
+        pendingTaskActions.delete(task.id);
+        await refreshTaskList();
+      }
     }
   });
   return button;

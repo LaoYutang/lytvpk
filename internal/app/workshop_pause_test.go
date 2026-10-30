@@ -23,6 +23,7 @@ type pauseTestRequest struct {
 
 type pauseTestServer struct {
 	url            string
+	mode           string
 	requests       chan pauseTestRequest
 	firstChunkSent chan struct{}
 	firstClosed    chan struct{}
@@ -34,6 +35,7 @@ func newPauseTestServer(t *testing.T, payload []byte, mode string) *pauseTestSer
 	const firstChunk = 16 * 1024
 	const etag = `"pause-test-v1"`
 	testServer := &pauseTestServer{
+		mode:           mode,
 		requests:       make(chan pauseTestRequest, 8),
 		firstChunkSent: make(chan struct{}),
 		firstClosed:    make(chan struct{}),
@@ -184,7 +186,22 @@ func startAndPauseTestTask(t *testing.T, app *App, server *pauseTestServer, payl
 	waitPauseTestTask(t, id, func(task DownloadTask) bool {
 		return task.Status == "downloading" && task.DownloadedSize >= 16*1024
 	})
-	if err := app.PauseDownloadTask(id); err != nil {
+	if server.mode == "no-etag" {
+		if err := app.PauseDownloadTask(id); err == nil || !strings.Contains(err.Error(), downloadPauseConfirmationKnown) {
+			t.Fatalf("unverified bytes should require pause confirmation: %v", err)
+		}
+		if task := pauseTestSnapshot(t, id); task.Status != "downloading" {
+			t.Fatalf("unconfirmed pause changed task status to %q", task.Status)
+		}
+		select {
+		case <-server.firstClosed:
+			t.Fatal("unconfirmed pause cancelled the original request")
+		default:
+		}
+		if err := app.ConfirmPauseDownloadTask(id); err != nil {
+			t.Fatalf("confirm pause of unverified download: %v", err)
+		}
+	} else if err := app.PauseDownloadTask(id); err != nil {
 		t.Fatalf("pause active download: %v", err)
 	}
 	waitPauseTestSignal(t, server.firstClosed, "first request cancellation")
@@ -293,28 +310,28 @@ func TestWorkshopPauseResumeRestartsWhenRangeIgnored(t *testing.T) {
 	assertPauseTestCompletedFile(t, app, id, payload)
 }
 
-func TestWorkshopPauseResumeWithoutETagStartsFromZero(t *testing.T) {
+func TestWorkshopPauseResumeWithoutETagRestartsFromZero(t *testing.T) {
 	payload := pauseTestPayload()
 	server := newPauseTestServer(t, payload, "no-etag")
 	app := &App{rootDir: t.TempDir(), ctx: context.Background()}
 	id := startAndPauseTestTask(t, app, server, payload)
 	paused := pauseTestSnapshot(t, id)
-	if paused.DownloadedSize != 0 || paused.Progress != 0 {
-		t.Fatalf("unverifiable partial download was retained: downloaded=%d progress=%d", paused.DownloadedSize, paused.Progress)
+	if paused.DownloadedSize != 0 || paused.Progress != 0 || !strings.Contains(paused.Notice, "从头下载") {
+		t.Fatalf("unresumable pause should show zero and a restart notice: downloaded=%d progress=%d notice=%q", paused.DownloadedSize, paused.Progress, paused.Notice)
 	}
 	entries, err := os.ReadDir(filepath.Join(app.rootDir, "temp"))
 	if err != nil {
 		t.Fatalf("read temporary download directory: %v", err)
 	}
 	if len(entries) != 0 {
-		t.Fatalf("unverifiable partial download left %d temporary files", len(entries))
+		t.Fatalf("unresumable pause should remove temporary files, got %d", len(entries))
 	}
 	if err := app.ResumeDownloadTask(id); err != nil {
 		t.Fatalf("resume paused download: %v", err)
 	}
 	request := waitPauseTestRequest(t, server.requests)
 	if request.rangeHeader != "" || request.ifRange != "" {
-		t.Fatalf("download without a strong ETag should restart from zero: %+v", request)
+		t.Fatalf("download without a strong ETag must restart with one complete GET: %+v", request)
 	}
 	assertPauseTestCompletedFile(t, app, id, payload)
 	if got := server.getCount.Load(); got != 2 {
