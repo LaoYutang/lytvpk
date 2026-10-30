@@ -3,8 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"image"
@@ -14,9 +12,7 @@ import (
 	"io"
 	"log"
 	"mime"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,8 +20,6 @@ import (
 	"time"
 
 	"vpk-manager/internal/network"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 var downloadTaskSequence atomic.Uint64
@@ -79,14 +73,28 @@ func (a *App) StartDownloadTask(details WorkshopFileDetails, useOptimizedIP bool
 }
 
 func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downloadUrl string) {
+	defer a.finishDownloadRun(task)
 	updateStatus := func(status string, err string) {
 		taskManager.mu.Lock()
-		task.Status = status
-		task.Error = err
+		if task.Status != "pausing" && task.Status != "cancelling" && ctx.Err() == nil {
+			if status == "downloading" && task.Status == "finalizing" {
+				task.Notice = err
+			} else {
+				if status == "failed" {
+					task.Status = "failing"
+				} else {
+					task.Status = status
+				}
+				task.Error = err
+			}
+		}
 		taskManager.mu.Unlock()
-		runtime.EventsEmit(a.ctx, "task_updated", task)
+		a.emitDownloadTaskEvent("task_updated", task)
 	}
 
+	if ctx.Err() != nil {
+		return
+	}
 	updateStatus("downloading", "")
 
 	if a.rootDir == "" {
@@ -103,7 +111,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 	var bestIP string
 	// Check global preferred IP setting
 	if a.GetWorkshopPreferredIP() {
+		taskManager.mu.Lock()
 		task.UseOptimizedIP = true
+		taskManager.mu.Unlock()
 	}
 
 	if task.UseOptimizedIP {
@@ -115,6 +125,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			bestIP = network.GlobalIPSelector.GetBestIP(downloadUrl)
 		}
 		updateStatus("downloading", "")
+	}
+	if ctx.Err() != nil {
+		return
 	}
 
 	// Ensure temp directory exists
@@ -132,15 +145,21 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			taskManager.mu.Lock()
 			task.TotalSize = totalSize
 			taskManager.mu.Unlock()
-			runtime.EventsEmit(a.ctx, "task_updated", task)
+			a.emitDownloadTaskEvent("task_updated", task)
 		}
+	}
+	if ctx.Err() != nil {
+		return
 	}
 
 	// Calculate optimal thread count based on file size (max 8 threads)
 	threadCount := network.CalculateThreadCount(totalSize, 8)
 
 	// Use chunked download if multiple threads are needed
-	if threadCount > 1 && totalSize > 0 {
+	taskManager.mu.RLock()
+	resumeSingle := task.transfer != nil && task.transfer.mode == "single"
+	taskManager.mu.RUnlock()
+	if !resumeSingle && threadCount > 1 && totalSize > 0 {
 		fmt.Printf("[Download] Using %d-thread download for %s (Size: %.2f MB)\n",
 			threadCount, task.Filename, float64(totalSize)/1024/1024)
 
@@ -151,7 +170,6 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 				fmt.Printf("[Download] Server does not support Range, falling back to single-thread download\n")
 				// Continue to single-thread download below
 			} else if ctx.Err() != nil {
-				updateStatus("cancelled", "Cancelled by user")
 				return
 			} else {
 				updateStatus("failed", err.Error())
@@ -159,6 +177,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 			}
 		} else {
 			// Chunked download succeeded
+			if !a.beginDownloadFinalizing(ctx, task) {
+				return
+			}
 			targetPath := filepath.Join(a.rootDir, filepath.Base(task.Filename))
 
 			// For direct downloads, use timestamp for uniqueness
@@ -170,13 +191,16 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 				task.Filename = newFilename
 				taskManager.mu.Unlock()
 				targetPath = filepath.Join(a.rootDir, newFilename)
-				runtime.EventsEmit(a.ctx, "task_updated", task)
+				a.emitDownloadTaskEvent("task_updated", task)
 			}
 
 			if err := os.Rename(finalPath, targetPath); err != nil {
 				updateStatus("failed", "Rename failed: "+err.Error())
 				return
 			}
+			taskManager.mu.Lock()
+			task.transfer = nil
+			taskManager.mu.Unlock()
 
 			// Download preview image
 			a.downloadPreviewImage(task, targetPath)
@@ -205,219 +229,47 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		}
 	}
 
-	// Single-thread download (fallback or small files)
-	fmt.Printf("[Download] Using single-thread download for %s\n", task.Filename)
-
-	// Generate hash for temp filename
-	hashInput := fmt.Sprintf("%s-%d", task.Filename, time.Now().UnixNano())
-	hash := md5.Sum([]byte(hashInput))
-	tempFileName := hex.EncodeToString(hash[:])
-	tempPath := filepath.Join(tempDir, tempFileName)
-
+	// Single-thread download (also used when the server rejects byte ranges).
+	tempPath, cd, err := a.downloadSingle(ctx, task, downloadUrl, bestIP, tempDir)
+	if err != nil {
+		if ctx.Err() == nil {
+			updateStatus("failed", err.Error())
+		}
+		return
+	}
+	if !a.beginDownloadFinalizing(ctx, task) {
+		return
+	}
 	targetPath := filepath.Join(a.rootDir, filepath.Base(task.Filename))
 
-	out, err := os.Create(tempPath)
-	if err != nil {
-		updateStatus("failed", err.Error())
-		return
-	}
-
-	// Ensure cleanup on failure or cancellation
-	defer func() {
-		out.Close()
-		taskManager.mu.RLock()
-		status := task.Status
-		taskManager.mu.RUnlock()
-		if status == "failed" || status == "cancelled" {
-			os.Remove(tempPath)
-		}
-	}()
-
-	// Use a transport with timeouts and keep-alive
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   15 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		ResponseHeaderTimeout: 60 * time.Second, // Increased timeout
-	}
-
-	if task.UseOptimizedIP {
-		if bestIP != "" {
-			dialer := &net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}
-			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, port, _ := net.SplitHostPort(addr)
-
-				// Check if the host matches the download URL's host
-				u, parseErr := url.Parse(downloadUrl)
-				if parseErr == nil && u.Hostname() == host {
-					return dialer.DialContext(ctx, network, net.JoinHostPort(bestIP, port))
-				}
-				return dialer.DialContext(ctx, network, addr)
-			}
-			fmt.Printf("[Download] Using optimized IP: %s for %s\n", bestIP, downloadUrl)
-		}
-	}
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   0, // No global timeout for large downloads
-	}
-
-	var resp *http.Response
-	var reqErr error
-	maxRetries := 3
-
-	// Retry loop
-	for i := 0; i < maxRetries; i++ {
-		// Check for cancellation before retry
-		select {
-		case <-ctx.Done():
-			updateStatus("cancelled", "Cancelled by user")
-			out.Close()
-			os.Remove(tempPath)
-			return
-		default:
-		}
-
-		if i > 0 {
-			time.Sleep(2 * time.Second)
-			fmt.Printf("[Download] Retrying task %s (%d/%d)...\n", task.ID, i+1, maxRetries)
-		}
-
-		var req *http.Request
-		req, err = http.NewRequestWithContext(ctx, "GET", downloadUrl, nil)
-		if err != nil {
-			updateStatus("failed", err.Error())
-			return
-		}
-		// Updated User-Agent
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-		req.Header.Set("Referer", "https://steamcommunity.com/")
-		req.Header.Set("Accept", "*/*")
-
-		resp, reqErr = client.Do(req)
-		if reqErr == nil {
-			if resp.StatusCode == http.StatusOK {
-				break // Success
-			}
-			// If status is not OK, close body and retry if it's a server error
-			resp.Body.Close()
-			reqErr = fmt.Errorf("HTTP status: %d", resp.StatusCode)
-
-			// Don't retry on 404
-			if resp.StatusCode == http.StatusNotFound {
-				break
-			}
-		} else {
-			// Check if error is due to cancellation
-			if ctx.Err() != nil {
-				updateStatus("cancelled", "Cancelled by user")
-				out.Close()
-				os.Remove(tempPath)
-				return
-			}
-		}
-	}
-
-	if reqErr != nil {
-		updateStatus("failed", reqErr.Error())
-		return
-	}
-	defer resp.Body.Close()
-
-	// Try to get filename from Content-Disposition
-	cd := resp.Header.Get("Content-Disposition")
+	// Prefer the filename supplied by the server for direct downloads.
 	if cd != "" {
 		if _, params, mimeErr := mime.ParseMediaType(cd); mimeErr == nil {
-			if filename, ok := params["filename"]; ok && filename != "" {
-				// Clean filename
-				filename = cleanFilename(filename)
-
-				// If it's a workshop download (not direct), use the ID as filename
+			if filename := cleanFilename(params["filename"]); filename != "" {
 				if !strings.HasPrefix(task.WorkshopID, "direct-") {
-					ext := filepath.Ext(filename)
-					filename = fmt.Sprintf("%s%s", task.WorkshopID, ext)
+					filename = fmt.Sprintf("%s%s", task.WorkshopID, filepath.Ext(filename))
 				}
-
-				// Update task filename if it was unknown or we want to prefer server filename
-				// For now, let's update it if the current one is "unknown.vpk" or similar
-				// Or if we are in direct download mode
 				if strings.HasPrefix(task.WorkshopID, "direct-") || strings.HasPrefix(task.Filename, "unknown") {
 					taskManager.mu.Lock()
 					task.Filename = filename
-					// Also update title for direct downloads
 					if strings.HasPrefix(task.WorkshopID, "direct-") {
 						task.Title = filename
 					}
 					taskManager.mu.Unlock()
-					// Update target path
 					targetPath = filepath.Join(a.rootDir, filename)
-					runtime.EventsEmit(a.ctx, "task_updated", task)
+					a.emitDownloadTaskEvent("task_updated", task)
 				}
 			}
 		}
 	}
-
-	// If filename is still unknown/generic, use timestamp
 	if task.Filename == "unknown.vpk" || task.Filename == "" {
 		newFilename := fmt.Sprintf("unknown_%d.vpk", time.Now().Unix())
 		taskManager.mu.Lock()
 		task.Filename = newFilename
 		taskManager.mu.Unlock()
 		targetPath = filepath.Join(a.rootDir, newFilename)
-		runtime.EventsEmit(a.ctx, "task_updated", task)
+		a.emitDownloadTaskEvent("task_updated", task)
 	}
-
-	// Check Content-Type
-	contentType := resp.Header.Get("Content-Type")
-	if contentType != "" && (contentType == "text/html" || contentType == "application/json") {
-		updateStatus("failed", fmt.Sprintf("Invalid content type: %s", contentType))
-		return
-	}
-
-	// Determine total size
-	if totalSize == 0 && resp.ContentLength > 0 {
-		totalSize = resp.ContentLength
-		// Update task info
-		taskManager.mu.Lock()
-		task.TotalSize = totalSize
-		taskManager.mu.Unlock()
-		runtime.EventsEmit(a.ctx, "task_updated", task)
-	}
-
-	// Progress tracking
-	counter := &TaskWriteCounter{
-		Task:     task,
-		Ctx:      a.ctx,
-		Total:    totalSize,
-		LastTime: time.Now(),
-	}
-
-	// Use a buffer for copying to reduce syscalls and lock contention
-	// But io.Copy already uses a buffer (32KB)
-	if _, err = io.Copy(out, io.TeeReader(resp.Body, counter)); err != nil {
-		out.Close()
-		// Check if error is due to cancellation
-		if ctx.Err() != nil || errors.Is(err, context.Canceled) {
-			updateStatus("cancelled", "Cancelled by user")
-			os.Remove(tempPath)
-		} else {
-			updateStatus("failed", err.Error())
-		}
-		return
-	}
-
-	out.Close() // Close before rename
 
 	// For direct downloads, ALWAYS use timestamp to ensure uniqueness
 	if strings.HasPrefix(task.WorkshopID, "direct-") {
@@ -432,7 +284,7 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		taskManager.mu.Unlock()
 
 		targetPath = filepath.Join(a.rootDir, newFilename)
-		runtime.EventsEmit(a.ctx, "task_updated", task)
+		a.emitDownloadTaskEvent("task_updated", task)
 	}
 
 	// Rename to final
@@ -440,6 +292,9 @@ func (a *App) processDownloadTask(ctx context.Context, task *DownloadTask, downl
 		updateStatus("failed", "Rename failed: "+err.Error())
 		return
 	}
+	taskManager.mu.Lock()
+	task.transfer = nil
+	taskManager.mu.Unlock()
 
 	// 尝试下载预览图作为同名文件
 	if task.PreviewUrl != "" {

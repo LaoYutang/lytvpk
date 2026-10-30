@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
 	"vpk-manager/internal/platform/protocol"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type WorkshopChild struct {
@@ -61,15 +60,17 @@ type DownloadTask struct {
 	PreviewUrl     string             `json:"preview_url"`
 	FileUrl        string             `json:"file_url"` // Added for retry
 	UseOptimizedIP bool               `json:"use_optimized_ip"`
-	Status         string             `json:"status"` // "pending", "downloading", "completed", "failed", "cancelled"
+	Status         string             `json:"status"` // pending, downloading, pausing, paused, finalizing, completed, failed, cancelled
 	Progress       int                `json:"progress"`
 	TotalSize      int64              `json:"total_size"`
 	DownloadedSize int64              `json:"downloaded_size"`
 	Speed          string             `json:"speed"`
 	Error          string             `json:"error"`
+	Notice         string             `json:"notice,omitempty"`
 	Description    string             `json:"description"`
 	CreatedAt      string             `json:"created_at"`
 	cancelFunc     context.CancelFunc `json:"-"`
+	transfer       *downloadTransferState
 }
 
 // TaskManager manages download tasks
@@ -88,7 +89,7 @@ func (a *App) HasActiveDownloads() bool {
 	defer taskManager.mu.RUnlock()
 
 	for _, task := range taskManager.tasks {
-		if task.Status == "downloading" || task.Status == "pending" {
+		if task.Status == "downloading" || task.Status == "pending" || task.Status == "selecting_ip" || task.Status == "pausing" || task.Status == "cancelling" || task.Status == "paused" || task.Status == "finalizing" {
 			return true
 		}
 	}
@@ -96,51 +97,111 @@ func (a *App) HasActiveDownloads() bool {
 }
 
 // CancelDownloadTask cancels a download task
-func (a *App) CancelDownloadTask(taskID string) {
+func (a *App) CancelDownloadTask(taskID string) error {
 	taskManager.mu.Lock()
 	task, exists := taskManager.tasks[taskID]
-	if exists && task.cancelFunc != nil && (task.Status == "pending" || task.Status == "downloading") {
-		task.cancelFunc()
+	if !exists {
+		taskManager.mu.Unlock()
+		return fmt.Errorf("download task not found")
+	}
+	switch task.Status {
+	case "pending", "selecting_ip", "downloading", "pausing":
+		task.Status = "cancelling"
+		task.Speed = ""
+		if task.cancelFunc != nil {
+			task.cancelFunc()
+		}
+	case "paused":
 		task.Status = "cancelled"
 		task.Error = "Cancelled by user"
+		task.Notice = ""
+		if task.transfer != nil {
+			os.Remove(task.transfer.tempPath)
+			task.transfer = nil
+		}
+	default:
+		taskManager.mu.Unlock()
+		return fmt.Errorf("task cannot be cancelled while %s", task.Status)
 	}
 	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
+	return nil
+}
 
-	if exists {
-		runtime.EventsEmit(a.ctx, "task_updated", task)
+// PauseDownloadTask stops an active transfer. The worker publishes "paused"
+// only after all network requests and file writes have stopped.
+func (a *App) PauseDownloadTask(taskID string) error {
+	taskManager.mu.Lock()
+	task, exists := taskManager.tasks[taskID]
+	if !exists {
+		taskManager.mu.Unlock()
+		return fmt.Errorf("download task not found")
 	}
+	if task.Status != "pending" && task.Status != "selecting_ip" && task.Status != "downloading" {
+		taskManager.mu.Unlock()
+		return fmt.Errorf("task cannot be paused while %s", task.Status)
+	}
+	task.Status = "pausing"
+	task.Speed = ""
+	if task.cancelFunc != nil {
+		task.cancelFunc()
+	}
+	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
+	return nil
+}
+
+// ResumeDownloadTask starts a new worker only after the paused worker has exited.
+func (a *App) ResumeDownloadTask(taskID string) error {
+	taskManager.mu.Lock()
+	task, exists := taskManager.tasks[taskID]
+	if !exists {
+		taskManager.mu.Unlock()
+		return fmt.Errorf("download task not found")
+	}
+	if task.Status != "paused" {
+		taskManager.mu.Unlock()
+		return fmt.Errorf("task cannot be resumed while %s", task.Status)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	task.cancelFunc = cancel
+	task.Status = "pending"
+	task.Error = ""
+	task.Speed = ""
+	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
+	go a.processDownloadTask(ctx, task, task.FileUrl)
+	return nil
 }
 
 // RetryDownloadTask retries a failed or cancelled task
 func (a *App) RetryDownloadTask(taskID string) {
 	taskManager.mu.Lock()
 	task, exists := taskManager.tasks[taskID]
-	taskManager.mu.Unlock()
-
-	if !exists {
-		return
-	}
-
-	// Only retry if failed or cancelled
-	if task.Status != "failed" && task.Status != "cancelled" {
+	if !exists || (task.Status != "failed" && task.Status != "cancelled") {
+		taskManager.mu.Unlock()
 		return
 	}
 
 	// Reset task state
-	taskManager.mu.Lock()
 	task.Status = "pending"
 	task.Progress = 0
 	task.DownloadedSize = 0
 	task.Error = ""
+	task.Notice = ""
 	task.Speed = ""
 	task.FilePath = ""
+	if task.transfer != nil {
+		os.Remove(task.transfer.tempPath)
+		task.transfer = nil
+	}
 
 	// Create new context
 	ctx, cancel := context.WithCancel(context.Background())
 	task.cancelFunc = cancel
 	taskManager.mu.Unlock()
 
-	runtime.EventsEmit(a.ctx, "task_updated", task)
+	a.emitDownloadTaskEvent("task_updated", task)
 
 	go a.processDownloadTask(ctx, task, task.FileUrl)
 }

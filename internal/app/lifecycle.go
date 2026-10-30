@@ -153,6 +153,7 @@ func (a *App) HandleProtocolURL(url string) {
 
 // ForceExit forces the application to exit
 func (a *App) ForceExit() {
+	a.cleanupPausedDownloadTemps()
 	a.forceClose = true
 	runtime.Quit(a.ctx)
 }

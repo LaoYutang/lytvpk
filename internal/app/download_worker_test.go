@@ -54,7 +54,11 @@ func TestDownloadBlockRangeAndEOF(t *testing.T) {
 				if r.Header.Get("Range") != "bytes=2-5" {
 					t.Fatalf("range=%q", r.Header.Get("Range"))
 				}
-				return &http.Response{StatusCode: test.status, Header: make(http.Header), Body: io.NopCloser(&blockEOFReader{[]byte(test.data), test.readErr}), Request: r}, nil
+				header := make(http.Header)
+				if test.status == http.StatusPartialContent {
+					header.Set("Content-Range", "bytes 2-5/10")
+				}
+				return &http.Response{StatusCode: test.status, Header: header, ContentLength: -1, Body: io.NopCloser(&blockEOFReader{[]byte(test.data), test.readErr}), Request: r}, nil
 			})}
 			bm := NewBlockManager(10, 1, 4)
 			defer bm.cancel()

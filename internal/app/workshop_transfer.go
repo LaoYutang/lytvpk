@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -17,80 +18,175 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, downloadUrl string, bestIP string, totalSize int64, workerCount int, tempDir string) (string, error) {
-	finalPath := filepath.Join(tempDir, task.ID+"_final")
-
-	// 1. Preallocate final file
-	file, err := createPreallocatedFile(finalPath, totalSize)
+func (a *App) probeChunkRange(ctx context.Context, downloadURL, bestIP, validator string, expectedTotal int64) (string, error) {
+	transport := buildDownloadTransport(bestIP, downloadURL)
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport}
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
 	if err != nil {
 		return "", err
 	}
+	req.Header.Set("Range", "bytes=0-0")
+	if validator != "" {
+		req.Header.Set("If-Range", validator)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Referer", "https://steamcommunity.com/")
+	req.Header.Set("Accept-Encoding", "identity")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && !strings.EqualFold(encoding, "identity") {
+		return "", fmt.Errorf("unsupported content encoding: %s", encoding)
+	}
+	if resp.StatusCode == http.StatusOK {
+		return "", errRangeNotSupported
+	}
+	if resp.StatusCode != http.StatusPartialContent {
+		return "", fmt.Errorf("range probe HTTP status: %d", resp.StatusCode)
+	}
+	start, end, total, err := parseByteContentRange(resp.Header.Get("Content-Range"))
+	if err != nil || start != 0 || end != 0 || total != expectedTotal || (resp.ContentLength >= 0 && resp.ContentLength != 1) {
+		return "", errRangeNotSupported
+	}
+	newValidator := strongETag(resp.Header)
+	if newValidator == "" {
+		return "", errRangeNotSupported
+	}
+	if validator != "" && newValidator != validator {
+		return "", errRangeNotSupported
+	}
+	return newValidator, nil
+}
 
-	// 2. Create BlockManager with 5MB blocks
+func (a *App) processChunkedDownload(ctx context.Context, task *DownloadTask, downloadURL string, bestIP string, totalSize int64, workerCount int, tempDir string) (string, error) {
+	finalPath := filepath.Join(tempDir, task.ID+"_final")
+	taskManager.mu.RLock()
+	state := task.transfer
+	taskManager.mu.RUnlock()
+	if state != nil && (state.mode != "chunk" || state.totalSize != totalSize || state.validator == "") {
+		a.restartDownloadFromZero(task, "暂存文件无法安全续传，已从头重新下载")
+		state = nil
+	}
+	validator := ""
+	if state != nil {
+		validator = state.validator
+	}
+	probedValidator, err := a.probeChunkRange(ctx, downloadURL, bestIP, validator, totalSize)
+	if err != nil {
+		if state != nil && ctx.Err() == nil {
+			a.restartDownloadFromZero(task, "服务器未接受断点续传，已从头重新下载")
+		}
+		return "", err
+	}
+
+	var file *os.File
+	if state != nil {
+		file, err = os.OpenFile(finalPath, os.O_RDWR, 0600)
+		if err == nil {
+			var info os.FileInfo
+			info, err = file.Stat()
+			if err == nil && (info.Size() != totalSize || len(state.completedBlocks) != int((totalSize+5*1024*1024-1)/(5*1024*1024))) {
+				err = fmt.Errorf("chunk state does not match temp file")
+			}
+		}
+		if err != nil {
+			if file != nil {
+				file.Close()
+			}
+			a.restartDownloadFromZero(task, "暂存文件无法安全续传，已从头重新下载")
+			state = nil
+		}
+	}
+	if state == nil {
+		file, err = createPreallocatedFile(finalPath, totalSize)
+		if err != nil {
+			return "", err
+		}
+	}
+	defer file.Close()
 	bm := NewBlockManager(totalSize, workerCount, 5*1024*1024)
+	bm.validator = probedValidator
+	defer bm.cancel()
+	stopCancellationLink := context.AfterFunc(ctx, bm.cancel)
+	defer stopCancellationLink()
+	if state != nil {
+		for i, completed := range state.completedBlocks {
+			if completed {
+				bm.blocks[i].SetStatus(blockStatusCompleted)
+				bm.completedBlocks.Add(1)
+				bm.completedBytes.Add(bm.blocks[i].EndByte - bm.blocks[i].StartByte + 1)
+			}
+		}
+		bm.lastReportBytes.Store(bm.completedBytes.Load())
+	}
+	taskManager.mu.Lock()
+	task.transfer = &downloadTransferState{mode: "chunk", tempPath: finalPath, validator: probedValidator, totalSize: totalSize}
+	taskManager.mu.Unlock()
 
-	// 3. Link external context cancellation to BlockManager
-	go func() {
-		<-ctx.Done()
-		bm.cancel()
-	}()
-
-	fmt.Printf("[ChunkedDownload] Starting dynamic %d-worker download for %s (Size: %.2f MB, Blocks: %d)\n",
-		workerCount, task.Filename, float64(totalSize)/1024/1024, len(bm.blocks))
-
-	// 4. Start progress reporter
 	stopReporter := make(chan struct{})
-	go a.progressReporter(bm, task, stopReporter)
-
-	// 5. Start workers
+	reporterDone := make(chan struct{})
+	go func() { a.progressReporter(bm, task, stopReporter); close(reporterDone) }()
 	var wg sync.WaitGroup
 	for i := range workerCount {
 		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			a.downloadWorker(id, bm, file, downloadUrl, bestIP)
-		}(i)
+		go func(id int) { defer wg.Done(); a.downloadWorker(id, bm, file, downloadURL, bestIP) }(i)
 	}
-
-	// 6. Wait for all workers to finish
 	wg.Wait()
 	close(stopReporter)
-
-	// 7. Close file
-	file.Close()
-
-	// 8. Check for cancellation
+	<-reporterDone
+	if err := file.Sync(); err != nil {
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		return "", err
+	}
 	if ctx.Err() != nil {
-		os.Remove(finalPath)
+		completed := make([]bool, len(bm.blocks))
+		for i, block := range bm.blocks {
+			completed[i] = block.Status() == blockStatusCompleted
+		}
+		taskManager.mu.Lock()
+		task.transfer.completedBlocks = completed
+		task.DownloadedSize = bm.completedBytes.Load()
+		task.Progress = int(100 * task.DownloadedSize / totalSize)
+		taskManager.mu.Unlock()
 		return "", ctx.Err()
 	}
-
-	// 9. Check for fatal errors
 	if fatalErr := bm.HasFatalError(); fatalErr != nil {
-		os.Remove(finalPath)
+		if errors.Is(fatalErr, errRangeNotSupported) {
+			a.restartDownloadFromZero(task, "服务器未接受断点续传，已从头重新下载")
+		} else {
+			os.Remove(finalPath)
+			taskManager.mu.Lock()
+			task.transfer = nil
+			taskManager.mu.Unlock()
+		}
 		return "", fatalErr
 	}
-
-	// 10. Verify final file size
+	if bm.completedBlocks.Load() != int32(len(bm.blocks)) {
+		os.Remove(finalPath)
+		return "", fmt.Errorf("incomplete chunked download")
+	}
 	stat, err := os.Stat(finalPath)
 	if err != nil || stat.Size() != totalSize {
 		os.Remove(finalPath)
-		return "", fmt.Errorf("final size mismatch: expected %d, got %d", totalSize, stat.Size())
+		return "", fmt.Errorf("final size mismatch for chunked download")
 	}
-
-	// 11. Emit final progress
 	taskManager.mu.Lock()
 	task.DownloadedSize = totalSize
 	task.Progress = 100
+	task.Speed = ""
+	task.transfer.completedBlocks = make([]bool, len(bm.blocks))
+	for i := range task.transfer.completedBlocks {
+		task.transfer.completedBlocks[i] = true
+	}
 	taskManager.mu.Unlock()
-	runtime.EventsEmit(a.ctx, "task_progress", task)
-
-	fmt.Printf("[ChunkedDownload] Successfully downloaded %s with dynamic workers\n", task.Filename)
-
+	a.emitDownloadTaskEvent("task_progress", task)
 	return finalPath, nil
 }
 

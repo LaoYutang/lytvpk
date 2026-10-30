@@ -9,11 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Block status constants
@@ -55,6 +54,7 @@ type BlockManager struct {
 	errMu           sync.Mutex
 	lastReportTime  atomic.Value // stores time.Time
 	lastReportBytes atomic.Int64
+	validator       string
 }
 
 // NewBlockManager creates a BlockManager that splits totalSize into fixed-size blocks
@@ -314,21 +314,35 @@ func (a *App) downloadBlock(
 	}
 
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", block.StartByte, block.EndByte))
+	if bm.validator != "" {
+		req.Header.Set("If-Range", bm.validator)
+	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", "https://steamcommunity.com/")
 	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Accept-Encoding", "identity")
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && !strings.EqualFold(encoding, "identity") {
+		return fmt.Errorf("unsupported content encoding: %s", encoding)
+	}
 
 	if resp.StatusCode == http.StatusOK {
 		return errRangeNotSupported
 	}
 	if resp.StatusCode != http.StatusPartialContent {
 		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+	start, end, total, rangeErr := parseByteContentRange(resp.Header.Get("Content-Range"))
+	if rangeErr != nil || start != block.StartByte || end != block.EndByte || total != bm.totalSize || (resp.ContentLength >= 0 && resp.ContentLength != end-start+1) {
+		return fmt.Errorf("block %d returned an inconsistent Content-Range", block.Index)
+	}
+	if bm.validator != "" && strongETag(resp.Header) != bm.validator {
+		return fmt.Errorf("block %d returned a different file version", block.Index)
 	}
 
 	offset := block.StartByte
@@ -392,7 +406,7 @@ func (a *App) progressReporter(bm *BlockManager, task *DownloadTask, stopChan <-
 			}
 			taskManager.mu.Unlock()
 
-			runtime.EventsEmit(a.ctx, "task_progress", task)
+			a.emitDownloadTaskEvent("task_progress", task)
 		}
 	}
 }

@@ -483,6 +483,19 @@
   border-color: var(--primary);
 }
 
+.task-action-btn.pause-task-btn:hover,
+.task-action-btn.resume-task-btn:hover {
+  background: var(--primary-light);
+  color: white;
+  border-color: var(--primary);
+}
+
+.task-action-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
 .task-action-btn svg {
   width: 14px;
   height: 14px;

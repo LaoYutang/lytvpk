@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -10,13 +11,110 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// downloadTransferState survives a pause while the task remains in memory.
+// Only the stopped worker may leave a partial file for the next worker.
+type downloadTransferState struct {
+	mode               string
+	tempPath           string
+	validator          string // strong ETag from the GET response
+	totalSize          int64
+	contentDisposition string
+	completedBlocks    []bool
+}
+
+func (a *App) emitDownloadTaskEvent(name string, task *DownloadTask) {
+	// Wails supplies the events bus in its context. Tests and other headless
+	// callers have no bus; EventsEmit would terminate their process.
+	if a.ctx == nil || a.ctx.Value("events") == nil {
+		return
+	}
+	// Snapshot and enqueue under the same mutex so an earlier status cannot be
+	// delivered after a later one (for example pausing after paused).
+	taskManager.mu.Lock()
+	snapshot := *task
+	runtime.EventsEmit(a.ctx, name, &snapshot)
+	taskManager.mu.Unlock()
+}
+
+func (a *App) finishDownloadRun(task *DownloadTask) {
+	taskManager.mu.Lock()
+	switch task.Status {
+	case "pausing":
+		task.Status = "paused"
+		task.Speed = ""
+		if state := task.transfer; state != nil {
+			if state.validator == "" {
+				hadBytes := task.DownloadedSize > 0
+				if state.mode == "single" {
+					if info, err := os.Stat(state.tempPath); err == nil && info.Size() > 0 {
+						hadBytes = true
+					}
+				}
+				os.Remove(state.tempPath)
+				task.transfer = nil
+				task.DownloadedSize = 0
+				task.Progress = 0
+				if hadBytes {
+					task.Notice = "服务器未提供可验证的文件标识，继续时将从头下载"
+				}
+			} else if state.mode == "single" {
+				if info, err := os.Stat(state.tempPath); err == nil {
+					task.DownloadedSize = info.Size()
+					if state.totalSize > 0 {
+						task.Progress = int(100 * info.Size() / state.totalSize)
+					}
+				}
+			}
+		}
+	case "cancelling":
+		task.Status = "cancelled"
+		task.Error = "Cancelled by user"
+		task.Notice = ""
+	case "failing":
+		task.Status = "failed"
+	}
+	if task.Status == "failed" || task.Status == "cancelled" {
+		if task.transfer != nil {
+			os.Remove(task.transfer.tempPath)
+			task.transfer = nil
+		}
+	}
+	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
+}
+
+func (a *App) beginDownloadFinalizing(ctx context.Context, task *DownloadTask) bool {
+	taskManager.mu.Lock()
+	if ctx.Err() != nil || task.Status == "pausing" || task.Status == "cancelling" {
+		taskManager.mu.Unlock()
+		return false
+	}
+	task.Status = "finalizing"
+	task.Speed = ""
+	taskManager.mu.Unlock()
+	a.emitDownloadTaskEvent("task_updated", task)
+	return true
+}
+
+func (a *App) cleanupPausedDownloadTemps() {
+	taskManager.mu.Lock()
+	defer taskManager.mu.Unlock()
+	for _, task := range taskManager.tasks {
+		if task.Status == "paused" && task.transfer != nil {
+			os.Remove(task.transfer.tempPath)
+			task.transfer = nil
+		}
+	}
+}
+
 func (a *App) GetDownloadTasks() []*DownloadTask {
 	taskManager.mu.RLock()
 	defer taskManager.mu.RUnlock()
 
 	tasks := make([]*DownloadTask, 0, len(taskManager.tasks))
 	for _, t := range taskManager.tasks {
-		tasks = append(tasks, t)
+		copy := *t
+		tasks = append(tasks, &copy)
 	}
 
 	// Sort by created time desc (simple implementation)
@@ -87,10 +185,10 @@ func (a *App) updateCompletedDownloadTaskPath(oldPath string, newPath string) {
 }
 
 type TaskWriteCounter struct {
+	App         *App
 	Task        *DownloadTask
 	Total       int64
 	Current     int64
-	Ctx         context.Context
 	LastPercent int
 	LastTime    time.Time
 	LastBytes   int64
@@ -140,7 +238,7 @@ func (wc *TaskWriteCounter) Write(p []byte) (int, error) {
 
 		taskManager.mu.Unlock()
 
-		runtime.EventsEmit(wc.Ctx, "task_progress", wc.Task)
+		wc.App.emitDownloadTaskEvent("task_progress", wc.Task)
 	}
 	return n, nil
 }
