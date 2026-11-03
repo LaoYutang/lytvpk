@@ -74,7 +74,7 @@ func newWorkshopNetworkClients(config WorkshopDNSConfig) *workshopNetworkClients
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.DialContext = network.NewWorkshopDialer(config.server()).DialContext
-	browser := resty.New().SetTimeout(15 * time.Second).SetRetryCount(2).SetTransport(transport)
+	browser := resty.New().SetTimeout(30 * time.Second).SetRetryCount(2).SetTransport(transport)
 	return &workshopNetworkClients{
 		transport: transport,
 		browser:   browser,
