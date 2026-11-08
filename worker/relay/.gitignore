@@ -1,0 +1,20 @@
+# Local builds stay inside this standalone service.
+/build/
+/lytvpk-relay
+/lytvpk-relay-linux-*
+
+# Local configuration, runtime state and development output.
+.env
+.env.*
+!.env.example
+*.env
+*.log
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+__pycache__/
+*.pyc
+*.pyo
