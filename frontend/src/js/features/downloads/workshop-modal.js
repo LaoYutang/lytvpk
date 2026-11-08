@@ -1,8 +1,9 @@
 import { switchAppPage } from "../../core/ui-shell.js";
 import { showError, showNotification, showInfo } from "../../core/toast.js";
 import { getConfig } from "../../core/config.js";
-import { formatAPILineError, getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { escapeHtml } from "../../core/utils.js";
+import { createWorkshopRequestError } from "../workshop/request-error.js";
 import { refreshTaskList } from "./task-list.js";
 import { closeWorkshopHistory, recordWorkshopHistory } from "./workshop-history.js";
 import {
@@ -40,6 +41,8 @@ const IMAGE_PLACEHOLDER_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" fill="n
 let currentWorkshopResult = null;
 let workshopParseSequence = 0;
 let parseButtonContent = null;
+let workshopParseErrorVisible = false;
+const parseInputBindings = new WeakSet();
 const submittingButtons = new WeakSet();
 const workshopCache = new Map();
 const CACHE_DURATION = 3600 * 1000;
@@ -223,15 +226,47 @@ function restoreParseButton() {
   }
 }
 
+function clearWorkshopParseError() {
+  if (!workshopParseErrorVisible) return;
+  const result = document.getElementById("workshop-result");
+  result?.replaceChildren();
+  result?.classList.add("hidden");
+  workshopParseErrorVisible = false;
+}
+
+function bindWorkshopParseInput(input) {
+  if (parseInputBindings.has(input)) return;
+  parseInputBindings.add(input);
+  input.addEventListener("input", invalidateWorkshopParse);
+}
+
 function invalidateWorkshopParse() {
   workshopParseSequence++;
+  clearWorkshopParseError();
   restoreParseButton();
+}
+
+function getWorkshopInputError(error) {
+  const message = typeof error === "string" ? error : typeof error?.message === "string" ? error.message : "";
+  if (message.startsWith("工坊ID不能为空")) {
+    return "请输入创意工坊链接或工坊ID";
+  }
+  if (message.startsWith("工坊ID列表包含空项")) {
+    return "工坊ID列表包含空项，请检查后重新解析。";
+  }
+  if (message.startsWith("无效的工坊ID片段 ") || message === "invalid URL" ||
+      message === "could not find valid workshop ID in URL" || message === "请输入有效的工坊 ID") {
+    return "请输入有效的创意工坊链接或工坊ID。";
+  }
+  return "";
 }
 
 export async function checkWorkshopUrl() {
   const input = document.getElementById("workshop-url");
+  bindWorkshopParseInput(input);
   const url = input.value.trim();
   if (!url) {
+    invalidateWorkshopParse();
     showError("请输入创意工坊链接或工坊ID");
     return;
   }
@@ -255,6 +290,7 @@ export async function checkWorkshopUrl() {
   checkBtn.replaceChildren(spinner, document.createTextNode(" 解析中..."));
 
   currentWorkshopResult = null;
+  clearWorkshopParseError();
   result.classList.add("hidden");
   result.replaceChildren();
   downloadUrlInput.value = "";
@@ -283,7 +319,23 @@ export async function checkWorkshopUrl() {
     recordWorkshopHistory(groupedResult?.groups);
   } catch (err) {
     if (isCurrentRequest()) {
-      showError(formatAPILineError(err, "解析失败，请稍后重试。"));
+      const inputError = getWorkshopInputError(err);
+      if (inputError) {
+        showError(inputError);
+        return;
+      }
+      result.replaceChildren(createWorkshopRequestError({
+        title: "解析失败",
+        error: err,
+        fallback: "解析失败，请稍后重试。",
+        compact: true,
+        line: line.line,
+        retryLabel: "重新解析",
+        retryHint: "可以点击“解析”再次尝试，或在设置中切换线路后重试。",
+        onRetry: checkWorkshopUrl,
+      }));
+      result.classList.remove("hidden");
+      workshopParseErrorVisible = true;
     }
   } finally {
     if (isCurrentAPILine(line) && requestSequence === workshopParseSequence) {

@@ -1339,6 +1339,9 @@ export namespace app {
 	export class UpdateCheckResult {
 	    total_updates: number;
 	    new_detected: number;
+	    failed_count: number;
+	    first_error: string;
+	    line: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new UpdateCheckResult(source);
@@ -1348,6 +1351,9 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.total_updates = source["total_updates"];
 	        this.new_detected = source["new_detected"];
+	        this.failed_count = source["failed_count"];
+	        this.first_error = source["first_error"];
+	        this.line = source["line"];
 	    }
 	}
 	export class UpdateInfo {

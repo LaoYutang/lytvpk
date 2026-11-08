@@ -27,7 +27,8 @@ const { openWorkshopDetail } = await import(detailURL);
 hooks.deregister();
 
 class Element {
-  constructor() {
+  constructor(tag = "div") {
+    this.tagName = tag;
     this.classes = new Set();
     this.classList = {
       add: (...values) => values.forEach((value) => this.classes.add(value)),
@@ -41,12 +42,17 @@ class Element {
     this.scrollTop = 0;
     this.clientHeight = 200;
   }
+  set className(value) { this.classes = new Set(value.split(/\s+/).filter(Boolean)); }
+  get className() { return [...this.classes].join(" "); }
+  get childNodes() { return this.children; }
   set innerHTML(value) { this.html = value; this.children = []; }
-  get innerHTML() { return this.html || ""; }
+  get innerHTML() { return this.html || this.children.map((child) => child.textContent).join(""); }
   set textContent(value) { this.text = value; }
   get textContent() { return (this.text || "") + this.children.map((child) => child.textContent).join(""); }
   replaceChildren(...children) { this.children = children; this.html = ""; this.text = ""; }
+  append(...children) { children.forEach((child) => this.appendChild(child)); }
   appendChild(child) { this.children.push(child); return child; }
+  setAttribute(name, value) { this[name] = value; }
   querySelector() { return null; }
   querySelectorAll() { return []; }
   closest() { return document.getElementById("browser-body"); }
@@ -64,7 +70,8 @@ test.beforeEach(() => {
       if (!elements.has(id)) elements.set(id, new Element());
       return elements.get(id);
     },
-    createElement: () => new Element(),
+    createElement: (tag) => new Element(tag),
+    createElementNS: (_, tag) => new Element(tag),
     addEventListener() {},
     querySelectorAll: () => [],
   };
@@ -199,7 +206,7 @@ test("list and detail preserve safe rate-limit and timeout guidance", async (t) 
     throw new Error("https://private.invalid/ token=secret 备用线路请求过于频繁（HTTP 429），请至少等待 8 秒后重试 192.0.2.10");
   };
   await loadWorkshopList();
-  assert.equal(element("browser-grid").textContent, "备用线路请求过于频繁（HTTP 429），请至少等待8秒后重试。");
+  assert.match(element("browser-grid").textContent, /备用线路请求过于频繁（HTTP 429），请至少等待8秒后重试。/);
   workshopDeps.FetchWorkshopDetail = async () => {
     throw new Error("https://private.invalid/ 主线路请求超时（HTTP 504），请稍后重试 token=secret");
   };

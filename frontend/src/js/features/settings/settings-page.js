@@ -1,6 +1,7 @@
 import { appendWorkshopDNSSettings } from "./workshop-dns.js";
 import { appendAPILineSettings, updateAPILineStatus } from "./api-line.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+import { showWorkshopRequestError } from "../workshop/request-error.js";
 
 let activeIPDropdown;
 subscribeAPILineChange(() => activeIPDropdown?.invalidate());
@@ -553,27 +554,63 @@ function bindSettingsPage(deps) {
     }
   });
 
-  document.getElementById("settings-manual-check-btn")?.addEventListener("click", async () => {
-    const btn = document.getElementById("settings-manual-check-btn");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="btn-spinner"></span> 检测中...';
-    btn.style.pointerEvents = "none";
+  const manualCheckBtn = document.getElementById("settings-manual-check-btn");
+  const manualCheckContent = manualCheckBtn ? [...manualCheckBtn.childNodes] : [];
+  let manualCheckPending = false;
+  const runManualUpdateCheck = async () => {
+    if (manualCheckPending) return;
+    manualCheckPending = true;
+    if (manualCheckBtn?.isConnected) {
+      manualCheckBtn.disabled = true;
+      const spinner = document.createElement("span");
+      spinner.className = "btn-spinner";
+      manualCheckBtn.replaceChildren(spinner, document.createTextNode(" 检测中..."));
+      manualCheckBtn.style.pointerEvents = "none";
+    }
+    const snapshot = getAPILineSnapshot();
+    const line = snapshot.line;
     try {
       const result = await deps.CheckModUpdates();
-      const config = deps.getConfig();
-      config.lastUpdateCheckTime = String(Date.now());
-      deps.saveConfig(config);
-      const count = result.total_updates || 0;
-      deps.showNotification(count > 0 ? `检测完成，发现 ${count} 个Mod有更新` : "检测完成，所有Mod均为最新版本", count > 0 ? "info" : "success");
+      if (!isCurrentAPILine(snapshot)) return;
+      if (!Number.isInteger(result?.failed_count) || result.failed_count !== 0 || !Number.isInteger(result?.total_updates) || result.total_updates < 0) {
+        showWorkshopRequestError({
+          title: "更新检查未完成",
+          error: result?.first_error,
+          line: result?.line || line,
+          fallback: "部分工坊项目未取得有效检查结果，请重新检查。",
+          retryLabel: "重新检查",
+          retryHint: "可以点击“重新检查”再次检查，或在设置中切换线路后重试。",
+          onRetry: runManualUpdateCheck,
+        });
+      } else {
+        const config = deps.getConfig();
+        config.lastUpdateCheckTime = String(Date.now());
+        deps.saveConfig(config);
+        const count = result.total_updates || 0;
+        deps.showNotification(count > 0 ? `检测完成，发现 ${count} 个Mod有更新` : "检测完成，所有Mod均为最新版本", count > 0 ? "info" : "success");
+      }
       await deps.refreshFilesKeepFilter();
     } catch (err) {
-      deps.showNotification("检测失败: " + err, "error");
+      if (!isCurrentAPILine(snapshot)) return;
+      showWorkshopRequestError({
+        title: "更新检查未完成",
+        error: err,
+        line,
+        fallback: "未能取得工坊更新检查结果，请重新检查。",
+        retryLabel: "重新检查",
+        retryHint: "可以点击“重新检查”再次检查，或在设置中切换线路后重试。",
+        onRetry: runManualUpdateCheck,
+      });
+    } finally {
+      manualCheckPending = false;
+      if (manualCheckBtn?.isConnected) {
+        manualCheckBtn.disabled = false;
+        manualCheckBtn.replaceChildren(...manualCheckContent);
+        manualCheckBtn.style.pointerEvents = "";
+      }
     }
-    btn.disabled = false;
-    const checkIcon = '<svg class="trigger-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>';
-    btn.innerHTML = checkIcon + '<span class="trigger-check-text">立即触发检测</span>';
-    btn.style.pointerEvents = "";
-  });
+  };
+  manualCheckBtn?.addEventListener("click", runManualUpdateCheck);
 
   document.querySelectorAll('input[name="settings-browser-target"]').forEach((radio) => {
     radio.addEventListener("change", async () => {

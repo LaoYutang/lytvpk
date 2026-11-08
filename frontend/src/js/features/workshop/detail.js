@@ -1,5 +1,6 @@
 import { workshopDeps } from "./deps.js";
-import { formatAPILineError, getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+import { createWorkshopRequestError } from "./request-error.js";
 import {
   getWorkshopPreviewImages,
   renderThumbnails,
@@ -530,20 +531,27 @@ export async function openWorkshopDetail(item, options = {}) {
     renderWorkshopDetail(detail, options);
   } catch (err) {
     if (!isCurrentRequest()) return;
-    detailView.innerHTML = `
-            <div class="loading-placeholder">
-                <p>${escapeHtml(formatAPILineError(err, "加载详情失败，请稍后重试。"))}</p>
-                <button class="btn btn-primary" id="detail-error-back-btn">${options.parentDetail ? "返回合集" : "返回"}</button>
-            </div>`;
-    document
-      .getElementById("detail-error-back-btn")
-      ?.addEventListener("click", () => {
+    detailView.replaceChildren(createWorkshopRequestError({
+      title: "加载详情失败",
+      error: err,
+      fallback: "加载详情失败，请稍后重新查询。",
+      line: line.line,
+      retryLabel: "重新查询",
+      retryHint: "点击“重新查询”刷新详情，也可以在设置中手动切换线路后再试。",
+      onRetry: () => {
+        if (isCurrentRequest()) return openWorkshopDetail(item, options);
+      },
+      backLabel: options.parentDetail ? "返回合集" : "返回列表",
+      onBack: () => {
+        if (!isCurrentRequest()) return;
         if (options.parentDetail) {
+          detailRequestSequence++;
           renderWorkshopDetail(options.parentDetail);
           return;
         }
         hideWorkshopDetailView(detailView, browserBody);
-      });
+      },
+    }));
   }
 }
 

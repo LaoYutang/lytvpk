@@ -5,6 +5,7 @@ import {
   updateLoadingMessage,
 } from "../state.js";
 import { showError, showNotification } from "../../core/toast.js";
+import { getWorkshopMetadataWarning, showWorkshopRequestError } from "../workshop/request-error.js";
 import { unpackVPKFromPath } from "../diagnostics/vpk-unpack.js";
 import { showConfirmModal } from "../modals/confirm.js";
 import { refreshFilesKeepFilter } from "./filters.js";
@@ -81,6 +82,15 @@ export async function moveWorkshopFilesToAddons(filePaths) {
       showNotification(`成功转移 ${successCount} 个文件${skippedText}${unsubscribeReminder}`, "success");
     } else {
       showNotification(`没有可转移的创意工坊文件，已跳过 ${skippedCount} 个`, "info");
+    }
+    const metadataWarning = getWorkshopMetadataWarning(items);
+    if (metadataWarning) {
+      showWorkshopRequestError({
+        title: `有 ${metadataWarning.count} 项工坊信息未能获取`,
+        error: metadataWarning.error,
+        fallback: "文件转移已结束，但部分工坊信息未能获取。",
+        retryHint: "转移结果已保留。可以在设置中切换线路，后续工坊查询将使用所选线路。",
+      });
     }
     return result;
   } catch (error) {

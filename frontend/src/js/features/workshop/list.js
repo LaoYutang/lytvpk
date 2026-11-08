@@ -1,6 +1,7 @@
 import { workshopDeps } from "./deps.js";
-import { formatAPILineError, getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { openWorkshopDetail, resetWorkshopDetailView } from "./detail.js";
+import { createWorkshopRequestError } from "./request-error.js";
 import { setupWorkshopIdJump } from "./id-jump.js";
 import {
   addFilterIcons,
@@ -73,13 +74,48 @@ function updateWorkshopLoadMoreButton() {
   const loadMoreBtn = document.getElementById("browser-load-more");
   if (!loadMoreBtn) return;
 
-  if (browserState.loadFailed) {
-    loadMoreBtn.textContent = "加载失败，点击重试";
+  const hasErrorCard = Boolean(document.getElementById("browser-grid")?.querySelector(".workshop-request-error"));
+  if (browserState.loadFailed && !hasErrorCard) {
+    loadMoreBtn.textContent = "重新查询";
     loadMoreBtn.classList.remove("hidden");
   } else {
     loadMoreBtn.textContent = "加载更多";
     loadMoreBtn.classList.add("hidden");
   }
+}
+
+function renderWorkshopListRequestError(error, { page, line, isCurrentRequest, fallback }) {
+  const grid = document.getElementById("browser-grid");
+  browserState.loadFailed = true;
+  document.getElementById("browser-loading")?.classList.add("hidden");
+  if (!grid) {
+    updateWorkshopLoadMoreButton();
+    return;
+  }
+
+  const view = createWorkshopRequestError({
+    title: page === 1 ? "工坊列表加载失败" : "更多内容加载失败",
+    error,
+    fallback: fallback || "加载失败，请稍后重新查询。",
+    line: line.line,
+    compact: page > 1,
+    retryLabel: "重新查询",
+    retryHint: page === 1
+      ? "可以点击“查询”再次刷新，或在设置中切换线路后重试。"
+      : "点击“重新查询”继续加载本页，也可以在设置中手动切换线路后再试。",
+    onRetry: () => {
+      if (!isCurrentRequest() || browserState.loading) return;
+      browserState.page = page;
+      return loadWorkshopList();
+    },
+  });
+  if (page === 1) {
+    grid.replaceChildren(view);
+  } else {
+    grid.querySelector(".error-state")?.remove();
+    grid.appendChild(view);
+  }
+  updateWorkshopLoadMoreButton();
 }
 
 function maybeAutoLoadNextWorkshopPage() {
@@ -128,6 +164,7 @@ export function openBrowser(options = {}) {
 export async function loadWorkshopList() {
   if (browserState.loading) return;
   const line = getAPILineSnapshot();
+  const page = browserState.page;
   const sequence = ++listRequestSequence;
   const isCurrentRequest = () => isCurrentAPILine(line) && sequence === listRequestSequence;
   clearInterval(ipSelectionTimer);
@@ -136,11 +173,13 @@ export async function loadWorkshopList() {
   let isSelecting;
   try {
     isSelecting = await workshopDeps.IsSelectingIP();
-  } catch {
+  } catch (error) {
     if (isCurrentRequest()) {
       browserState.loading = false;
-      browserState.loadFailed = true;
-      updateWorkshopLoadMoreButton();
+      renderWorkshopListRequestError(error, {
+        page, line, isCurrentRequest,
+        fallback: "无法读取网络优选状态，请点击“重新查询”再试。",
+      });
     }
     return;
   }
@@ -170,12 +209,13 @@ export async function loadWorkshopList() {
       let stillSelecting;
       try {
         stillSelecting = await workshopDeps.IsSelectingIP();
-      } catch {
+      } catch (error) {
         if (isCurrentRequest()) {
           clearInterval(ipSelectionTimer);
-          browserState.loadFailed = true;
-          loadingEl?.classList.add("hidden");
-          updateWorkshopLoadMoreButton();
+          renderWorkshopListRequestError(error, {
+            page, line, isCurrentRequest,
+            fallback: "无法读取网络优选状态，请点击“重新查询”再试。",
+          });
         }
         return;
       }
@@ -219,12 +259,8 @@ export async function loadWorkshopList() {
   }
 
   try {
-    console.log(
-      `[Frontend] Fetching Workshop List: Page=${browserState.page}, Query=${browserState.query}, Sort=${browserState.sort}, FileType=${browserState.filetype}`
-    );
-
     const opts = {
-      page: browserState.page,
+      page,
       search_text: browserState.query,
       sort: browserState.sort,
       tags: browserState.tags,
@@ -246,14 +282,7 @@ export async function loadWorkshopList() {
     }
   } catch (err) {
     if (!isCurrentRequest()) return;
-    console.error("Fetch failed", err);
-    browserState.loadFailed = true;
-    if (browserState.page === 1) {
-      const message = document.createElement("div");
-      message.className = "error-state";
-      message.textContent = formatAPILineError(err, "加载失败，请稍后重试。");
-      grid.replaceChildren(message);
-    }
+    renderWorkshopListRequestError(err, { page, line, isCurrentRequest });
   } finally {
     if (isCurrentRequest()) {
       browserState.loading = false;
@@ -317,17 +346,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const searchInput = document.getElementById("browser-search-input");
-  if (searchInput) {
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        browserState.query = e.target.value.trim();
-        resetWorkshopPaging();
-        loadWorkshopList();
-      }
-    });
-  }
-
   document
     .querySelectorAll("#browser-sort-list .filter-item")
     .forEach((item) => {
@@ -349,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadMoreBtn = document.getElementById("browser-load-more");
   if (loadMoreBtn) {
     loadMoreBtn.addEventListener("click", () => {
+      if (browserState.loading) return;
       if (!browserState.loadFailed) {
         browserState.page++;
       }
@@ -377,6 +396,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const browserResetBtn = document.getElementById("browser-reset-btn");
 
   const performBrowserSearch = () => {
+    clearTimeout(searchDebounceTimer);
     if (browserSearch) {
       browserState.query = browserSearch.value.trim();
     }

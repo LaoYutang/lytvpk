@@ -351,7 +351,9 @@ test("late failure from another line never releases or reports over the new pars
   assert.equal(input("check-workshop-btn").disabled, true);
   latest.reject(new Error("https://private.invalid/latest"));
   await second;
-  assert.deepEqual(calls.errors, ["解析失败，请稍后重试。"]);
+  assert.deepEqual(calls.errors, []);
+  assert.equal(input("workshop-result").classList.contains("hidden"), false);
+  assert.match(input("workshop-result").childNodes[0].className, /workshop-request-error/);
   assert.equal(input("check-workshop-btn").disabled, false);
   assert.equal(fetches, 2, "errors must not trigger a request on another line");
 });
@@ -378,5 +380,11 @@ test("parse errors retain safe line guidance without showing transport details",
     throw new Error("https://private.invalid/ token=secret 备用线路请求失败，请稍后重试，或在设置中手动切换主线路后重试 192.0.2.10");
   };
   await openWorkshopParse("985555");
-  assert.deepEqual(calls.errors, ["备用线路请求失败，请稍后重试。"]);
+  assert.deepEqual(calls.errors, []);
+  const textOf = (node) => [node.textContent || "", ...(node.childNodes || []).map(textOf)].join(" ");
+  const text = textOf(input("workshop-result"));
+  assert.match(text, /备用线路/);
+  assert.match(text, /重新解析/);
+  assert.match(text, /设置/);
+  assert.doesNotMatch(text, /private\.invalid|192\.0\.2\.10|token=secret/);
 });

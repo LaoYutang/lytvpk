@@ -1,0 +1,69 @@
+.workshop-request-error {
+  grid-column: 1 / -1;
+  width: min(100%, 560px);
+  box-sizing: border-box;
+  min-width: 0;
+  align-self: flex-start;
+  margin: 36px auto;
+  padding: 26px;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.workshop-request-error__header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.workshop-request-error__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger-dark);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.workshop-request-error__heading { flex: 1; min-width: 0; }
+.workshop-request-error__title { margin: 0; font-size: 1.05rem; line-height: 1.5; font-weight: 650; }
+.workshop-request-error__context { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 5px; font-size: 12px; color: var(--text-tertiary); }
+.workshop-request-error__status { padding-left: 8px; border-left: 1px solid var(--border-strong); font-family: var(--font-mono); }
+.workshop-request-error__message { margin: 0; font-size: 14px; line-height: 1.75; color: var(--text-secondary); white-space: pre-wrap; }
+.workshop-request-error__details { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-app); }
+.workshop-request-error__detail-label { display: block; margin-bottom: 5px; font-size: 11px; letter-spacing: 0.04em; color: var(--text-tertiary); }
+.workshop-request-error__detail-text { margin: 0; white-space: pre-wrap; color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
+.workshop-request-error__advice { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-light); }
+.workshop-request-error__advice-label { display: block; color: var(--text-primary); font-size: 12px; font-weight: 600; }
+.workshop-request-error__hint { margin: 5px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 1.75; }
+.workshop-request-error__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.workshop-request-error__actions .btn { min-height: 36px; height: auto; max-width: 100%; padding: 8px 15px; white-space: normal; line-height: 1.5; }
+.workshop-request-error__actions .btn:focus-visible, .workshop-request-error__close:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.workshop-request-error__close { border: 0; background: transparent; color: var(--text-tertiary); font-size: 23px; cursor: pointer; width: 32px; height: 32px; border-radius: var(--radius-md); }
+.workshop-request-error__close:hover { background: var(--bg-hover); color: var(--text-primary); }
+.workshop-request-error--compact { width: 100%; margin: 8px 0; padding: 20px; }
+.workshop-detail-view > .workshop-request-error { max-height: calc(100% - 72px); overflow-y: auto; }
+.workshop-request-error--notice { width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow-y: auto; margin: 0; pointer-events: auto; box-shadow: var(--shadow-lg); }
+body > .workshop-request-error--notice { position: fixed; z-index: var(--z-toast); bottom: 20px; right: 20px; max-height: calc(100vh - 64px); overflow-y: auto; }
+html.dark-mode .workshop-request-error__icon { color: var(--danger-light); background: rgba(239, 68, 68, 0.12); border-color: rgba(248, 113, 113, 0.2); }
+
+@media (max-width: 700px) {
+  .workshop-request-error { padding: 20px; margin: 20px auto; }
+  .workshop-request-error__header { gap: 10px; }
+  .workshop-request-error__icon { flex-basis: 38px; width: 38px; height: 38px; border-radius: 12px; }
+  .workshop-request-error__actions { gap: 8px; }
+  .workshop-request-error__actions .btn { flex: 1 1 120px; }
+  .workshop-detail-view > .workshop-request-error { max-height: calc(100% - 40px); }
+  .workshop-request-error--compact, .workshop-request-error--notice { margin: 8px 0; }
+}

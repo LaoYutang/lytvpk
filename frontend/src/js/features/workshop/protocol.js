@@ -1,16 +1,34 @@
 import { workshopDeps } from "./deps.js";
 import { openWorkshopDetail } from "./detail.js";
 import { openBrowser } from "./list.js";
+import { getCurrentPage } from "../../core/ui-shell.js";
+import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+
+let pendingWorkshopOpen;
+
+function cancelPendingWorkshopOpen() {
+  pendingWorkshopOpen?.abort();
+  pendingWorkshopOpen = null;
+}
+
+subscribeAPILineChange(cancelPendingWorkshopOpen);
+document.addEventListener("app:page-change", (event) => {
+  if (event.detail?.page !== "workshop") cancelPendingWorkshopOpen();
+});
 
 export async function handleProtocolParse(workshopId) {
-  console.log("处理协议解析:", workshopId);
-
+  cancelPendingWorkshopOpen();
   workshopDeps.showNotification(`正在解析工坊ID: ${workshopId}`, "info");
   return workshopDeps.openWorkshopParse(workshopId);
 }
 
 export async function handleProtocolWorkshop(workshopId) {
-  console.log("处理协议打开工坊:", workshopId);
+  cancelPendingWorkshopOpen();
+  const controller = new AbortController();
+  pendingWorkshopOpen = controller;
+  const line = getAPILineSnapshot();
+  const isCurrentOpen = () => !controller.signal.aborted &&
+    pendingWorkshopOpen === controller && isCurrentAPILine(line) && getCurrentPage() === "workshop";
 
   const fileDetailModal = document.getElementById("file-detail-modal");
   if (fileDetailModal && !fileDetailModal.classList.contains("hidden")) {
@@ -20,52 +38,64 @@ export async function handleProtocolWorkshop(workshopId) {
   workshopDeps.showNotification(`正在打开工坊: ${workshopId}`, "info");
   openBrowser();
 
-  const isSelecting = await workshopDeps.IsSelectingIP();
-  if (isSelecting) {
-    console.log("正在优选IP，等待完成...");
-    workshopDeps.showNotification("正在等待IP优选完成...", "info");
-
-    await waitForIPSelection();
-    console.log("IP优选已完成，继续获取详情");
-  }
-
-  setTimeout(async () => {
+  try {
+    let isSelecting = false;
     try {
-      const detail = await workshopDeps.FetchWorkshopDetail(workshopId);
-      if (detail && detail.publishedfileid) {
-        openWorkshopDetail(detail);
-      } else {
-        openWorkshopDetail({
-          publishedfileid: workshopId,
-          title: `工坊 #${workshopId}`,
-          preview_url: "",
-          description: "无法获取详细信息，请检查网络连接",
-        });
-      }
-    } catch (err) {
-      console.error("获取工坊详情失败:", err);
-      openWorkshopDetail({
-        publishedfileid: workshopId,
-        title: `工坊 #${workshopId}`,
-        preview_url: "",
-        description: `获取详情失败: ${err}\n\n请检查网络连接或稍后重试`,
-      });
-      workshopDeps.showError(`获取工坊详情失败: ${err}`);
+      isSelecting = await workshopDeps.IsSelectingIP();
+    } catch {
+      // This optional readiness check must not become a second error surface.
+      // The detail view owns the real request and its safe error feedback.
     }
-  }, 500);
+    if (!isCurrentOpen()) return;
+    if (isSelecting) {
+      workshopDeps.showNotification("正在等待IP优选完成...", "info");
+      await waitForIPSelection(controller.signal);
+    }
+    if (!isCurrentOpen()) return;
+    await waitForLayout(controller.signal);
+    if (!isCurrentOpen()) return;
+    return await openWorkshopDetail({ publishedfileid: workshopId });
+  } finally {
+    if (pendingWorkshopOpen === controller) pendingWorkshopOpen = null;
+    controller.abort();
+  }
 }
 
-function waitForIPSelection() {
+function waitForIPSelection(signal) {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      console.log("等待IP优选超时，继续执行");
-      resolve();
-    }, 30000);
-
-    const cleanup = workshopDeps.EventsOn("ip_selection_end", () => {
+    if (signal.aborted) return resolve();
+    let finished = false;
+    let unsubscribe;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
       clearTimeout(timeout);
-      cleanup();
+      signal.removeEventListener("abort", finish);
+      try { unsubscribe?.(); } catch { /* Optional event cleanup must not block opening or cancellation. */ }
       resolve();
-    });
+    };
+    const timeout = setTimeout(finish, 30000);
+    signal.addEventListener("abort", finish, { once: true });
+    try {
+      const cleanup = workshopDeps.EventsOn("ip_selection_end", finish);
+      if (typeof cleanup === "function") unsubscribe = cleanup;
+      // An event source may complete synchronously while registering.
+      if (finished) unsubscribe?.();
+    } catch {
+      finish();
+    }
+  });
+}
+
+function waitForLayout(signal) {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve();
+    const finish = () => {
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timeout = setTimeout(finish, 500);
+    signal.addEventListener("abort", finish, { once: true });
   });
 }

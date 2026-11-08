@@ -1,6 +1,7 @@
 import {
   initAppShell,
   switchAppPage,
+  getCurrentPage,
   refreshActiveIndicator,
 } from "../core/ui-shell.js";
 import {
@@ -83,6 +84,8 @@ import {
   initWatchLaterStorage,
 } from "./workshop/workshop-browser.js";
 import { showError, showNotification, handleError } from "../core/toast.js";
+import { getAPILineSnapshot, isCurrentAPILine } from "../core/api-line.js";
+import { showWorkshopRequestError } from "./workshop/request-error.js";
 import { appState, applyConfigToAppState } from "./state.js";
 import { renderFileList } from "./file-list/render.js";
 import {
@@ -416,6 +419,50 @@ document.addEventListener("DOMContentLoaded", function () {
 const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24小时
 
 let _updateCheckTimer = null;
+let _updateCheckPending = false;
+
+async function runScheduledWorkshopUpdateCheck() {
+  const isEnabled = () => {
+    const config = getConfig();
+    return config.workshopUpdateCheckEnabled === true && config.workshopMetaEnabled === true;
+  };
+  if (_updateCheckPending || !isEnabled()) return;
+  _updateCheckPending = true;
+  const snapshot = getAPILineSnapshot();
+  const line = snapshot.line;
+  try {
+    const result = await CheckModUpdates();
+    if (!isCurrentAPILine(snapshot) || !isEnabled()) return;
+    if (!Number.isInteger(result?.failed_count) || result.failed_count !== 0 || !Number.isInteger(result?.total_updates) || result.total_updates < 0) {
+      showWorkshopRequestError({
+        title: "更新检查未完成",
+        error: result?.first_error,
+        line: result?.line || line,
+        fallback: "部分工坊项目未取得有效检查结果，请重新检查。",
+        retryLabel: "重新检查",
+        retryHint: "可以点击“重新检查”再次检查，或在设置中切换线路后重试。",
+        onRetry: runScheduledWorkshopUpdateCheck,
+      });
+      return;
+    }
+    const nextConfig = getConfig();
+    nextConfig.lastUpdateCheckTime = String(Date.now());
+    saveConfig(nextConfig);
+  } catch (err) {
+    if (!isCurrentAPILine(snapshot) || !isEnabled()) return;
+    showWorkshopRequestError({
+      title: "更新检查未完成",
+      error: err,
+      line,
+      fallback: "未能取得工坊更新检查结果，请重新检查。",
+      retryLabel: "重新检查",
+      retryHint: "可以点击“重新检查”再次检查，或在设置中切换线路后重试。",
+      onRetry: runScheduledWorkshopUpdateCheck,
+    });
+  } finally {
+    _updateCheckPending = false;
+  }
+}
 
 async function initUpdateCheck() {
   try {
@@ -428,16 +475,7 @@ async function initUpdateCheck() {
     const now = Date.now();
     if (!lastCheck || now - Number(lastCheck) >= UPDATE_CHECK_INTERVAL) {
       // 延迟30秒后首次检测，避免和IP优选等其他启动任务冲突
-      setTimeout(async () => {
-        try {
-          await CheckModUpdates();
-          const nextConfig = getConfig();
-          nextConfig.lastUpdateCheckTime = String(Date.now());
-          saveConfig(nextConfig);
-        } catch (err) {
-          console.warn("更新检测失败:", err);
-        }
-      }, 30000);
+      setTimeout(runScheduledWorkshopUpdateCheck, 30000);
     }
 
     // 每小时检查一次是否超过24小时
@@ -446,14 +484,7 @@ async function initUpdateCheck() {
       async () => {
         const last = getConfig().lastUpdateCheckTime;
         if (!last || Date.now() - Number(last) >= UPDATE_CHECK_INTERVAL) {
-          try {
-            await CheckModUpdates();
-            const nextConfig = getConfig();
-            nextConfig.lastUpdateCheckTime = String(Date.now());
-            saveConfig(nextConfig);
-          } catch (err) {
-            console.warn("定时更新检测失败:", err);
-          }
+          await runScheduledWorkshopUpdateCheck();
         }
       },
       60 * 60 * 1000
@@ -615,6 +646,17 @@ async function initializeApp() {
 }
 
 function setupSettingsAndAboutListeners() {
+  document.addEventListener("workshop:open-line-settings", async () => {
+    await showGlobalSettings();
+    if (getCurrentPage() !== "settings") return;
+    const form = document.getElementById("settings-api-line-form");
+    if (!form?.isConnected) return;
+    document.querySelector('#settings-page-content .settings-nav-item[data-panel="network"]')?.click();
+    form.scrollIntoView({ behavior: "smooth", block: "center" });
+    form.setAttribute("tabindex", "-1");
+    form.setAttribute("aria-label", "API 线路设置");
+    form.focus({ preventScroll: true });
+  });
   document.addEventListener("app:page-change", (event) => {
     const page = event.detail.page;
 
