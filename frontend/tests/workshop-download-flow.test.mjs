@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import test from "node:test";
+import { setAPILineState } from "../src/js/core/api-line.js";
 
 const modalUrl = new URL("../src/js/features/downloads/workshop-modal.js", import.meta.url).href;
 const importNames = {
@@ -104,6 +105,7 @@ test.beforeEach(() => {
     },
     IsSelectingIP: async () => false,
   };
+  setAPILineState("primary");
   applyWorkshopGroups([]);
   calls.errors.length = 0;
 });
@@ -293,4 +295,88 @@ test("failed submissions release the button and never trigger task navigation", 
   assert.equal(calls.finished.length, 1);
   assert.match(calls.errors[0], /添加任务失败/);
   assert.equal(input("download-url").value, "https://example.com/failure.vpk");
+});
+
+test("line changes isolate parse caches without sending a request automatically", async () => {
+  let fetches = 0;
+  globalThis.__workshopFlowTest.GetWorkshopDetailsGrouped = async () => {
+    fetches++;
+    return { groups: [group("981111")] };
+  };
+  await openWorkshopParse("981111");
+  await openWorkshopParse("981111");
+  assert.equal(fetches, 1, "the current line can reuse its own metadata");
+  input("download-url").value = "https://example.com/manual.vpk";
+  setAPILineState("backup");
+  assert.equal(fetches, 1);
+  assert.equal(input("download-url").value, "https://example.com/manual.vpk");
+  assert.equal(input("workshop-result").classList.contains("hidden"), true);
+  await openWorkshopParse("981111");
+  assert.equal(fetches, 2, "backup must not use the primary cache");
+  setAPILineState("primary");
+  await openWorkshopParse("981111");
+  assert.equal(fetches, 3, "returning to a line starts a fresh metadata generation");
+});
+
+test("late success cannot refill a new line's parse cache or restore its old results", async () => {
+  const old = Promise.withResolvers();
+  const latest = Promise.withResolvers();
+  let fetches = 0;
+  globalThis.__workshopFlowTest.GetWorkshopDetailsGrouped = () => ++fetches === 1 ? old.promise : latest.promise;
+  const first = openWorkshopParse("982222");
+  setAPILineState("backup");
+  const second = openWorkshopParse("982222");
+  old.resolve({ groups: [group("982223")] });
+  await first;
+  assert.equal(input("check-workshop-btn").disabled, true, "old finally must not release a new parse button");
+  assert.deepEqual(calls.history, []);
+  latest.resolve({ groups: [group("982222")] });
+  await second;
+  await openWorkshopParse("982222");
+  assert.equal(fetches, 2);
+  assert.deepEqual(calls.history.map((groups) => groups[0].root_id), ["982222", "982222"]);
+});
+
+test("late failure from another line never releases or reports over the new parse", async () => {
+  const old = Promise.withResolvers();
+  const latest = Promise.withResolvers();
+  let fetches = 0;
+  globalThis.__workshopFlowTest.GetWorkshopDetailsGrouped = () => ++fetches === 1 ? old.promise : latest.promise;
+  const first = openWorkshopParse("983333");
+  setAPILineState("backup");
+  const second = openWorkshopParse("983333");
+  old.reject(new Error("https://private.invalid/old"));
+  await first;
+  assert.deepEqual(calls.errors, []);
+  assert.equal(input("check-workshop-btn").disabled, true);
+  latest.reject(new Error("https://private.invalid/latest"));
+  await second;
+  assert.deepEqual(calls.errors, ["解析失败，请稍后重试。"]);
+  assert.equal(input("check-workshop-btn").disabled, false);
+  assert.equal(fetches, 2, "errors must not trigger a request on another line");
+});
+
+test("changing the metadata line preserves an already submitted download batch", async () => {
+  const pending = Promise.withResolvers();
+  applyWorkshopGroups([group("984444"), group("984445")]);
+  globalThis.__workshopFlowTest.StartDownloadTask = async (details) => {
+    calls.tasks.push({ details });
+    return calls.tasks.length === 1 ? pending.promise : "second-task";
+  };
+  const downloading = downloadWorkshopFile();
+  await settle();
+  setAPILineState("backup");
+  assert.equal(input("download-workshop-btn").disabled, true);
+  pending.resolve("first-task");
+  assert.equal(await downloading, 2);
+  assert.deepEqual(calls.tasks.map(({ details }) => details.publishedfileid), ["984444", "984445"]);
+  assert.deepEqual(calls.created.map(({ id }) => id), ["first-task", "second-task"]);
+});
+
+test("parse errors retain safe line guidance without showing transport details", async () => {
+  globalThis.__workshopFlowTest.GetWorkshopDetailsGrouped = async () => {
+    throw new Error("https://private.invalid/ token=secret 备用线路请求失败，请稍后重试，或在设置中手动切换主线路后重试 192.0.2.10");
+  };
+  await openWorkshopParse("985555");
+  assert.deepEqual(calls.errors, ["备用线路请求失败，请稍后重试。"]);
 });

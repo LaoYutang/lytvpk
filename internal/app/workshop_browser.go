@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"vpk-manager/internal/network"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -16,7 +18,7 @@ import (
 // 这些方法直接挂载在 *App 上，供前端调用
 
 // 定义 Cloudflare Worker 的地址
-var WorkshopWorkerURL = "https://l4d2-workshop.laoyutang.cn"
+var WorkshopWorkerURL = network.EndpointsForAPILine(network.APILinePrimary).WorkshopBaseURL
 
 // WorkshopQueryOptions 前端传来的搜索参数
 type WorkshopQueryOptions struct {
@@ -103,6 +105,13 @@ type WorkshopCacheItem struct {
 
 var workshopCache sync.Map
 
+func clearWorkshopAPICache() {
+	workshopCache.Range(func(key, _ interface{}) bool {
+		workshopCache.Delete(key)
+		return true
+	})
+}
+
 func getWorkshopCache(key string) (interface{}, bool) {
 	val, ok := workshopCache.Load(key)
 	if !ok {
@@ -123,12 +132,31 @@ func setWorkshopCache(key string, data interface{}) {
 	})
 }
 
+// A completed request may still belong to the line selected before a switch.
+// Hold the read lock through Store so switching can clear every old entry.
+func (a *App) cacheWorkshopAPIResult(operation apiOperation, key string, data interface{}) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	line := a.apiLine
+	if line == "" {
+		line = network.APILinePrimary
+	}
+	if line != operation.line || a.apiGeneration != operation.generation {
+		return
+	}
+	setWorkshopCache(key, data)
+}
+
 // FetchWorkshopList 获取创意工坊列表
 func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, error) {
+	return a.fetchWorkshopListWithOperation(a.captureAPIOperation(), opts)
+}
+
+func (a *App) fetchWorkshopListWithOperation(operation apiOperation, opts WorkshopQueryOptions) (WorkshopListResult, error) {
 	// 1. 检查缓存
 	// 使用 opts 的 JSON 字符串作为 Key
 	ctxKeyBytes, _ := json.Marshal(opts)
-	cacheKey := "list:" + string(ctxKeyBytes)
+	cacheKey := operation.cachePrefix() + "list:" + string(ctxKeyBytes)
 
 	if val, ok := getWorkshopCache(cacheKey); ok {
 		if res, ok := val.(WorkshopListResult); ok {
@@ -137,9 +165,10 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 		}
 	}
 
-	client := a.getWorkshopClient()
+	client := operation.clients.browser
 
 	req := client.R().
+		SetContext(operation.ctx).
 		SetQueryParam("page", strconv.Itoa(opts.Page)).
 		SetQueryParam("q", opts.SearchText).
 		SetQueryParam("sort", opts.Sort).
@@ -156,15 +185,17 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 	fmt.Printf("[Workshop] Fetching List: Page=%d, Q=%s, Sort=%s, FileType=%s\n", opts.Page, opts.SearchText, opts.Sort, opts.FileType)
 
 	// 发起请求到 Cloudflare Worker (Path: /list)
-	resp, err := req.Get(WorkshopWorkerURL + "/list")
+	resp, err := req.Get(operation.endpoints.WorkshopBaseURL + "/list")
 
 	if err != nil {
-		runtime.LogErrorf(a.ctx, "Failed to fetch workshop list: %v", err)
-		return WorkshopListResult{}, fmt.Errorf("network error: %w", err)
+		if a.ctx != nil {
+			runtime.LogErrorf(a.ctx, "Failed to fetch workshop list: %v", err)
+		}
+		return WorkshopListResult{}, network.NewAPIRequestError(operation.line, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return WorkshopListResult{}, fmt.Errorf("API returned status: %d", resp.StatusCode())
+		return WorkshopListResult{}, network.NewAPIStatusError(operation.line, resp.StatusCode(), resp.Header().Get("Retry-After"))
 	}
 
 	result := resp.Result().(*SteamMsgResponse)
@@ -189,7 +220,7 @@ func (a *App) FetchWorkshopList(opts WorkshopQueryOptions) (WorkshopListResult, 
 	}
 
 	// 写入缓存
-	setWorkshopCache(cacheKey, finalResult)
+	a.cacheWorkshopAPIResult(operation, cacheKey, finalResult)
 
 	return finalResult, nil
 }
@@ -208,9 +239,13 @@ func (a *App) FetchWorkshopDetail(id string) (WorkshopItemDetail, error) {
 // withPreviews 为 false 时走服务端默认的轻量模式（不查询多图预览，省一次 Steam API 调用），
 // 两种模式使用独立缓存键，避免互相覆盖。
 func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool, withPreviews bool) (WorkshopItemDetail, error) {
-	cacheKey := "detail:raw:" + id
+	return a.fetchWorkshopDetailRawWithOperation(a.captureAPIOperation(), id, forceRefresh, withPreviews)
+}
+
+func (a *App) fetchWorkshopDetailRawWithOperation(operation apiOperation, id string, forceRefresh bool, withPreviews bool) (WorkshopItemDetail, error) {
+	cacheKey := operation.cachePrefix() + "detail:raw:" + id
 	if withPreviews {
-		cacheKey = "detail:raw:previews:" + id
+		cacheKey = operation.cachePrefix() + "detail:raw:previews:" + id
 	}
 	if !forceRefresh {
 		if val, ok := getWorkshopCache(cacheKey); ok {
@@ -221,9 +256,10 @@ func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool, withPreviews 
 		}
 	}
 
-	client := a.getWorkshopClient()
+	client := operation.clients.browser
 
 	req := client.R().
+		SetContext(operation.ctx).
 		SetQueryParam("id", id).
 		SetResult(&SteamDetailResponse{})
 
@@ -231,13 +267,13 @@ func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool, withPreviews 
 		req.SetQueryParam("with_previews", "1")
 	}
 
-	resp, err := req.Get(WorkshopWorkerURL + "/detail")
+	resp, err := req.Get(operation.endpoints.WorkshopBaseURL + "/detail")
 	if err != nil {
-		return WorkshopItemDetail{}, err
+		return WorkshopItemDetail{}, network.NewAPIRequestError(operation.line, err)
 	}
 
 	if resp.StatusCode() != http.StatusOK {
-		return WorkshopItemDetail{}, fmt.Errorf("API error: %d", resp.StatusCode())
+		return WorkshopItemDetail{}, network.NewAPIStatusError(operation.line, resp.StatusCode(), resp.Header().Get("Retry-After"))
 	}
 
 	result := resp.Result().(*SteamDetailResponse)
@@ -247,7 +283,7 @@ func (a *App) fetchWorkshopDetailRaw(id string, forceRefresh bool, withPreviews 
 
 	item := result.Response.PublishedFileDetails[0]
 
-	setWorkshopCache(cacheKey, item)
+	a.cacheWorkshopAPIResult(operation, cacheKey, item)
 
 	return item, nil
 }

@@ -1,5 +1,19 @@
 export namespace app {
 	
+	export class APILineStatus {
+	    line: string;
+	    ipPoolFallback: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new APILineStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.line = source["line"];
+	        this.ipPoolFallback = source["ipPoolFallback"];
+	    }
+	}
 	export class AddonListOrderInfo {
 	    exists: boolean;
 	    order: string[];
@@ -73,6 +87,7 @@ export namespace app {
 	    }
 	}
 	export class ConfigFile {
+	    apiLine: string;
 	    workshopDNS?: WorkshopDNSConfig;
 	    modRotationConfig: RotationConfig;
 	    workshopPreferredIP?: boolean;
@@ -106,6 +121,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.apiLine = source["apiLine"];
 	        this.workshopDNS = this.convertValues(source["workshopDNS"], WorkshopDNSConfig);
 	        this.modRotationConfig = this.convertValues(source["modRotationConfig"], RotationConfig);
 	        this.workshopPreferredIP = source["workshopPreferredIP"];
@@ -241,6 +257,22 @@ export namespace app {
 		}
 	}
 	
+	export class DownloadExitRisk {
+	    downloads: boolean;
+	    downloadLossRisk: boolean;
+	    downloadIdentityUnknown: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new DownloadExitRisk(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.downloads = source["downloads"];
+	        this.downloadLossRisk = source["downloadLossRisk"];
+	        this.downloadIdentityUnknown = source["downloadIdentityUnknown"];
+	    }
+	}
 	export class DownloadTask {
 	    id: string;
 	    workshop_id: string;
@@ -256,6 +288,7 @@ export namespace app {
 	    downloaded_size: number;
 	    speed: string;
 	    error: string;
+	    notice?: string;
 	    description: string;
 	    created_at: string;
 	
@@ -279,6 +312,7 @@ export namespace app {
 	        this.downloaded_size = source["downloaded_size"];
 	        this.speed = source["speed"];
 	        this.error = source["error"];
+	        this.notice = source["notice"];
 	        this.description = source["description"];
 	        this.created_at = source["created_at"];
 	    }

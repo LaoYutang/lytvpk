@@ -1,3 +1,4 @@
+import { normalizeAPILine, setAPILineState } from "./api-line.js";
 import {
   GetAppConfig,
   GetConfigMigrationVersion,
@@ -15,6 +16,7 @@ const LEGACY_STORAGE_KEYS = {
 };
 
 const DEFAULT_CONFIG = {
+  apiLine: "primary",
   modRotationConfig: {
     enableCharacters: false,
     enableWeapons: false,
@@ -77,6 +79,7 @@ export async function migrateLegacyLocalStorageIfNeeded() {
 export async function initConfig() {
   const config = await GetAppConfig();
   configCache = normalizeConfig(config);
+  setAPILineState(configCache.apiLine);
   return getConfig();
 }
 
@@ -90,6 +93,8 @@ export function saveConfig(config) {
   configCache = normalizeConfig({
     ...configCache,
     ...config,
+    // General preference saves cannot change a separately persisted API line.
+    apiLine: configCache.apiLine,
   });
   const savePromise = SaveAppConfig(configCache);
   savePromise.catch((error) => {
@@ -103,6 +108,7 @@ export function updateConfigCache(patch) {
     ...configCache,
     ...patch,
   });
+  setAPILineState(configCache.apiLine);
   return getConfig();
 }
 
@@ -111,6 +117,7 @@ function normalizeConfig(config = {}) {
     ...DEFAULT_CONFIG,
     ...config,
   };
+  next.apiLine = normalizeAPILine(next.apiLine);
 
   next.modRotationConfig = {
     ...DEFAULT_CONFIG.modRotationConfig,

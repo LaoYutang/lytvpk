@@ -12,8 +12,6 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-const workshopParseWorkerURL = "https://l4d2-workshop-parse.laoyutang.cn"
-
 type WorkshopDNSConfig struct {
 	Mode          string `json:"mode"`
 	CustomAddress string `json:"customAddress"`
@@ -71,22 +69,32 @@ type workshopNetworkClients struct {
 }
 
 func newWorkshopNetworkClients(config WorkshopDNSConfig) *workshopNetworkClients {
+	return newWorkshopNetworkClientsForLine(config, network.APILinePrimary)
+}
+
+func newWorkshopNetworkClientsForLine(config WorkshopDNSConfig, line network.APILine) *workshopNetworkClients {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.DialContext = network.NewWorkshopDialer(config.server()).DialContext
-	browser := resty.New().SetTimeout(30 * time.Second).SetRetryCount(2).SetTransport(transport)
+	timeout := network.APIRequestTimeout(line, 30*time.Second)
+	browser := resty.New().SetTimeout(timeout).SetRetryCount(0).SetTransport(transport)
+	browser.GetClient().CheckRedirect = stopAPIRedirect
 	return &workshopNetworkClients{
 		transport: transport,
 		browser:   browser,
-		parser:    &http.Client{Transport: transport, Timeout: 30 * time.Second},
+		parser:    &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: stopAPIRedirect},
 	}
 }
 
 func (a *App) getWorkshopNetworkClients() *workshopNetworkClients {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	return a.getWorkshopNetworkClientsLocked()
+}
+
+func (a *App) getWorkshopNetworkClientsLocked() *workshopNetworkClients {
 	if a.workshopNetwork == nil {
-		a.workshopNetwork = newWorkshopNetworkClients(a.workshopDNSConfig)
+		a.workshopNetwork = newWorkshopNetworkClientsForLine(a.workshopDNSConfig, a.apiLineLocked())
 	}
 	return a.workshopNetwork
 }
@@ -110,9 +118,9 @@ func (a *App) SetWorkshopDNSConfig(config WorkshopDNSConfig) error {
 	if err != nil {
 		return err
 	}
-	clients := newWorkshopNetworkClients(config)
 	a.configWriteMu.Lock()
 	a.mu.Lock()
+	clients := newWorkshopNetworkClientsForLine(config, a.apiLineLocked())
 	snapshot := a.snapshotConfigLocked()
 	snapshot.WorkshopDNS = &config
 	if err := a.writeConfigFileLocked(snapshot); err != nil {

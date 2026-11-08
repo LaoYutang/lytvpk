@@ -1,4 +1,5 @@
 import { normalizePanelUrl } from "./panel-url.js";
+import { getAPILineSnapshot, isCurrentAPILine } from "../../core/api-line.js";
 
 let showError;
 let showNotification;
@@ -68,6 +69,7 @@ export function configurePanelModal(deps) {
 
 let currentPanelServer = null;
 let currentPanelServerIndex = -1;
+let panelStatusGeneration = 0;
 let currentPanelMaps = [];
 let currentPanelMapFiles = [];
 const currentPanelMapIssues = new Map();
@@ -118,6 +120,7 @@ export function openPanelServerDetailsModal(index) {
 }
 
 export function closePanelServerDetailsModal() {
+  panelStatusGeneration++;
   document.getElementById("panel-server-details-modal")?.classList.add("hidden");
   currentPanelServer = null;
   currentPanelServerIndex = -1;
@@ -125,6 +128,11 @@ export function closePanelServerDetailsModal() {
 
 async function loadPanelStatus(server = currentPanelServer) {
   if (!server) return;
+  const generation = ++panelStatusGeneration;
+  const isCurrentStatus = () => (
+    generation === panelStatusGeneration && currentPanelServer?.id === server.id &&
+    !document.getElementById("panel-server-details-modal")?.classList.contains("hidden")
+  );
 
   const loading = document.getElementById("panel-details-loading");
   const content = document.getElementById("panel-details-content");
@@ -139,17 +147,19 @@ async function loadPanelStatus(server = currentPanelServer) {
 
   try {
     const status = await FetchPanelServerStatus(server.id);
-    await renderPanelStatus(server, status || {});
+    if (!isCurrentStatus()) return;
+    renderPanelStatus(server, status || {}, isCurrentStatus);
     loading.classList.add("hidden");
     content.classList.remove("hidden");
   } catch (err) {
+    if (!isCurrentStatus()) return;
     console.error("获取面板状态失败:", err);
     loading.classList.add("hidden");
     error.textContent = "获取面板状态失败: " + err;
     error.classList.remove("hidden");
     renderPanelStatusError(err);
   } finally {
-    refreshBtn?.removeAttribute("disabled");
+    if (isCurrentStatus()) refreshBtn?.removeAttribute("disabled");
   }
 }
 
@@ -171,28 +181,20 @@ function renderPanelStatusError(err) {
   error.classList.remove("hidden");
 }
 
-async function renderPanelStatus(server, status) {
+function renderPanelStatus(server, status, isCurrentStatus) {
   const summary = document.getElementById("panel-status-summary");
   const playerList = document.getElementById("panel-player-list");
   const rawMap = status.map || "Unknown";
   currentPanelDifficulty = status.difficulty || "";
-  let displayMap = rawMap;
-  try {
-    const resolved = await resolveMapName(rawMap);
-    if (resolved && resolved !== rawMap) {
-      displayMap = resolved;
-    }
-  } catch {
-    displayMap = rawMap;
-  }
-
   summary.innerHTML = `
     ${renderPanelStatusItem("服务器", status.hostname || server.name)}
-    ${renderPanelStatusItem("地图", displayMap, rawMap)}
+    ${renderPanelStatusItem("地图", rawMap, rawMap, "panel-status-map-name")}
     ${renderPanelStatusItem("玩家", status.players || "0/0")}
     ${renderPanelStatusItem("模式", status.gameMode || "未知")}
     ${renderPanelStatusItem("难度", status.difficulty || "未知")}
   `;
+  const mapName = summary.querySelector("#panel-status-map-name");
+  void updatePanelMapName(rawMap, mapName, isCurrentStatus, getAPILineSnapshot());
 
   const users = Array.isArray(status.users) ? status.users : [];
   if (users.length === 0) {
@@ -217,11 +219,21 @@ async function renderPanelStatus(server, status) {
     .join("");
 }
 
-function renderPanelStatusItem(label, value, title = "") {
+async function updatePanelMapName(rawMap, target, isCurrentStatus, line) {
+  try {
+    const name = await resolveMapName(rawMap);
+    if (!isCurrentStatus() || !isCurrentAPILine(line) || !target?.isConnected) return;
+    if (name && name !== rawMap) target.textContent = name;
+  } catch {
+    // Optional metadata never delays or replaces the actual panel status.
+  }
+}
+
+function renderPanelStatusItem(label, value, title = "", valueID = "") {
   return `
     <div class="server-info-item panel-status-item" title="${escapeAttr(title || value)}">
       <span class="server-info-label">${escapeHtml(label)}</span>
-      <span class="server-info-value">${escapeHtml(value)}</span>
+      <span class="server-info-value"${valueID ? ` id="${escapeAttr(valueID)}"` : ""}>${escapeHtml(value)}</span>
     </div>
   `;
 }

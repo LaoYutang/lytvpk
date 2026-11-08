@@ -1,4 +1,9 @@
 import { appendWorkshopDNSSettings } from "./workshop-dns.js";
+import { appendAPILineSettings, updateAPILineStatus } from "./api-line.js";
+import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+
+let activeIPDropdown;
+subscribeAPILineChange(() => activeIPDropdown?.invalidate());
 
 const SETTINGS_NAV_ICONS = {
   network: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>`,
@@ -24,6 +29,9 @@ export async function renderSettingsPage({
   GetWorkshopPreferredIP,
   GetWorkshopDNSConfig,
   SetWorkshopDNSConfig,
+  GetAPILine,
+  SetAPILine,
+  GetAPILineStatus,
   GetWorkshopFixedIP,
   GetWorkshopIPOptions,
   GetWorkshopMetaEnabled,
@@ -267,6 +275,13 @@ export async function renderSettingsPage({
   // Each async continuation belongs to this layout, never a newer render's DOM.
   const layout = container.firstElementChild;
   const isCurrentPage = () => isCurrentRender() && layout.isConnected;
+  await appendAPILineSettings(layout, {
+    isCurrentRender: isCurrentPage,
+    GetAPILine,
+    SetAPILine,
+    showNotification,
+  });
+  if (!isCurrentPage()) return;
   await appendWorkshopDNSSettings(layout, {
     isCurrentRender: isCurrentPage,
     GetWorkshopDNSConfig,
@@ -290,6 +305,9 @@ export async function renderSettingsPage({
   if (!isCurrentPage()) return;
 
   bindSettingsPage({
+    isCurrentPage,
+    layout,
+    GetAPILineStatus,
     enabled,
     fixedIP,
     ipOptions,
@@ -372,6 +390,9 @@ function bindSettingsPage(deps) {
     onStatusUpdate: refreshIPStatus,
   });
   loadIPOptionsForDropdown({
+    isCurrentPage: deps.isCurrentPage,
+    layout: deps.layout,
+    GetAPILineStatus: deps.GetAPILineStatus,
     GetWorkshopIPOptions: deps.GetWorkshopIPOptions,
     fixedIP: deps.fixedIP,
     trigger: ipOptionTrigger,
@@ -699,7 +720,10 @@ function renderIPOptionDropdown({
   };
 }
 
-async function loadIPOptionsForDropdown({
+export async function loadIPOptionsForDropdown({
+  isCurrentPage = () => true,
+  layout,
+  GetAPILineStatus,
   GetWorkshopIPOptions,
   fixedIP,
   trigger,
@@ -713,6 +737,33 @@ async function loadIPOptionsForDropdown({
   onStatusUpdate,
 }) {
   if (!trigger || !menu || typeof GetWorkshopIPOptions !== "function") return;
+  const line = getAPILineSnapshot();
+  const isCurrentRequest = () => isCurrentPage() && trigger.isConnected && isCurrentAPILine(line);
+  const reload = () => loadIPOptionsForDropdown({
+    isCurrentPage, layout, GetAPILineStatus, GetWorkshopIPOptions,
+    fixedIP: fixedInput?.value.trim() || "", trigger, menu, fixedInput,
+    setOptions, SetWorkshopFixedIP, getConfig, saveConfig, showNotification, onStatusUpdate,
+  });
+  activeIPDropdown = {
+    invalidate() {
+      if (!isCurrentPage() || !trigger.isConnected) {
+        activeIPDropdown = null;
+        return;
+      }
+      setOptions([]);
+      menu.textContent = "";
+      menu.classList.add("hidden");
+      trigger.textContent = "点击加载候选列表";
+      trigger.disabled = false;
+      trigger.classList.remove("is-disabled");
+      trigger.onclick = async (event) => {
+        event.stopPropagation();
+        if (!isCurrentPage() || trigger.disabled) return;
+        menu.classList.remove("hidden");
+        await reload();
+      };
+    },
+  };
 
   trigger.textContent = "正在加载推荐固定 IP...";
   trigger.classList.add("is-disabled");
@@ -721,6 +772,7 @@ async function loadIPOptionsForDropdown({
 
   try {
     const nextOptions = normalizeIPOptions(await GetWorkshopIPOptions());
+    if (!isCurrentRequest()) return;
     setOptions(nextOptions);
     renderIPOptionDropdown({
       options: nextOptions,
@@ -735,10 +787,31 @@ async function loadIPOptionsForDropdown({
       onStatusUpdate,
     });
     await onStatusUpdate?.();
+    if (!isCurrentRequest()) return;
+    const fallback = layout && await updateAPILineStatus(layout, GetAPILineStatus, isCurrentRequest);
+    if (!isCurrentRequest()) return;
+    const toggle = trigger.onclick;
+    if (fallback) {
+      let retrying = false;
+      trigger.onclick = async (event) => {
+        if (!isCurrentRequest() || retrying) return;
+        const opening = menu.classList.contains("hidden");
+        toggle?.(event);
+        if (!opening) return;
+        retrying = true;
+        try {
+          await reload();
+        } finally {
+          retrying = false;
+        }
+      };
+    }
   } catch (error) {
+    if (!isCurrentRequest()) return;
     trigger.textContent = "候选 IP 加载失败，可自建服务器并填写 IP";
     trigger.classList.add("is-disabled");
     trigger.disabled = true;
+    if (layout) await updateAPILineStatus(layout, GetAPILineStatus, isCurrentRequest);
   }
 }
 

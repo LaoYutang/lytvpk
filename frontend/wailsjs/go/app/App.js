@@ -54,6 +54,10 @@ export function ClearWorkshopHistory() {
   return window['go']['app']['App']['ClearWorkshopHistory']();
 }
 
+export function ConfirmPauseDownloadTask(arg1) {
+  return window['go']['app']['App']['ConfirmPauseDownloadTask'](arg1);
+}
+
 export function ConnectToServer(arg1) {
   return window['go']['app']['App']['ConnectToServer'](arg1);
 }
@@ -154,6 +158,18 @@ export function ForceExit() {
   return window['go']['app']['App']['ForceExit']();
 }
 
+export function ForceExitWithPauseLossAccepted(arg1) {
+  return window['go']['app']['App']['ForceExitWithPauseLossAccepted'](arg1);
+}
+
+export function GetAPILine() {
+  return window['go']['app']['App']['GetAPILine']();
+}
+
+export function GetAPILineStatus() {
+  return window['go']['app']['App']['GetAPILineStatus']();
+}
+
 export function GetAddonListOrder() {
   return window['go']['app']['App']['GetAddonListOrder']();
 }
@@ -180,6 +196,10 @@ export function GetCurrentBestIP() {
 
 export function GetCurrentBestIPOption() {
   return window['go']['app']['App']['GetCurrentBestIPOption']();
+}
+
+export function GetDownloadExitRisk() {
+  return window['go']['app']['App']['GetDownloadExitRisk']();
 }
 
 export function GetDownloadTasks() {
@@ -398,6 +418,10 @@ export function ParseWorkshopID(arg1) {
   return window['go']['app']['App']['ParseWorkshopID'](arg1);
 }
 
+export function PauseDownloadTask(arg1) {
+  return window['go']['app']['App']['PauseDownloadTask'](arg1);
+}
+
 export function PreviewSnapshotRestore(arg1) {
   return window['go']['app']['App']['PreviewSnapshotRestore'](arg1);
 }
@@ -420,6 +444,10 @@ export function RestartPanelServer(arg1) {
 
 export function RestoreProblemModScan() {
   return window['go']['app']['App']['RestoreProblemModScan']();
+}
+
+export function ResumeDownloadTask(arg1) {
+  return window['go']['app']['App']['ResumeDownloadTask'](arg1);
 }
 
 export function RetryDownloadTask(arg1) {
@@ -492,6 +520,10 @@ export function SelectVPKUnpackOutputDirectory() {
 
 export function SendPanelRconCommand(arg1, arg2) {
   return window['go']['app']['App']['SendPanelRconCommand'](arg1, arg2);
+}
+
+export function SetAPILine(arg1) {
+  return window['go']['app']['App']['SetAPILine'](arg1);
 }
 
 export function SetAddonListOrder(arg1) {

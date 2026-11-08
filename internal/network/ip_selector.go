@@ -82,33 +82,69 @@ func ipOptionsToIPs(options []IPOption) []string {
 	return ips
 }
 
-func fetchRemoteIPOptions(domain string) ([]IPOption, error) {
-	apiURL := fmt.Sprintf("https://lytvpk-get-ips.laoyutang.cn/?domain=%s&format=entries", url.QueryEscape(domain))
+func normalizeIPPoolAPILine(line APILine) APILine {
+	normalized, err := NormalizeAPILine(string(line))
+	if err != nil {
+		return APILinePrimary
+	}
+	return normalized
+}
+
+func newIPPoolClient(line APILine) *http.Client {
+	line = normalizeIPPoolAPILine(line)
 	dialer := &net.Dialer{Timeout: 5 * time.Second}
-	client := &http.Client{
-		Timeout: 5 * time.Second,
+	return &http.Client{
+		Timeout: APIRequestTimeout(line, 5*time.Second),
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return dialer.DialContext(ctx, "tcp4", addr)
 			},
 		},
 	}
+}
 
-	resp, err := client.Get(apiURL)
+func fetchRemoteIPOptionsWithClient(ctx context.Context, domain string, line APILine, client *http.Client) ([]IPOption, error) {
+	line = normalizeIPPoolAPILine(line)
+	apiURL, err := url.Parse(EndpointsForAPILine(line).IPPoolURL)
 	if err != nil {
-		return nil, err
+		return nil, NewAPIRequestError(line, err)
+	}
+	query := apiURL.Query()
+	query.Set("domain", domain)
+	query.Set("format", "entries")
+	apiURL.RawQuery = query.Encode()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL.String(), nil)
+	if err != nil {
+		return nil, NewAPIRequestError(line, err)
+	}
+	resp, err := client.Do(request)
+	if err != nil {
+		return nil, NewAPIRequestError(line, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status: %d", resp.StatusCode)
+		return nil, NewAPIStatusError(line, resp.StatusCode, resp.Header.Get("Retry-After"))
 	}
 
 	options, err := decodeIPOptions(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, NewAPIRequestError(line, err)
 	}
 	return options, nil
+}
+
+func fetchRemoteIPOptionsForLine(ctx context.Context, domain string, line APILine) ([]IPOption, error) {
+	client := newIPPoolClient(line)
+	defer client.CloseIdleConnections()
+	return fetchRemoteIPOptionsWithClient(ctx, domain, line, client)
+}
+
+func fetchRemoteIPOptions(domain string) ([]IPOption, error) {
+	return fetchRemoteIPOptionsForLine(context.Background(), domain, GlobalIPSelector.GetAPILine())
 }
 
 func fetchRemoteIPs(domain string) ([]string, error) {
@@ -120,26 +156,86 @@ func fetchRemoteIPs(domain string) ([]string, error) {
 }
 
 func GetSteamCDNIPOptions() []IPOption {
-	return GlobalIPSelector.getIPOptions(func() ([]IPOption, error) {
-		return fetchRemoteIPOptions(steamCDNDomain)
-	})
+	options, _ := GetSteamCDNIPOptionsContext(context.Background())
+	return options
+}
+
+// GetSteamCDNIPOptionsContext returns both candidates and an API error when the
+// built-in fallback was needed. Reading alone does not retry a failed cache.
+func GetSteamCDNIPOptionsContext(ctx context.Context) ([]IPOption, error) {
+	return GlobalIPSelector.getCurrentIPOptions(ctx)
+}
+
+type ipOptionsLoad struct {
+	done    chan struct{}
+	options []IPOption
+	err     error
 }
 
 type IPSelector struct {
-	cachedBestIP       string
-	cachedBestCategory string
-	cachedSpeed        float64 // Cached download speed in MB/s
-	lastCheck          time.Time
-	isSelecting        bool
-	fixedIP            string
-	ipOptions          []IPOption
-	ipOptionsLoaded    bool
-	ipOptionsLoading   bool
-	ipCategories       map[string]string
-	mu                 sync.RWMutex
+	cachedBestIP        string
+	cachedBestCategory  string
+	cachedSpeed         float64 // Cached download speed in MB/s
+	lastCheck           time.Time
+	isSelecting         bool
+	fixedIP             string
+	ipOptions           []IPOption
+	ipOptionsLoaded     bool
+	apiLine             APILine
+	ipOptionsGeneration uint64
+	ipOptionsLoad       *ipOptionsLoad
+	ipOptionsError      error
+	ipCategories        map[string]string
+	mu                  sync.RWMutex
 }
 
 var GlobalIPSelector = &IPSelector{}
+
+// SetAPILine only invalidates candidate metadata. Existing best/fixed choices
+// and transfers that already use them keep their current addresses.
+func (s *IPSelector) SetAPILine(line APILine) {
+	line = normalizeIPPoolAPILine(line)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if normalizeIPPoolAPILine(s.apiLine) == line {
+		return
+	}
+	s.apiLine = line
+	s.ipOptionsGeneration++
+	s.ipOptions = nil
+	s.ipOptionsLoaded = false
+	s.ipCategories = nil
+	s.ipOptionsLoad = nil
+	s.ipOptionsError = nil
+}
+
+func (s *IPSelector) GetAPILine() APILine {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return normalizeIPPoolAPILine(s.apiLine)
+}
+
+// GetIPOptionsError reports an API failure when built-in candidates were used.
+func (s *IPSelector) GetIPOptionsError() error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.ipOptionsError
+}
+
+// InvalidateFailedIPOptions permits a later explicit user request to retry the
+// same line. Successful caches and an already running load are left alone.
+func (s *IPSelector) InvalidateFailedIPOptions() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.ipOptionsLoaded || s.ipOptionsError == nil || s.ipOptionsLoad != nil {
+		return
+	}
+	s.ipOptionsGeneration++
+	s.ipOptions = nil
+	s.ipOptionsLoaded = false
+	s.ipCategories = nil
+	s.ipOptionsError = nil
+}
 
 func (s *IPSelector) SetFixedIP(ip string) {
 	s.mu.Lock()
@@ -227,45 +323,68 @@ func (s *IPSelector) GetCachedBestIPOption() IPOption {
 }
 
 func (s *IPSelector) getIPOptions(fetcher func() ([]IPOption, error)) []IPOption {
+	options, _ := s.getIPOptionsContext(context.Background(), func(context.Context, APILine) ([]IPOption, error) {
+		return fetcher()
+	})
+	return options
+}
+
+func (s *IPSelector) getCurrentIPOptions(ctx context.Context) ([]IPOption, error) {
+	return s.getIPOptionsContext(ctx, func(ctx context.Context, line APILine) ([]IPOption, error) {
+		return fetchRemoteIPOptionsForLine(ctx, steamCDNDomain, line)
+	})
+}
+
+// A load belongs to the line and generation observed on entry. Switching lines
+// allows a new load immediately; old callers finish without refilling its cache.
+func (s *IPSelector) getIPOptionsContext(ctx context.Context, fetcher func(context.Context, APILine) ([]IPOption, error)) ([]IPOption, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	if s.ipOptionsLoaded {
 		options := cloneIPOptions(s.ipOptions)
+		err := s.ipOptionsError
 		s.mu.Unlock()
-		return options
+		return options, err
 	}
-	if s.ipOptionsLoading {
+	if load := s.ipOptionsLoad; load != nil {
 		s.mu.Unlock()
-		for {
-			time.Sleep(50 * time.Millisecond)
-			s.mu.RLock()
-			loaded := s.ipOptionsLoaded
-			loading := s.ipOptionsLoading
-			options := cloneIPOptions(s.ipOptions)
-			s.mu.RUnlock()
-			if loaded {
-				return options
-			}
-			if !loading {
-				break
-			}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-load.done:
+			return cloneIPOptions(load.options), load.err
 		}
-		return s.getIPOptions(fetcher)
 	}
-	s.ipOptionsLoading = true
+	line, generation := normalizeIPPoolAPILine(s.apiLine), s.ipOptionsGeneration
+	load := &ipOptionsLoad{done: make(chan struct{})}
+	s.ipOptionsLoad = load
 	s.mu.Unlock()
 
-	options, err := fetcher()
+	options, err := fetcher(ctx, line)
 	options = normalizeIPOptions(options)
-	if err != nil || len(options) == 0 {
+	if err == nil && len(options) == 0 {
+		err = NewAPIRequestError(line, fmt.Errorf("IP pool returned no valid entries"))
+	}
+	if ctx.Err() != nil {
+		options, err = nil, ctx.Err()
+	} else if err != nil {
 		options = defaultIPOptions()
 	}
 
 	s.mu.Lock()
-	s.setIPOptionsLocked(options)
-	s.ipOptionsLoading = false
-	cached := cloneIPOptions(s.ipOptions)
+	load.options, load.err = cloneIPOptions(options), err
+	if generation == s.ipOptionsGeneration && s.ipOptionsLoad == load {
+		if ctx.Err() == nil {
+			s.setIPOptionsLocked(options)
+			s.ipOptionsError = err
+		}
+		s.ipOptionsLoad = nil
+	}
+	close(load.done)
 	s.mu.Unlock()
-	return cached
+	return cloneIPOptions(options), err
 }
 
 func (s *IPSelector) setIPOptionsLocked(options []IPOption) {
@@ -348,9 +467,7 @@ func (s *IPSelector) refreshBestIP(testUrl string) string {
 	}()
 
 	// Fetch remote IPs
-	candidateOptions := s.getIPOptions(func() ([]IPOption, error) {
-		return fetchRemoteIPOptions(steamCDNDomain)
-	})
+	candidateOptions, _ := s.getCurrentIPOptions(context.Background())
 	fmt.Printf("[IPSelector] Using %d candidate IPs\n", len(candidateOptions))
 
 	candidateIPs := ipOptionsToIPs(candidateOptions)

@@ -1,4 +1,5 @@
 import { workshopDeps } from "./deps.js";
+import { formatAPILineError, getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { openWorkshopDetail, resetWorkshopDetailView } from "./detail.js";
 import { setupWorkshopIdJump } from "./id-jump.js";
 import {
@@ -20,6 +21,20 @@ import {
 } from "./watch-later.js";
 
 let browserOpenedFromWorkshopModal = false;
+let listRequestSequence = 0;
+let ipSelectionTimer;
+let searchDebounceTimer;
+
+subscribeAPILineChange(() => {
+  listRequestSequence++;
+  clearInterval(ipSelectionTimer);
+  clearTimeout(searchDebounceTimer);
+  browserState.loading = false;
+  resetWorkshopPaging();
+  document.getElementById("browser-grid")?.replaceChildren();
+  document.getElementById("browser-loading")?.classList.add("hidden");
+  updateWorkshopLoadMoreButton();
+});
 
 function updateWorkshopTypeToggle() {
   const toggle = document.getElementById("browser-type-toggle");
@@ -112,9 +127,24 @@ export function openBrowser(options = {}) {
 
 export async function loadWorkshopList() {
   if (browserState.loading) return;
+  const line = getAPILineSnapshot();
+  const sequence = ++listRequestSequence;
+  const isCurrentRequest = () => isCurrentAPILine(line) && sequence === listRequestSequence;
+  clearInterval(ipSelectionTimer);
   browserState.loading = true;
 
-  const isSelecting = await workshopDeps.IsSelectingIP();
+  let isSelecting;
+  try {
+    isSelecting = await workshopDeps.IsSelectingIP();
+  } catch {
+    if (isCurrentRequest()) {
+      browserState.loading = false;
+      browserState.loadFailed = true;
+      updateWorkshopLoadMoreButton();
+    }
+    return;
+  }
+  if (!isCurrentRequest()) return;
   if (isSelecting) {
     browserState.loading = false;
 
@@ -134,10 +164,24 @@ export async function loadWorkshopList() {
       );
     }
 
-    const checkInterval = setInterval(async () => {
-      const stillSelecting = await workshopDeps.IsSelectingIP();
+    clearInterval(ipSelectionTimer);
+    ipSelectionTimer = setInterval(async () => {
+      if (!isCurrentRequest()) return;
+      let stillSelecting;
+      try {
+        stillSelecting = await workshopDeps.IsSelectingIP();
+      } catch {
+        if (isCurrentRequest()) {
+          clearInterval(ipSelectionTimer);
+          browserState.loadFailed = true;
+          loadingEl?.classList.add("hidden");
+          updateWorkshopLoadMoreButton();
+        }
+        return;
+      }
+      if (!isCurrentRequest()) return;
       if (!stillSelecting) {
-        clearInterval(checkInterval);
+        clearInterval(ipSelectionTimer);
         if (loadingEl) loadingEl.innerHTML = renderWorkshopLoading();
         loadWorkshopList();
       }
@@ -188,6 +232,7 @@ export async function loadWorkshopList() {
     };
 
     const result = await workshopDeps.FetchWorkshopList(opts);
+    if (!isCurrentRequest()) return;
 
     if (result.items && result.items.length > 0) {
       renderWorkshopGrid(result.items);
@@ -200,16 +245,24 @@ export async function loadWorkshopList() {
       }
     }
   } catch (err) {
+    if (!isCurrentRequest()) return;
     console.error("Fetch failed", err);
     browserState.loadFailed = true;
     if (browserState.page === 1) {
-      grid.innerHTML = `<div class="error-state" style="grid-column: 1/-1; text-align: center; color: var(--danger);">加载失败: ${err}</div>`;
+      const message = document.createElement("div");
+      message.className = "error-state";
+      message.textContent = formatAPILineError(err, "加载失败，请稍后重试。");
+      grid.replaceChildren(message);
     }
   } finally {
-    browserState.loading = false;
-    loadingEl.classList.add("hidden");
-    updateWorkshopLoadMoreButton();
-    requestAnimationFrame(maybeAutoLoadNextWorkshopPage);
+    if (isCurrentRequest()) {
+      browserState.loading = false;
+      loadingEl.classList.add("hidden");
+      updateWorkshopLoadMoreButton();
+      requestAnimationFrame(() => {
+        if (isCurrentRequest()) maybeAutoLoadNextWorkshopPage();
+      });
+    }
   }
 }
 
@@ -332,19 +385,18 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   if (browserSearch) {
-    let debounceTimer;
-
     browserSearch.addEventListener("keyup", (e) => {
       if (e.key === "Enter") {
-        clearTimeout(debounceTimer);
+        clearTimeout(searchDebounceTimer);
         performBrowserSearch();
       }
     });
 
     browserSearch.addEventListener("input", () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        performBrowserSearch();
+      clearTimeout(searchDebounceTimer);
+      const line = getAPILineSnapshot();
+      searchDebounceTimer = setTimeout(() => {
+        if (isCurrentAPILine(line)) performBrowserSearch();
       }, 800);
     });
   }

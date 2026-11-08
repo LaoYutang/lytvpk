@@ -1,4 +1,5 @@
 import { workshopDeps } from "./deps.js";
+import { formatAPILineError, getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import {
   getWorkshopPreviewImages,
   renderThumbnails,
@@ -23,6 +24,15 @@ import {
 } from "./utils.js";
 
 const descriptionTranslationCache = new Map();
+let detailRequestSequence = 0;
+let detailViewSequence = 0;
+
+subscribeAPILineChange(() => {
+  detailRequestSequence++;
+  const view = document.getElementById("browser-detail-view");
+  resetWorkshopDetailView(view);
+  view?.replaceChildren();
+});
 const TRANSLATE_ICON_SVG = `
   <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="m5 8 6 6"></path>
@@ -36,6 +46,7 @@ const TRANSLATE_ICON_SVG = `
 
 function showWorkshopDetailView(detailView, browserBody) {
   if (!detailView) return;
+  detailViewSequence++;
 
   browserBody?.classList.add("detail-open");
   detailView.classList.remove(
@@ -53,6 +64,8 @@ function showWorkshopDetailView(detailView, browserBody) {
 }
 
 function hideWorkshopDetailView(detailView, browserBody) {
+  detailRequestSequence++;
+  const viewSequence = ++detailViewSequence;
   if (!detailView || detailView.classList.contains("hidden")) {
     browserBody?.classList.remove("detail-open");
     return;
@@ -64,7 +77,7 @@ function hideWorkshopDetailView(detailView, browserBody) {
 
   let finished = false;
   const finish = () => {
-    if (finished) return;
+    if (finished || viewSequence !== detailViewSequence) return;
     finished = true;
     detailView.classList.add("hidden");
     detailView.classList.remove("workshop-detail-leave");
@@ -75,6 +88,8 @@ function hideWorkshopDetailView(detailView, browserBody) {
 }
 
 export function resetWorkshopDetailView(detailView) {
+  detailRequestSequence++;
+  detailViewSequence++;
   if (!detailView) return;
 
   detailView.classList.add("hidden");
@@ -500,18 +515,24 @@ function renderWorkshopDetail(detail, options = {}) {
 }
 
 export async function openWorkshopDetail(item, options = {}) {
+  const line = getAPILineSnapshot();
+  const sequence = ++detailRequestSequence;
+  const isCurrentRequest = () => isCurrentAPILine(line) && sequence === detailRequestSequence;
   const detailView = document.getElementById("browser-detail-view");
+  if (!detailView) return;
   const browserBody = detailView.closest(".browser-body");
   showWorkshopDetailView(detailView, browserBody);
   detailView.innerHTML = `<div class="workshop-detail-loading">${renderWorkshopLoading("正在加载物品详情...")}</div>`;
 
   try {
     const detail = await workshopDeps.FetchWorkshopDetail(getWorkshopItemId(item));
+    if (!isCurrentRequest()) return;
     renderWorkshopDetail(detail, options);
   } catch (err) {
+    if (!isCurrentRequest()) return;
     detailView.innerHTML = `
             <div class="loading-placeholder">
-                <p>加载详情失败: ${err}</p>
+                <p>${escapeHtml(formatAPILineError(err, "加载详情失败，请稍后重试。"))}</p>
                 <button class="btn btn-primary" id="detail-error-back-btn">${options.parentDetail ? "返回合集" : "返回"}</button>
             </div>`;
     document

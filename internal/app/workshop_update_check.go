@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/panjf2000/ants/v2"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -73,14 +74,25 @@ func (a *App) CheckModUpdates() UpdateCheckResult {
 	var newDetected int
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	operation := a.captureAPIOperation()
+	pool, err := ants.NewPool(4)
+	if err != nil {
+		log.Printf("无法启动更新检测: %v", err)
+		return UpdateCheckResult{TotalUpdates: confirmedCount}
+	}
+	defer pool.Release()
 
 	for _, item := range toCheck {
+		if operation.ctx.Err() != nil {
+			break
+		}
+		filePath, workshopID, downloadedAt := item.filePath, item.workshopID, item.downloadedAt
 		wg.Add(1)
-		go func(filePath, workshopID string, downloadedAt time.Time) {
+		if err := pool.Submit(func() {
 			defer wg.Done()
 
 			// 只读取 time_updated，走默认轻量模式（服务端不查询多图预览）
-			detail, err := a.fetchWorkshopDetailRaw(workshopID, false, false)
+			detail, err := a.fetchWorkshopDetailRawWithOperation(operation, workshopID, false, false)
 			if err != nil {
 				log.Printf("检测更新失败: (ID: %s), 错误: %v", workshopID, err)
 				return
@@ -113,7 +125,11 @@ func (a *App) CheckModUpdates() UpdateCheckResult {
 					log.Printf("写入TimeUpdated失败: %s, 错误: %v", filePath, writeErr)
 				}
 			}
-		}(item.filePath, item.workshopID, item.downloadedAt)
+		}); err != nil {
+			wg.Done()
+			log.Printf("更新检测任务未启动: %v", err)
+			break
+		}
 	}
 
 	wg.Wait()

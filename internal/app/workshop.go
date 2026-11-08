@@ -13,7 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"vpk-manager/internal/network"
 	"vpk-manager/internal/platform/protocol"
 )
 
@@ -446,9 +448,13 @@ func (a *App) GetWorkshopDetails(workshopUrl string) ([]WorkshopFileDetails, err
 	if err != nil {
 		return nil, err
 	}
+	operation := a.captureAPIOperation()
+	ctx, cancel := context.WithTimeout(operation.ctx, workshopParseOperationTimeout)
+	defer cancel()
+	operation.ctx = ctx
 
 	payload := fmt.Sprintf(`[%s]`, id)
-	details, err := a.fetchWorkshopDetails(payload)
+	details, err := a.fetchWorkshopDetailsWithOperation(operation, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -466,9 +472,9 @@ func (a *App) GetWorkshopDetails(workshopUrl string) ([]WorkshopFileDetails, err
 
 		// Fetch details for all children
 		childPayload := "[" + strings.Join(childIDs, ",") + "]"
-		childrenDetails, err := a.fetchWorkshopDetails(childPayload)
+		childrenDetails, err := a.fetchWorkshopDetailsWithOperation(operation, childPayload)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch children details: %v", err)
+			return nil, fmt.Errorf("获取合集子项失败: %w", err)
 		}
 
 		// If the parent item is also a valid file, include it
@@ -487,10 +493,14 @@ func (a *App) GetWorkshopDetailsGrouped(workshopInput string) (WorkshopDetailsRe
 	if err != nil {
 		return WorkshopDetailsResult{}, err
 	}
+	operation := a.captureAPIOperation()
+	ctx, cancel := context.WithTimeout(operation.ctx, workshopParseOperationTimeout)
+	defer cancel()
+	operation.ctx = ctx
 
 	groups := make([]WorkshopDetailsGroup, 0, len(rootIDs))
 	for _, rootID := range rootIDs {
-		group, err := a.getWorkshopDetailsGroup(rootID)
+		group, err := a.getWorkshopDetailsGroupWithOperation(operation, rootID)
 		if err != nil {
 			return WorkshopDetailsResult{}, fmt.Errorf("解析工坊ID %s 失败: %w", rootID, err)
 		}
@@ -501,7 +511,11 @@ func (a *App) GetWorkshopDetailsGrouped(workshopInput string) (WorkshopDetailsRe
 }
 
 func (a *App) getWorkshopDetailsGroup(rootID string) (WorkshopDetailsGroup, error) {
-	details, err := a.fetchWorkshopDetails(workshopPayload([]string{rootID}))
+	return a.getWorkshopDetailsGroupWithOperation(a.captureAPIOperation(), rootID)
+}
+
+func (a *App) getWorkshopDetailsGroupWithOperation(operation apiOperation, rootID string) (WorkshopDetailsGroup, error) {
+	details, err := a.fetchWorkshopDetailsWithOperation(operation, workshopPayload([]string{rootID}))
 	if err != nil {
 		return WorkshopDetailsGroup{}, err
 	}
@@ -521,9 +535,9 @@ func (a *App) getWorkshopDetailsGroup(rootID string) (WorkshopDetailsGroup, erro
 		}
 
 		if len(childIDs) > 0 {
-			childrenDetails, err = a.fetchWorkshopDetails(workshopPayload(childIDs))
+			childrenDetails, err = a.fetchWorkshopDetailsWithOperation(operation, workshopPayload(childIDs))
 			if err != nil {
-				return WorkshopDetailsGroup{}, fmt.Errorf("failed to fetch children details: %v", err)
+				return WorkshopDetailsGroup{}, fmt.Errorf("获取合集子项失败: %w", err)
 			}
 		}
 	}
@@ -570,30 +584,75 @@ func buildWorkshopDetailsGroup(rootID string, main WorkshopFileDetails, children
 	}
 }
 
+const (
+	workshopParseBatchSize        = 100
+	workshopParseOperationTimeout = 2 * time.Minute
+)
+
 func (a *App) fetchWorkshopDetails(payload string) ([]WorkshopFileDetails, error) {
-	req, err := http.NewRequest("POST", workshopParseWorkerURL, bytes.NewBuffer([]byte(payload)))
+	return a.fetchWorkshopDetailsWithOperation(a.captureAPIOperation(), payload)
+}
+
+func (a *App) fetchWorkshopDetailsWithOperation(operation apiOperation, payload string) ([]WorkshopFileDetails, error) {
+	// Decode decimal IDs without a floating-point round trip. Send strings so
+	// JavaScript Workers also preserve every uint64 digit when reading JSON.
+	var values []json.RawMessage
+	if err := json.Unmarshal([]byte(payload), &values); err != nil || len(values) == 0 {
+		return nil, fmt.Errorf("请输入有效的工坊 ID")
+	}
+	ids := make([]string, len(values))
+	for index, raw := range values {
+		value := string(raw)
+		if len(raw) > 0 && raw[0] == '"' {
+			if err := json.Unmarshal(raw, &value); err != nil {
+				return nil, fmt.Errorf("请输入有效的工坊 ID")
+			}
+		}
+		for _, digit := range value {
+			if digit < '0' || digit > '9' {
+				return nil, fmt.Errorf("请输入有效的工坊 ID")
+			}
+		}
+		id, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || id == 0 {
+			return nil, fmt.Errorf("请输入有效的工坊 ID")
+		}
+		ids[index] = strconv.FormatUint(id, 10)
+	}
+	var details []WorkshopFileDetails
+	for start := 0; start < len(ids); start += workshopParseBatchSize {
+		body, err := json.Marshal(ids[start:min(start+workshopParseBatchSize, len(ids))])
+		if err != nil {
+			return nil, fmt.Errorf("无法构建工坊解析请求")
+		}
+		batch, err := a.fetchWorkshopDetailsBatch(operation, body)
+		if err != nil {
+			return nil, err
+		}
+		details = append(details, batch...)
+	}
+	return details, nil
+}
+
+func (a *App) fetchWorkshopDetailsBatch(operation apiOperation, payload []byte) ([]WorkshopFileDetails, error) {
+	req, err := http.NewRequestWithContext(operation.ctx, http.MethodPost, operation.endpoints.ParseURL, bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return nil, network.NewAPIRequestError(operation.line, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-	client := a.getWorkshopNetworkClients().parser
-	resp, err := client.Do(req)
+	req.Header.Set("User-Agent", "LytVPK")
+	resp, err := operation.clients.parser.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, network.NewAPIRequestError(operation.line, err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
+		return nil, network.NewAPIStatusError(operation.line, resp.StatusCode, resp.Header.Get("Retry-After"))
 	}
-
 	var details []WorkshopFileDetails
 	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
-		return nil, err
+		return nil, network.NewAPIRequestError(operation.line, err)
 	}
-
 	return details, nil
 }
 

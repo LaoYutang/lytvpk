@@ -14,6 +14,9 @@ let renderSettingsPage;
 let GetWorkshopPreferredIP;
 let GetWorkshopDNSConfig;
 let SetWorkshopDNSConfig;
+let GetAPILine;
+let SetAPILine;
+let GetAPILineStatus;
 let GetWorkshopFixedIP;
 let GetWorkshopIPOptions;
 let GetWorkshopMetaEnabled;
@@ -42,6 +45,7 @@ let settingsRenderGeneration = 0;
 let pendingSettingsRender = null;
 
 export function configureSettings(deps) {
+  ({ GetAPILine, SetAPILine, GetAPILineStatus } = deps);
   ({ GetWorkshopDNSConfig, SetWorkshopDNSConfig } = deps);
   ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, showError, SelectDirectory, GetSnapshotDirectory, SetSnapshotDirectory, OpenSnapshotDirectory, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, GetWorkshopTranslateCustomBaseURL, GetWorkshopTranslateCustomModelId, HasWorkshopTranslateCustomAPIKey, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, SetWorkshopTranslateCustomBaseURL, SetWorkshopTranslateCustomModelId, SetWorkshopTranslateCustomAPIKey, CheckModUpdates, EventsOn, switchAppPage } = deps);
 }
@@ -90,6 +94,9 @@ async function renderCurrentSettingsPage(isCurrentRender) {
       GetWorkshopPreferredIP,
       GetWorkshopDNSConfig,
       SetWorkshopDNSConfig,
+      GetAPILine,
+      SetAPILine,
+      GetAPILineStatus,
       GetWorkshopFixedIP,
       GetWorkshopIPOptions,
       GetWorkshopMetaEnabled,

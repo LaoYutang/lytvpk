@@ -92,6 +92,8 @@ type App struct {
 	workshopPreferredIP            bool
 	workshopDNSConfig              WorkshopDNSConfig
 	workshopNetwork                *workshopNetworkClients
+	apiLine                        network.APILine
+	apiGeneration                  uint64
 	workshopFixedIP                string
 	workshopMetaEnabled            bool
 	workshopUpdateCheckEnabled     bool
@@ -125,6 +127,7 @@ type App struct {
 
 // ConfigFile 定义配置文件结构
 type ConfigFile struct {
+	APILine                        string             `json:"apiLine"`
 	WorkshopDNS                    *WorkshopDNSConfig `json:"workshopDNS,omitempty"`
 	ModRotationConfig              RotationConfig     `json:"modRotationConfig"`
 	WorkshopPreferredIP            *bool              `json:"workshopPreferredIP,omitempty"`
@@ -150,7 +153,7 @@ type ConfigFile struct {
 	LastUpdateCheckTime            string             `json:"lastUpdateCheckTime"`
 	WindowState                    *WindowState       `json:"windowState,omitempty"`
 	SnapshotDirectory              string             `json:"snapshotDirectory,omitempty"`
-	// v2: localStorage migrated; v3: workshop DNS settings; v4: VPK list sorting.
+	// v2: localStorage migrated; v3: workshop DNS; v4: sorting; v5: API line.
 	MigrationVersion int `json:"migrationVersion"`
 }
 
@@ -270,6 +273,7 @@ func NewApp() *App {
 		workshopHistoryPath:       workshopHistoryPath,
 		workshopPreferredIP:       true, // 默认开启优选IP
 		workshopDNSConfig:         defaultWorkshopDNSConfig(),
+		apiLine:                   network.APILinePrimary,
 		workshopMetaEnabled:       true,     // 默认开启工坊meta信息存储
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站
 		workshopTranslateProvider: workshopTranslateProviderMicrosoft,

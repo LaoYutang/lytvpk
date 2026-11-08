@@ -1,6 +1,7 @@
 import { switchAppPage } from "../../core/ui-shell.js";
 import { showError, showNotification, showInfo } from "../../core/toast.js";
 import { getConfig } from "../../core/config.js";
+import { formatAPILineError, getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { escapeHtml } from "../../core/utils.js";
 import { refreshTaskList } from "./task-list.js";
 import { closeWorkshopHistory, recordWorkshopHistory } from "./workshop-history.js";
@@ -42,6 +43,19 @@ let parseButtonContent = null;
 const submittingButtons = new WeakSet();
 const workshopCache = new Map();
 const CACHE_DURATION = 3600 * 1000;
+
+subscribeAPILineChange(() => {
+  invalidateWorkshopParse();
+  workshopCache.clear();
+  currentWorkshopResult = null;
+  const result = document.getElementById("workshop-result");
+  result?.replaceChildren();
+  result?.classList.add("hidden");
+  const downloadInput = document.getElementById("download-url");
+  if (downloadInput) downloadInput.placeholder = "解析后自动填充，或手动输入直链...";
+  const downloadButton = document.getElementById("download-workshop-btn");
+  if (downloadButton) updateDownloadButtonLabel();
+});
 
 function getCurrentGroups() {
   return Array.isArray(currentWorkshopResult?.groups)
@@ -227,9 +241,11 @@ export async function checkWorkshopUrl() {
   const downloadUrlInput = document.getElementById("download-url");
 
   cancelDownloadFeedback();
+  const line = getAPILineSnapshot();
+  const cacheKey = `${line.line}:${line.generation}:${url}`;
   const requestSequence = ++workshopParseSequence;
   const isCurrentRequest = () =>
-    requestSequence === workshopParseSequence && input.value.trim() === url;
+    isCurrentAPILine(line) && requestSequence === workshopParseSequence && input.value.trim() === url;
   if (!parseButtonContent) {
     parseButtonContent = [...checkBtn.childNodes];
   }
@@ -246,19 +262,19 @@ export async function checkWorkshopUrl() {
   try {
     let groupedResult;
 
-    if (workshopCache.has(url)) {
-      const cached = workshopCache.get(url);
+    if (workshopCache.has(cacheKey)) {
+      const cached = workshopCache.get(cacheKey);
       if (Date.now() - cached.timestamp < CACHE_DURATION) {
         groupedResult = cached.data;
       } else {
-        workshopCache.delete(url);
+        workshopCache.delete(cacheKey);
       }
     }
 
     if (!groupedResult) {
       groupedResult = await GetWorkshopDetailsGrouped(url);
-      if (groupedResult?.groups?.length > 0) {
-        workshopCache.set(url, { timestamp: Date.now(), data: groupedResult });
+      if (isCurrentRequest() && groupedResult?.groups?.length > 0) {
+        workshopCache.set(cacheKey, { timestamp: Date.now(), data: groupedResult });
       }
     }
 
@@ -267,10 +283,10 @@ export async function checkWorkshopUrl() {
     recordWorkshopHistory(groupedResult?.groups);
   } catch (err) {
     if (isCurrentRequest()) {
-      showError("解析失败: " + err);
+      showError(formatAPILineError(err, "解析失败，请稍后重试。"));
     }
   } finally {
-    if (requestSequence === workshopParseSequence) {
+    if (isCurrentAPILine(line) && requestSequence === workshopParseSequence) {
       restoreParseButton();
     }
   }

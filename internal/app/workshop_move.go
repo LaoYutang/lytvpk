@@ -234,6 +234,7 @@ func (a *App) processWorkshopTransferMeta(result *WorkshopTransferResult, tasks 
 	var wg sync.WaitGroup
 	var resultMu sync.Mutex
 	limit := make(chan struct{}, workshopMetaFetchConcurrency)
+	operation := a.captureAPIOperation()
 
 	run := func(task workshopMetaTransferTask) {
 		defer wg.Done()
@@ -253,7 +254,7 @@ func (a *App) processWorkshopTransferMeta(result *WorkshopTransferResult, tasks 
 			warning = fmt.Sprintf("无法从文件名识别有效工坊 ID: %s", name)
 		} else {
 			// meta 只用到主图与文本字段，不需要多图预览，走默认轻量模式
-			detail, err := a.fetchWorkshopDetailRaw(task.workshopID, true, false)
+			detail, err := a.fetchWorkshopDetailRawWithOperation(operation, task.workshopID, true, false)
 			if err != nil {
 				warning = fmt.Sprintf("获取工坊信息失败 %s: %v", task.workshopID, err)
 			} else {

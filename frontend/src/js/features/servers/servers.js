@@ -1,3 +1,4 @@
+import { getAPILineSnapshot, isCurrentAPILine } from "../../core/api-line.js";
 import {
   configureFormModal,
   openServerFormModal,
@@ -455,9 +456,11 @@ function recordRecentServer(address) {
 
 export async function resolveMapName(mapCode) {
   if (!mapCode) return mapCode;
+  const line = getAPILineSnapshot();
   try {
     if (typeof GetMapName === "function") {
       const name = await GetMapName(mapCode);
+      if (!isCurrentAPILine(line)) return mapCode;
       if (name && name.length > 0) {
         return name;
       }

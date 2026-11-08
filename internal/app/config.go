@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -19,7 +20,7 @@ import (
 )
 
 const (
-	configMigrationVersion       = 4
+	configMigrationVersion       = 5
 	localStorageMigrationVersion = 2
 )
 
@@ -62,6 +63,9 @@ func (a *App) ensureConfigPaths() {
 }
 
 func (a *App) loadConfig() {
+	defer func() {
+		network.GlobalIPSelector.SetAPILine(network.APILine(a.GetAPILine()))
+	}()
 	a.ensureConfigPaths()
 	if _, err := os.Stat(a.configPath); os.IsNotExist(err) {
 		return
@@ -80,6 +84,12 @@ func (a *App) loadConfig() {
 	}
 
 	a.mu.Lock()
+	line, lineErr := network.NormalizeAPILine(config.APILine)
+	if lineErr != nil {
+		log.Printf("读取 API 线路配置失败，使用主线路")
+		line = network.APILinePrimary
+	}
+	a.apiLine = line
 	a.modRotationConfig = config.ModRotationConfig
 	if config.WorkshopDNS != nil {
 		if dnsConfig, err := normalizeWorkshopDNSConfig(*config.WorkshopDNS); err == nil {
@@ -187,6 +197,7 @@ func (a *App) snapshotConfigLocked() ConfigFile {
 	}
 
 	return ConfigFile{
+		APILine:                        string(a.apiLineLocked()),
 		WorkshopDNS:                    &dnsConfig,
 		ModRotationConfig:              a.modRotationConfig,
 		WorkshopPreferredIP:            &preferredIP,
@@ -219,13 +230,14 @@ func (a *App) snapshotConfigLocked() ConfigFile {
 func (a *App) writeConfigFile(config ConfigFile) error {
 	a.configWriteMu.Lock()
 	defer a.configWriteMu.Unlock()
-	// A snapshot may predate a DNS change. Always retain the active DNS setting.
+	// A snapshot may predate a network setting change. Retain the active values.
 	a.mu.RLock()
 	dnsConfig := a.workshopDNSConfig
 	if dnsConfig.Mode == "" {
 		dnsConfig.Mode = "dnspod"
 	}
 	config.WorkshopDNS = &dnsConfig
+	config.APILine = string(a.apiLineLocked())
 	if config.MigrationVersion < a.migrationVersion {
 		config.MigrationVersion = a.migrationVersion
 	}
@@ -575,7 +587,17 @@ func (a *App) GetCurrentBestIPOption() IPOption {
 
 // GetWorkshopIPOptions 获取可手动选择的工坊IP列表
 func (a *App) GetWorkshopIPOptions() []IPOption {
-	return network.GetSteamCDNIPOptions()
+	a.mu.RLock()
+	ctx := a.ctx
+	a.mu.RUnlock()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Only an explicit candidate-list read retries a previous failed load.
+	// Background IP selection continues to reuse its existing candidates.
+	network.GlobalIPSelector.InvalidateFailedIPOptions()
+	options, _ := network.GetSteamCDNIPOptionsContext(ctx)
+	return options
 }
 
 // SetWorkshopFixedIP 设置工坊固定IP（留空则使用自动优选）

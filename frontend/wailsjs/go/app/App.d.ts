@@ -31,6 +31,8 @@ export function ClearPanelMaps(arg1:string):Promise<string>;
 
 export function ClearWorkshopHistory():Promise<void>;
 
+export function ConfirmPauseDownloadTask(arg1:string):Promise<void>;
+
 export function ConnectToServer(arg1:string):Promise<void>;
 
 export function CreateSnapshot(arg1:string,arg2:string):Promise<app.SnapshotSummary>;
@@ -81,6 +83,12 @@ export function FetchWorkshopList(arg1:app.WorkshopQueryOptions):Promise<app.Wor
 
 export function ForceExit():Promise<void>;
 
+export function ForceExitWithPauseLossAccepted(arg1:boolean):Promise<void>;
+
+export function GetAPILine():Promise<string>;
+
+export function GetAPILineStatus():Promise<app.APILineStatus>;
+
 export function GetAddonListOrder():Promise<Array<string>>;
 
 export function GetAddonListOrderInfo():Promise<app.AddonListOrderInfo>;
@@ -94,6 +102,8 @@ export function GetConfigMigrationVersion():Promise<number>;
 export function GetCurrentBestIP():Promise<string>;
 
 export function GetCurrentBestIPOption():Promise<network.IPOption>;
+
+export function GetDownloadExitRisk():Promise<app.DownloadExitRisk>;
 
 export function GetDownloadTasks():Promise<Array<app.DownloadTask>>;
 
@@ -203,6 +213,8 @@ export function ParseMDMPFile(arg1:string):Promise<minidump.Report>;
 
 export function ParseWorkshopID(arg1:string):Promise<string>;
 
+export function PauseDownloadTask(arg1:string):Promise<void>;
+
 export function PreviewSnapshotRestore(arg1:string):Promise<app.SnapshotRestorePlan>;
 
 export function RenameSnapshot(arg1:string,arg2:string):Promise<void>;
@@ -214,6 +226,8 @@ export function RestartApplication():Promise<void>;
 export function RestartPanelServer(arg1:string):Promise<string>;
 
 export function RestoreProblemModScan():Promise<app.ProblemModScanSession>;
+
+export function ResumeDownloadTask(arg1:string):Promise<void>;
 
 export function RetryDownloadTask(arg1:string):Promise<void>;
 
@@ -250,6 +264,8 @@ export function SelectVPKPackSourceDirectory():Promise<string>;
 export function SelectVPKUnpackOutputDirectory():Promise<string>;
 
 export function SendPanelRconCommand(arg1:string,arg2:string):Promise<string>;
+
+export function SetAPILine(arg1:string):Promise<void>;
 
 export function SetAddonListOrder(arg1:Array<string>):Promise<void>;
 
