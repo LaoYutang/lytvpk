@@ -5,14 +5,119 @@
 // ----------------------------------------------------
 const RATE_LIMIT_BURST = 500;
 const RATE_LIMIT_REFILL_PER_MIN = 50;
-const RATE_LIMIT_REFILL_PER_MS = RATE_LIMIT_REFILL_PER_MIN / 60000;
 const RATE_LIMIT_IDLE_MS = 10 * 60 * 1000;
 const RATE_LIMIT_SWEEP_EVERY = 1000;
 
+// 可选配置 (不在代码中填写实际地址):
+// WORKSHOP_HIGH_LIMIT_IPS: Cloudflare Secret, 英文逗号分隔的裸 IPv4 / IPv6。
+// 空白和空项忽略, 无效项跳过; 不接受网段、端口、zone ID 或通配符。
+// 名单 IP 的额度固定为普通 IP 的 10 倍: 突发 5000, 每分钟补充 500。
+// 只有 IP 名单可以通过 Secret 配置, 限流数值固定在下面的常量中。
+// 每个匹配 IP 独立计数, 并非多个 IP 共用一个桶。仍是 isolate 内的尽力限流。
+const HIGH_LIMIT_BURST = 5000;
+const HIGH_LIMIT_REFILL_PER_MIN = 500;
+const ordinaryRateLimit = {
+  burst: RATE_LIMIT_BURST,
+  refillPerMin: RATE_LIMIT_REFILL_PER_MIN,
+};
 const rateLimitBuckets = new Map();
 let rateLimitRequestCount = 0;
+let cachedHighLimitConfig;
 
-function takeRateLimitToken(clientIp) {
+function normalizeIPv4(value) {
+  const parts = value.split(".");
+  if (parts.length !== 4 || parts.some((part) =>
+    !/^(0|[1-9][0-9]{0,2})$/.test(part) || Number(part) > 255
+  )) return null;
+  return parts.map(Number);
+}
+
+// 不使用 URL 的宽松 IPv4 解析, 避免缩写、整数、八进制等别名意外命中。
+// IPv6 按完整 128 位比较; IPv4-mapped IPv6 与相应 IPv4 视作同一地址。
+function normalizeClientIP(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 45 ||
+      /[^0-9a-fA-F:.]/.test(value)) {
+    return null;
+  }
+  if (!value.includes(":")) {
+    const ipv4 = normalizeIPv4(value);
+    return ipv4 ? `v4:${ipv4.join(".")}` : null;
+  }
+  let expanded = value;
+  if (expanded.includes(".")) {
+    const lastColon = expanded.lastIndexOf(":");
+    const ipv4 = normalizeIPv4(expanded.slice(lastColon + 1));
+    if (!ipv4) return null;
+    expanded = expanded.slice(0, lastColon + 1) +
+      ((ipv4[0] << 8) | ipv4[1]).toString(16) + ":" +
+      ((ipv4[2] << 8) | ipv4[3]).toString(16);
+  }
+
+  const halves = expanded.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  if ([...left, ...right].some((part) => !/^[0-9a-fA-F]{1,4}$/.test(part))) {
+    return null;
+  }
+  const missing = 8 - left.length - right.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const words = [...left, ...Array(missing).fill("0"), ...right].map((part) =>
+    Number.parseInt(part, 16)
+  );
+  if (words.slice(0, 5).every((word) => word === 0) && words[5] === 0xffff) {
+    return `v4:${words[6] >> 8}.${words[6] & 255}.${words[7] >> 8}.${words[7] & 255}`;
+  }
+  return `v6:${words.map((word) => word.toString(16)).join(":")}`;
+}
+
+function parseHighLimitConfig(env) {
+  const ips = new Set();
+  if (typeof env?.WORKSHOP_HIGH_LIMIT_IPS === "string") {
+    for (const entry of env.WORKSHOP_HIGH_LIMIT_IPS.split(",")) {
+      const ip = normalizeClientIP(entry.trim());
+      if (ip) ips.add(ip);
+    }
+  }
+  return {
+    ips,
+    burst: HIGH_LIMIT_BURST,
+    refillPerMin: HIGH_LIMIT_REFILL_PER_MIN,
+  };
+}
+
+function highLimitConfig(env) {
+  const value = env?.WORKSHOP_HIGH_LIMIT_IPS;
+  if (!cachedHighLimitConfig || value !== cachedHighLimitConfig.value) {
+    cachedHighLimitConfig = { value, config: parseHighLimitConfig(env) };
+  }
+  return cachedHighLimitConfig.config;
+}
+
+// 只面向 Cloudflare 公网入口。request.cf 是平台元数据, 不是 HTTP 头。
+// CF-Connecting-IP 在公网入口由 Cloudflare 覆盖; 不读取 X-Forwarded-For / X-Real-IP。
+// 同 zone Worker 的 x-real-ip 可改写来源, 跨 zone Worker 又使用共享占位 IP,
+// 因此带子请求标记或来源不明的请求只使用普通额度, 不能凭转发头提权。
+// https://developers.cloudflare.com/fundamentals/reference/http-headers/
+const WORKER_SUBREQUEST_IP = "v6:2a06:98c0:3600:0:0:0:0:103";
+function getHighLimitClientIP(request) {
+  if (typeof request.cf?.colo !== "string" || request.cf.colo.length !== 3 ||
+      !/^[A-Z]{3}$/.test(request.cf.colo) ||
+      request.headers.has("CF-Worker") || request.headers.has("CF-EW-Via")) {
+    return null;
+  }
+  const ip = normalizeClientIP(request.headers.get("CF-Connecting-IP"));
+  if (!ip || ip === WORKER_SUBREQUEST_IP) return null;
+
+  // Pseudo IPv4 的 Overwrite Headers 模式会丢失主头中的真实 IPv6。
+  // 这些 Class E 伪地址不能获得高额度, 也不以另一个可自带的头恢复资格。
+  if (ip.startsWith("v4:") && Number(ip.slice(3).split(".")[0]) >= 240) {
+    return null;
+  }
+  return ip;
+}
+
+function takeRateLimitToken(clientIp, policy) {
   const now = Date.now();
 
   if (++rateLimitRequestCount >= RATE_LIMIT_SWEEP_EVERY) {
@@ -20,20 +125,27 @@ function takeRateLimitToken(clientIp) {
     sweepIdleBuckets(now);
   }
 
+  const refillPerMs = policy.refillPerMin / 60000;
   const bucket = rateLimitBuckets.get(clientIp);
   if (!bucket) {
     rateLimitBuckets.set(clientIp, {
-      tokens: RATE_LIMIT_BURST - 1,
+      tokens: policy.burst - 1,
       updatedAt: now,
+      burst: policy.burst,
+      refillPerMs,
     });
     return true;
   }
 
+  // 资格变化时保留已消耗额度, 用此前速率计算此前时段, 再应用新容量。
   const tokens = Math.min(
-    RATE_LIMIT_BURST,
-    bucket.tokens + (now - bucket.updatedAt) * RATE_LIMIT_REFILL_PER_MS
+    policy.burst,
+    bucket.burst,
+    bucket.tokens + Math.max(0, now - bucket.updatedAt) * bucket.refillPerMs
   );
   bucket.updatedAt = now;
+  bucket.burst = policy.burst;
+  bucket.refillPerMs = refillPerMs;
 
   if (tokens < 1) {
     bucket.tokens = tokens;
@@ -44,10 +156,12 @@ function takeRateLimitToken(clientIp) {
   return true;
 }
 
-// 闲置超过 IDLE_MS 的桶此时早已补满, 直接回收, 避免 Map 无界增长
+// 只回收闲置超过 10 分钟且已补满的桶, 避免回收时提前恢复额度。
 function sweepIdleBuckets(now) {
   for (const [ip, bucket] of rateLimitBuckets) {
-    if (now - bucket.updatedAt > RATE_LIMIT_IDLE_MS) {
+    const idle = now - bucket.updatedAt;
+    if (idle > RATE_LIMIT_IDLE_MS &&
+        bucket.tokens + idle * bucket.refillPerMs >= bucket.burst) {
       rateLimitBuckets.delete(ip);
     }
   }
@@ -77,7 +191,14 @@ export default {
     // 限流: 在入口处计数, 缓存命中的请求同样计入
     // (命中也照样消耗 Worker 自身的请求额度, 免费版每天 10 万次用尽后整个服务会不可用)
     const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
-    if (!takeRateLimitToken(clientIp)) {
+    const highLimit = highLimitConfig(env);
+    const listedIp = highLimit.ips.size ? normalizeClientIP(clientIp) : null;
+    const isListed = listedIp !== null && highLimit.ips.has(listedIp);
+    const useHighLimit = isListed && getHighLimitClientIP(request) === listedIp;
+    // 名单 IP 降为普通额度时仍用同一桶, 不能靠附加子请求头多取一份额度。
+    // 普通非名单 IP 保持原始键和原有限额。
+    const bucketKey = isListed ? `listed:${listedIp}` : `ordinary:${clientIp}`;
+    if (!takeRateLimitToken(bucketKey, useHighLimit ? highLimit : ordinaryRateLimit)) {
       return new Response(JSON.stringify({ error: "Too Many Requests" }), {
         status: 429,
         headers: { ...corsHeaders, "Retry-After": "1" },
