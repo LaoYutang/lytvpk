@@ -1,10 +1,9 @@
 import { appendWorkshopDNSSettings } from "./workshop-dns.js";
-import { appendAPILineSettings, updateAPILineStatus } from "./api-line.js";
-import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
+import { appendAPILineSettings } from "./api-line.js";
+import { appendPreferredIPSettings } from "./preferred-ip.js";
+export { loadIPOptionsForDropdown } from "./preferred-ip.js";
+import { getAPILineSnapshot, isCurrentAPILine } from "../../core/api-line.js";
 import { showWorkshopRequestError } from "../workshop/request-error.js";
-
-let activeIPDropdown;
-subscribeAPILineChange(() => activeIPDropdown?.invalidate());
 
 const SETTINGS_NAV_ICONS = {
   network: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>`,
@@ -27,13 +26,12 @@ export async function renderSettingsPage({
   GetSnapshotDirectory,
   SetSnapshotDirectory,
   OpenSnapshotDirectory,
-  GetWorkshopPreferredIP,
+  GetWorkshopIPSettings,
   GetWorkshopDNSConfig,
   SetWorkshopDNSConfig,
   GetAPILine,
   SetAPILine,
   GetAPILineStatus,
-  GetWorkshopFixedIP,
   GetWorkshopIPOptions,
   GetWorkshopMetaEnabled,
   GetWorkshopUpdateCheckEnabled,
@@ -45,8 +43,7 @@ export async function renderSettingsPage({
   IsSelectingIP,
   GetCurrentBestIP,
   GetCurrentBestIPOption,
-  SetWorkshopPreferredIP,
-  SetWorkshopFixedIP,
+  SetWorkshopIPSettings,
   SetWorkshopMetaEnabled,
   SetWorkshopUpdateCheckEnabled,
   SetWorkshopBrowserTarget,
@@ -60,9 +57,6 @@ export async function renderSettingsPage({
   const container = document.getElementById("settings-page-content");
   if (!container || !isCurrentRender()) return;
 
-  const enabled = await GetWorkshopPreferredIP();
-  const fixedIP = await GetWorkshopFixedIP();
-  const useFixedIP = enabled && fixedIP !== "";
   const metaEnabled = await GetWorkshopMetaEnabled();
   const updateCheckEnabled = await GetWorkshopUpdateCheckEnabled();
   const browserTarget = await GetWorkshopBrowserTarget();
@@ -70,23 +64,6 @@ export async function renderSettingsPage({
   const customBaseURL = await GetWorkshopTranslateCustomBaseURL();
   const customModelId = await GetWorkshopTranslateCustomModelId();
   const hasCustomAPIKey = await HasWorkshopTranslateCustomAPIKey();
-  const isSelecting = enabled ? await IsSelectingIP() : false;
-  const ipOptions = [];
-  const bestIPOption = enabled && !isSelecting ? await GetCurrentBestIPOption() : null;
-  const bestIP = getIPOptionIP(bestIPOption) || (enabled && !isSelecting ? await GetCurrentBestIP() : "");
-
-  let ipStatusText = "";
-  if (enabled) {
-    if (isSelecting) {
-      ipStatusText = "正在优选最佳线路...";
-    } else if (bestIP) {
-      const optionLabel = formatIPOptionLabel(bestIPOption || { ip: bestIP, category: useFixedIP ? "自定义" : "" });
-      ipStatusText = useFixedIP ? `当前固定 IP: ${optionLabel}` : `当前优选 IP: ${optionLabel}`;
-    } else {
-      ipStatusText = "尚未获取到优选 IP";
-    }
-  }
-
   if (!isCurrentRender() || !container.isConnected) return;
   container.innerHTML = `
     <div class="settings-layout embedded-settings">
@@ -97,42 +74,7 @@ export async function renderSettingsPage({
       </div>
       <div class="settings-content">
         <div class="settings-panels-track">
-        <div class="settings-panel active" id="settings-panel-network">
-          <div class="setting-card">
-            <div class="setting-card-title">网络加速</div>
-            <div class="setting-row">
-              <div class="setting-row-info">
-                <div class="setting-row-label">开启优选 IP 加速</div>
-                <div class="setting-row-desc">加速创意工坊图片与文件下载</div>
-                ${
-                  ipStatusText
-                    ? `<div class="setting-row-status-line">
-                        <div id="settings-ip-status" class="setting-row-status">${escapeHtml(ipStatusText)}</div>
-                      </div>`
-                    : ""
-                }
-              </div>
-              <label class="toggle-switch">
-                <input type="checkbox" id="settings-preferred-ip" ${enabled ? "checked" : ""}>
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <div id="settings-ip-mode-section" class="setting-indent" style="${enabled ? "" : "display:none"}">
-              <div class="setting-row-label">加速模式</div>
-              <div class="setting-radio-group">
-                <label class="setting-radio-label"><input type="radio" name="settings-ip-mode" value="auto" ${useFixedIP ? "" : "checked"}><span>自动优选最佳 IP（推荐）</span></label>
-                <label class="setting-radio-label"><input type="radio" name="settings-ip-mode" value="fixed" ${useFixedIP ? "checked" : ""}><span>手动指定 IP</span></label>
-              </div>
-              <div id="settings-fixed-ip-tools" class="settings-fixed-ip-tools" style="${useFixedIP ? "" : "display:none"}">
-                <div class="single-select-dropdown settings-ip-option-dropdown">
-                  <button type="button" id="settings-ip-option-trigger" class="select-trigger"></button>
-                  <div id="settings-ip-option-menu" class="select-menu settings-ip-option-menu hidden"></div>
-                </div>
-                <input type="text" id="settings-fixed-ip" class="form-input" value="${escapeAttr(fixedIP)}" placeholder="例如: 23.59.72.59">
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="settings-panel active" id="settings-panel-network"></div>
 
         <div class="settings-panel" id="settings-panel-interface">
           <div class="setting-card">
@@ -276,6 +218,20 @@ export async function renderSettingsPage({
   // Each async continuation belongs to this layout, never a newer render's DOM.
   const layout = container.firstElementChild;
   const isCurrentPage = () => isCurrentRender() && layout.isConnected;
+  const ipForm = await appendPreferredIPSettings(layout, {
+    isCurrentRender: isCurrentPage,
+    deferCandidateLoad: true,
+    GetWorkshopIPSettings,
+    SetWorkshopIPSettings,
+    GetWorkshopIPOptions,
+    GetAPILineStatus,
+    IsSelectingIP,
+    GetCurrentBestIP,
+    GetCurrentBestIPOption,
+    EventsOn,
+    showNotification,
+  });
+  if (!isCurrentPage()) return;
   await appendAPILineSettings(layout, {
     isCurrentRender: isCurrentPage,
     GetAPILine,
@@ -290,6 +246,7 @@ export async function renderSettingsPage({
     showNotification,
   });
   if (!isCurrentPage()) return;
+  void ipForm?.loadIPOptions?.();
 
   await appendSnapshotStoragePanel(layout, {
     isCurrentRender: isCurrentPage,
@@ -308,10 +265,6 @@ export async function renderSettingsPage({
   bindSettingsPage({
     isCurrentPage,
     layout,
-    GetAPILineStatus,
-    enabled,
-    fixedIP,
-    ipOptions,
     metaEnabled,
     updateCheckEnabled,
     browserTarget,
@@ -323,12 +276,6 @@ export async function renderSettingsPage({
     renderTagFilters,
     refreshFilesKeepFilter,
     showNotification,
-    GetWorkshopIPOptions,
-    IsSelectingIP,
-    GetCurrentBestIP,
-    GetCurrentBestIPOption,
-    SetWorkshopPreferredIP,
-    SetWorkshopFixedIP,
     SetWorkshopMetaEnabled,
     SetWorkshopUpdateCheckEnabled,
     SetWorkshopBrowserTarget,
@@ -354,103 +301,6 @@ function bindSettingsPage(deps) {
       document.getElementById(`settings-panel-${target}`)?.classList.add("active");
       updateSettingsNavIndicator();
     });
-  });
-
-  const ipToggle = document.getElementById("settings-preferred-ip");
-  const ipSection = document.getElementById("settings-ip-mode-section");
-  const fixedTools = document.getElementById("settings-fixed-ip-tools");
-  const fixedInput = document.getElementById("settings-fixed-ip");
-  const ipOptionTrigger = document.getElementById("settings-ip-option-trigger");
-  const ipOptionMenu = document.getElementById("settings-ip-option-menu");
-  const ipStatus = document.getElementById("settings-ip-status");
-  let ipOptions = normalizeIPOptions(deps.ipOptions);
-  const refreshIPStatus = async () => {
-    await updateIPStatus({
-      statusEl: ipStatus,
-      ipOptions,
-      getUseFixedIP: () => {
-        const fixedMode = document.querySelector('input[name="settings-ip-mode"][value="fixed"]')?.checked;
-        return Boolean(fixedMode && fixedInput?.value.trim());
-      },
-      IsSelectingIP: deps.IsSelectingIP,
-      GetCurrentBestIP: deps.GetCurrentBestIP,
-      GetCurrentBestIPOption: deps.GetCurrentBestIPOption,
-    });
-  };
-
-  renderIPOptionDropdown({
-    options: ipOptions,
-    fixedIP: deps.fixedIP,
-    trigger: ipOptionTrigger,
-    menu: ipOptionMenu,
-    fixedInput,
-    SetWorkshopFixedIP: deps.SetWorkshopFixedIP,
-    getConfig: deps.getConfig,
-    saveConfig: deps.saveConfig,
-    showNotification: deps.showNotification,
-    onStatusUpdate: refreshIPStatus,
-  });
-  loadIPOptionsForDropdown({
-    isCurrentPage: deps.isCurrentPage,
-    layout: deps.layout,
-    GetAPILineStatus: deps.GetAPILineStatus,
-    GetWorkshopIPOptions: deps.GetWorkshopIPOptions,
-    fixedIP: deps.fixedIP,
-    trigger: ipOptionTrigger,
-    menu: ipOptionMenu,
-    fixedInput,
-    setOptions: (nextOptions) => {
-      ipOptions = nextOptions;
-    },
-    SetWorkshopFixedIP: deps.SetWorkshopFixedIP,
-    getConfig: deps.getConfig,
-    saveConfig: deps.saveConfig,
-    showNotification: deps.showNotification,
-    onStatusUpdate: refreshIPStatus,
-  });
-
-  if (typeof window._settingsIPSelectionCleanup === "function") {
-    window._settingsIPSelectionCleanup();
-    window._settingsIPSelectionCleanup = null;
-  }
-  if (typeof deps.EventsOn === "function") {
-    window._settingsIPSelectionCleanup = deps.EventsOn("ip_selection_end", refreshIPStatus);
-  }
-
-  ipToggle?.addEventListener("change", async () => {
-    ipSection.style.display = ipToggle.checked ? "block" : "none";
-    await deps.SetWorkshopPreferredIP(ipToggle.checked);
-    const config = deps.getConfig();
-    config.workshopPreferredIP = ipToggle.checked;
-    deps.saveConfig(config);
-    deps.showNotification(ipToggle.checked ? "已开启优选 IP 加速" : "已关闭优选 IP 加速", ipToggle.checked ? "success" : "info");
-  });
-
-  document.querySelectorAll('input[name="settings-ip-mode"]').forEach((radio) => {
-    radio.addEventListener("change", async () => {
-      const useFixed = radio.value === "fixed" && radio.checked;
-      if (fixedTools) fixedTools.style.display = useFixed ? "" : "none";
-      if (!useFixed) {
-        await deps.SetWorkshopFixedIP("");
-        const config = deps.getConfig();
-        config.workshopFixedIP = "";
-        deps.saveConfig(config);
-        await deps.SetWorkshopPreferredIP(true);
-        await refreshIPStatus();
-      }
-    });
-  });
-
-  fixedInput?.addEventListener("change", async () => {
-    const fixedIP = fixedInput.value.trim();
-    await deps.SetWorkshopFixedIP(fixedIP);
-    const config = deps.getConfig();
-    config.workshopFixedIP = fixedIP;
-    deps.saveConfig(config);
-    updateIPOptionTrigger(ipOptionTrigger, ipOptions, fixedIP);
-    syncIPOptionMenuActive(ipOptionMenu, fixedIP);
-    await refreshIPStatus();
-    deps.showNotification("已更新固定 IP 设置", "success");
   });
 
   document.querySelectorAll('input[name="settings-display-mode"]').forEach((radio) => {
@@ -682,257 +532,6 @@ function bindSettingsPage(deps) {
     deps.showNotification("已更新自定义AI模型ID", "success");
   });
 
-}
-
-function renderIPOptionDropdown({
-  options,
-  fixedIP,
-  trigger,
-  menu,
-  fixedInput,
-  SetWorkshopFixedIP,
-  getConfig,
-  saveConfig,
-  showNotification,
-  onStatusUpdate,
-}) {
-  if (!trigger || !menu || !fixedInput) return;
-
-  const normalizedOptions = normalizeIPOptions(options);
-  trigger.classList.remove("is-disabled");
-  trigger.disabled = false;
-  updateIPOptionTrigger(trigger, normalizedOptions, fixedIP);
-  menu.textContent = "";
-
-  if (normalizedOptions.length === 0) {
-    trigger.classList.add("is-disabled");
-    trigger.disabled = true;
-    return;
-  }
-
-  normalizedOptions.forEach((option) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "select-option settings-ip-option";
-    button.dataset.value = option.ip;
-
-    const content = document.createElement("span");
-    content.className = "settings-ip-option-main";
-
-    const category = document.createElement("span");
-    category.className = "settings-ip-option-category";
-    category.textContent = option.category;
-
-    const ip = document.createElement("span");
-    ip.className = "settings-ip-option-address";
-    ip.textContent = option.ip;
-
-    content.appendChild(category);
-    content.appendChild(ip);
-    button.appendChild(content);
-
-    if (option.ip === fixedIP) {
-      button.classList.add("active");
-    }
-
-    button.addEventListener("click", async () => {
-      fixedInput.value = option.ip;
-      await SetWorkshopFixedIP(option.ip);
-      const config = getConfig();
-      config.workshopFixedIP = option.ip;
-      saveConfig(config);
-      updateIPOptionTrigger(trigger, normalizedOptions, option.ip);
-      syncIPOptionMenuActive(menu, option.ip);
-      await onStatusUpdate?.();
-      menu.classList.add("hidden");
-      showNotification("已更新固定 IP 设置", "success");
-    });
-
-    menu.appendChild(button);
-  });
-
-  trigger.onclick = (event) => {
-    event.stopPropagation();
-    menu.classList.toggle("hidden");
-  };
-}
-
-export async function loadIPOptionsForDropdown({
-  isCurrentPage = () => true,
-  layout,
-  GetAPILineStatus,
-  GetWorkshopIPOptions,
-  fixedIP,
-  trigger,
-  menu,
-  fixedInput,
-  setOptions,
-  SetWorkshopFixedIP,
-  getConfig,
-  saveConfig,
-  showNotification,
-  onStatusUpdate,
-}) {
-  if (!trigger || !menu || typeof GetWorkshopIPOptions !== "function") return;
-  const line = getAPILineSnapshot();
-  const isCurrentRequest = () => isCurrentPage() && trigger.isConnected && isCurrentAPILine(line);
-  const reload = () => loadIPOptionsForDropdown({
-    isCurrentPage, layout, GetAPILineStatus, GetWorkshopIPOptions,
-    fixedIP: fixedInput?.value.trim() || "", trigger, menu, fixedInput,
-    setOptions, SetWorkshopFixedIP, getConfig, saveConfig, showNotification, onStatusUpdate,
-  });
-  activeIPDropdown = {
-    invalidate() {
-      if (!isCurrentPage() || !trigger.isConnected) {
-        activeIPDropdown = null;
-        return;
-      }
-      setOptions([]);
-      menu.textContent = "";
-      menu.classList.add("hidden");
-      trigger.textContent = "点击加载候选列表";
-      trigger.disabled = false;
-      trigger.classList.remove("is-disabled");
-      trigger.onclick = async (event) => {
-        event.stopPropagation();
-        if (!isCurrentPage() || trigger.disabled) return;
-        menu.classList.remove("hidden");
-        await reload();
-      };
-    },
-  };
-
-  trigger.textContent = "正在加载推荐固定 IP...";
-  trigger.classList.add("is-disabled");
-  trigger.disabled = true;
-  menu.textContent = "";
-
-  try {
-    const nextOptions = normalizeIPOptions(await GetWorkshopIPOptions());
-    if (!isCurrentRequest()) return;
-    setOptions(nextOptions);
-    renderIPOptionDropdown({
-      options: nextOptions,
-      fixedIP,
-      trigger,
-      menu,
-      fixedInput,
-      SetWorkshopFixedIP,
-      getConfig,
-      saveConfig,
-      showNotification,
-      onStatusUpdate,
-    });
-    await onStatusUpdate?.();
-    if (!isCurrentRequest()) return;
-    const fallback = layout && await updateAPILineStatus(layout, GetAPILineStatus, isCurrentRequest);
-    if (!isCurrentRequest()) return;
-    const toggle = trigger.onclick;
-    if (fallback) {
-      let retrying = false;
-      trigger.onclick = async (event) => {
-        if (!isCurrentRequest() || retrying) return;
-        const opening = menu.classList.contains("hidden");
-        toggle?.(event);
-        if (!opening) return;
-        retrying = true;
-        try {
-          await reload();
-        } finally {
-          retrying = false;
-        }
-      };
-    }
-  } catch (error) {
-    if (!isCurrentRequest()) return;
-    trigger.textContent = "候选 IP 加载失败，可自建服务器并填写 IP";
-    trigger.classList.add("is-disabled");
-    trigger.disabled = true;
-    if (layout) await updateAPILineStatus(layout, GetAPILineStatus, isCurrentRequest);
-  }
-}
-
-function normalizeIPOptions(options = []) {
-  const seen = new Set();
-  const normalized = [];
-  options.forEach((option) => {
-    const ip = getIPOptionIP(option);
-    if (!ip || seen.has(ip)) return;
-    const category = getIPOptionCategory(option);
-    normalized.push({ ip, category });
-    seen.add(ip);
-  });
-  return normalized;
-}
-
-function updateIPOptionTrigger(trigger, options, ip) {
-  if (!trigger) return;
-  const option = findIPOption(options, ip);
-  if (option) {
-    trigger.textContent = formatIPOptionLabel(option);
-  } else if (ip) {
-    trigger.textContent = formatIPOptionLabel({ ip, category: "自定义" });
-  } else if (options?.length) {
-    trigger.textContent = "选择优选 IP，也可自建服务器并填写 IP";
-  } else {
-    trigger.textContent = "暂无候选 IP，可自建服务器并填写 IP";
-  }
-}
-
-function syncIPOptionMenuActive(menu, ip) {
-  menu?.querySelectorAll(".settings-ip-option").forEach((button) => {
-    button.classList.toggle("active", button.dataset.value === ip);
-  });
-}
-
-async function updateIPStatus({
-  statusEl,
-  ipOptions,
-  getUseFixedIP,
-  IsSelectingIP,
-  GetCurrentBestIP,
-  GetCurrentBestIPOption,
-}) {
-  if (!statusEl) return;
-
-  const isSelecting = await IsSelectingIP();
-  if (isSelecting) {
-    statusEl.textContent = "正在优选最佳线路...";
-    return;
-  }
-
-  const bestIPOption = await GetCurrentBestIPOption();
-  const bestIP = getIPOptionIP(bestIPOption) || (await GetCurrentBestIP());
-  if (!bestIP) {
-    statusEl.textContent = "尚未获取到优选 IP";
-    return;
-  }
-
-  const useFixedIP = getUseFixedIP?.() || false;
-  const option = bestIPOption || findIPOption(ipOptions, bestIP) || { ip: bestIP, category: useFixedIP ? "自定义" : "" };
-  statusEl.textContent = `${useFixedIP ? "当前固定 IP" : "当前优选 IP"}: ${formatIPOptionLabel(option)}`;
-}
-
-function findIPOption(options = [], ip) {
-  if (!ip) return null;
-  return options.find((option) => option.ip === ip) || null;
-}
-
-function formatIPOptionLabel(option) {
-  const ip = getIPOptionIP(option);
-  if (!ip) return "";
-  const category = getIPOptionCategory(option, "");
-  return category ? `${category} / ${ip}` : ip;
-}
-
-function getIPOptionIP(option) {
-  return String(option?.ip || option?.IP || "").trim();
-}
-
-function getIPOptionCategory(option, fallback = "未分类") {
-  const rawCategory = option?.category ?? option?.Category;
-  const category = String(rawCategory ?? fallback).trim();
-  return category || fallback;
 }
 
 function enhanceSettingsNav() {

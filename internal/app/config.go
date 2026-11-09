@@ -15,8 +15,6 @@ import (
 
 	"vpk-manager/internal/network"
 	"vpk-manager/internal/serveraddress"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -238,6 +236,9 @@ func (a *App) writeConfigFile(config ConfigFile) error {
 	}
 	config.WorkshopDNS = &dnsConfig
 	config.APILine = string(a.apiLineLocked())
+	preferredIP, fixedIP := a.workshopPreferredIP, a.workshopFixedIP
+	config.WorkshopPreferredIP = &preferredIP
+	config.WorkshopFixedIP = &fixedIP
 	if config.MigrationVersion < a.migrationVersion {
 		config.MigrationVersion = a.migrationVersion
 	}
@@ -516,27 +517,11 @@ func (a *App) SaveWorkshopWatchLaterStorage(storage WorkshopWatchLaterStorage) e
 // so we can call the runtime methods
 
 func (a *App) SetWorkshopPreferredIP(enabled bool) {
-	a.mu.Lock()
-	a.workshopPreferredIP = enabled
-	fixedIP := a.workshopFixedIP
-	a.mu.Unlock()
-
-	// 保存配置
-	a.saveConfig()
-
-	// 如果开启，立即触发一次IP优选（如果尚未优选）
-	if enabled {
-		runtime.EventsEmit(a.ctx, "ip_selection_start", nil)
-		go func() {
-			if fixedIP != "" {
-				network.GlobalIPSelector.SetFixedIP(fixedIP)
-			} else {
-				// 使用一个典型的工坊图片域名来测试
-				// 实际上 IPSelector 目前是硬编码了获取 IP 的逻辑，这里只需要触发一下
-				network.GlobalIPSelector.GetBestIP("https://steamuserimages-a.akamaihd.net/ugc/test")
-			}
-			runtime.EventsEmit(a.ctx, "ip_selection_end", nil)
-		}()
+	if err := a.saveWorkshopIPSettings(func(settings WorkshopIPSettings) WorkshopIPSettings {
+		settings.Enabled = enabled
+		return settings
+	}, workshopIPSelectionOnEnable, network.GlobalIPSelector); err != nil {
+		log.Printf("保存优选 IP 设置失败: %v", err)
 	}
 }
 
@@ -602,12 +587,12 @@ func (a *App) GetWorkshopIPOptions() []IPOption {
 
 // SetWorkshopFixedIP 设置工坊固定IP（留空则使用自动优选）
 func (a *App) SetWorkshopFixedIP(ip string) {
-	a.mu.Lock()
-	a.workshopFixedIP = ip
-	a.mu.Unlock()
-
-	network.GlobalIPSelector.SetFixedIP(ip)
-	a.saveConfig()
+	if err := a.saveWorkshopIPSettings(func(settings WorkshopIPSettings) WorkshopIPSettings {
+		settings.FixedIP = ip
+		return settings
+	}, workshopIPSelectionNone, network.GlobalIPSelector); err != nil {
+		log.Printf("保存固定 IP 设置失败: %v", err)
+	}
 }
 
 // GetWorkshopFixedIP 获取当前设置的固定IP

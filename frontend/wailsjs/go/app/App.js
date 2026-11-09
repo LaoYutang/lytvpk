@@ -298,6 +298,10 @@ export function GetWorkshopIPOptions() {
   return window['go']['app']['App']['GetWorkshopIPOptions']();
 }
 
+export function GetWorkshopIPSettings() {
+  return window['go']['app']['App']['GetWorkshopIPSettings']();
+}
+
 export function GetWorkshopMetaEnabled() {
   return window['go']['app']['App']['GetWorkshopMetaEnabled']();
 }
@@ -560,6 +564,10 @@ export function SetWorkshopDNSConfig(arg1) {
 
 export function SetWorkshopFixedIP(arg1) {
   return window['go']['app']['App']['SetWorkshopFixedIP'](arg1);
+}
+
+export function SetWorkshopIPSettings(arg1) {
+  return window['go']['app']['App']['SetWorkshopIPSettings'](arg1);
 }
 
 export function SetWorkshopMetaEnabled(arg1) {

@@ -11,13 +11,13 @@ let GetSnapshotDirectory;
 let SetSnapshotDirectory;
 let OpenSnapshotDirectory;
 let renderSettingsPage;
-let GetWorkshopPreferredIP;
+let GetWorkshopIPSettings;
+let SetWorkshopIPSettings;
 let GetWorkshopDNSConfig;
 let SetWorkshopDNSConfig;
 let GetAPILine;
 let SetAPILine;
 let GetAPILineStatus;
-let GetWorkshopFixedIP;
 let GetWorkshopIPOptions;
 let GetWorkshopMetaEnabled;
 let GetWorkshopUpdateCheckEnabled;
@@ -29,8 +29,6 @@ let HasWorkshopTranslateCustomAPIKey;
 let IsSelectingIP;
 let GetCurrentBestIP;
 let GetCurrentBestIPOption;
-let SetWorkshopPreferredIP;
-let SetWorkshopFixedIP;
 let SetWorkshopMetaEnabled;
 let SetWorkshopUpdateCheckEnabled;
 let SetWorkshopBrowserTarget;
@@ -47,7 +45,7 @@ let pendingSettingsRender = null;
 export function configureSettings(deps) {
   ({ GetAPILine, SetAPILine, GetAPILineStatus } = deps);
   ({ GetWorkshopDNSConfig, SetWorkshopDNSConfig } = deps);
-  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, showError, SelectDirectory, GetSnapshotDirectory, SetSnapshotDirectory, OpenSnapshotDirectory, renderSettingsPage, GetWorkshopPreferredIP, GetWorkshopFixedIP, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, GetWorkshopTranslateCustomBaseURL, GetWorkshopTranslateCustomModelId, HasWorkshopTranslateCustomAPIKey, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopPreferredIP, SetWorkshopFixedIP, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, SetWorkshopTranslateCustomBaseURL, SetWorkshopTranslateCustomModelId, SetWorkshopTranslateCustomAPIKey, CheckModUpdates, EventsOn, switchAppPage } = deps);
+  ({ appState, getConfig, saveConfig, renderFileList, renderTagFilters, refreshFilesKeepFilter, showNotification, showError, SelectDirectory, GetSnapshotDirectory, SetSnapshotDirectory, OpenSnapshotDirectory, renderSettingsPage, GetWorkshopIPSettings, SetWorkshopIPSettings, GetWorkshopIPOptions, GetWorkshopMetaEnabled, GetWorkshopUpdateCheckEnabled, GetWorkshopBrowserTarget, GetWorkshopTranslateProvider, GetWorkshopTranslateCustomBaseURL, GetWorkshopTranslateCustomModelId, HasWorkshopTranslateCustomAPIKey, IsSelectingIP, GetCurrentBestIP, GetCurrentBestIPOption, SetWorkshopMetaEnabled, SetWorkshopUpdateCheckEnabled, SetWorkshopBrowserTarget, SetWorkshopTranslateProvider, SetWorkshopTranslateCustomBaseURL, SetWorkshopTranslateCustomModelId, SetWorkshopTranslateCustomAPIKey, CheckModUpdates, EventsOn, switchAppPage } = deps);
 }
 
 export async function showGlobalSettings() {
@@ -91,13 +89,13 @@ async function renderCurrentSettingsPage(isCurrentRender) {
       GetSnapshotDirectory,
       SetSnapshotDirectory,
       OpenSnapshotDirectory,
-      GetWorkshopPreferredIP,
+      GetWorkshopIPSettings,
+      SetWorkshopIPSettings,
       GetWorkshopDNSConfig,
       SetWorkshopDNSConfig,
       GetAPILine,
       SetAPILine,
       GetAPILineStatus,
-      GetWorkshopFixedIP,
       GetWorkshopIPOptions,
       GetWorkshopMetaEnabled,
       GetWorkshopUpdateCheckEnabled,
@@ -109,8 +107,6 @@ async function renderCurrentSettingsPage(isCurrentRender) {
       IsSelectingIP,
       GetCurrentBestIP,
       GetCurrentBestIPOption,
-      SetWorkshopPreferredIP,
-      SetWorkshopFixedIP,
       SetWorkshopMetaEnabled,
       SetWorkshopUpdateCheckEnabled,
       SetWorkshopBrowserTarget,

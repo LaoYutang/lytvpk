@@ -153,6 +153,8 @@ export function GetWorkshopHistory():Promise<app.WorkshopHistoryStorage>;
 
 export function GetWorkshopIPOptions():Promise<Array<network.IPOption>>;
 
+export function GetWorkshopIPSettings():Promise<app.WorkshopIPSettings>;
+
 export function GetWorkshopMetaEnabled():Promise<boolean>;
 
 export function GetWorkshopPreferredIP():Promise<boolean>;
@@ -284,6 +286,8 @@ export function SetWorkshopBrowserTarget(arg1:string):Promise<void>;
 export function SetWorkshopDNSConfig(arg1:app.WorkshopDNSConfig):Promise<void>;
 
 export function SetWorkshopFixedIP(arg1:string):Promise<void>;
+
+export function SetWorkshopIPSettings(arg1:app.WorkshopIPSettings):Promise<void>;
 
 export function SetWorkshopMetaEnabled(arg1:boolean):Promise<void>;
 

@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"vpk-manager/internal/network"
 	"vpk-manager/internal/platform/protocol"
 	"vpk-manager/internal/platform/urlregistry"
 
@@ -55,28 +54,8 @@ func (a *App) startup(ctx context.Context) {
 		// 稍微延迟一下，确保旧进程完全退出
 		time.Sleep(2 * time.Second)
 
-		// 如果开启了优选IP，启动时自动触发
-		if a.GetWorkshopPreferredIP() {
-			a.mu.RLock()
-			fixedIP := a.workshopFixedIP
-			a.mu.RUnlock()
-			if fixedIP != "" {
-				log.Printf("检测到优选IP已开启且设置了固定IP: %s，跳过自动优选", fixedIP)
-				network.GlobalIPSelector.SetFixedIP(fixedIP)
-				runtime.EventsEmit(a.ctx, "ip_selection_end", nil)
-			} else {
-				log.Println("检测到优选IP已开启，后台启动IP优选...")
-				// 设置状态为正在选择
-				runtime.EventsEmit(a.ctx, "ip_selection_start", nil)
-
-				go func() {
-					// 使用一个典型的工坊图片域名来测试
-					network.GlobalIPSelector.GetBestIP("https://steamuserimages-a.akamaihd.net/ugc/test")
-					// 完成后通知前端
-					runtime.EventsEmit(a.ctx, "ip_selection_end", nil)
-				}()
-			}
-		}
+		// Read the current saved pair when the delayed startup work runs.
+		a.startWorkshopIPSelection()
 
 		exe, err := os.Executable()
 		if err != nil {
