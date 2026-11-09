@@ -96,7 +96,7 @@ function choose(form, value) {
   form.querySelectorAll("input").forEach((radio) => { radio.checked = radio.value === value; });
 }
 
-test("the API card defaults to the primary line and only a successful manual save changes it", async () => {
+test("the API card has no action buttons and radio changes persist only after success", async () => {
   const pending = Promise.withResolvers();
   const calls = [];
   const form = await card((value) => { calls.push(value); return pending.promise; });
@@ -106,25 +106,25 @@ test("the API card defaults to the primary line and only a successful manual sav
   assert.match(form.textContent, /备用线路/);
   assert.doesNotMatch(form.textContent, /https?:|\b\d{1,3}(?:\.\d{1,3}){3}\b|laoyutang|Worker/i);
   choose(form, "backup");
-  await radios[1].dispatch("change");
-  assert.deepEqual(calls, [], "changing the radio must not persist or send requests");
+  assert.equal(form.querySelector("button"), null);
   const before = getAPILineSnapshot();
-  const saving = form.dispatch("submit");
+  const saving = radios[1].dispatch("change");
   await form.dispatch("submit");
   assert.deepEqual(calls, ["backup"]);
   assert.equal(getConfig().apiLine, "primary");
   assert.equal(isCurrentAPILine(before), true);
-  assert.equal(form.querySelector("button").disabled, true);
+  assert.equal(form.querySelectorAll("input").every((radio) => radio.disabled), true);
   pending.resolve();
   await saving;
   assert.equal(getConfig().apiLine, "backup");
   assert.equal(isCurrentAPILine(before), false);
-  assert.equal(form.querySelector("button").disabled, false);
+  assert.equal(form.querySelectorAll("input").every((radio) => radio.disabled), false);
   assert.equal(notifications.length, 1);
 });
 
 test("failed saves retain the prior line and never render an error address", async () => {
-  const form = await card(async () => { throw new Error("request to https://private.invalid:1234/ failed at 192.0.2.10"); });
+  const calls = [];
+  const form = await card(async (line) => { calls.push(line); throw new Error("request to https://private.invalid:1234/ failed at 192.0.2.10"); });
   choose(form, "backup");
   const before = getAPILineSnapshot();
   await form.dispatch("submit");
@@ -133,7 +133,19 @@ test("failed saves retain the prior line and never render an error address", asy
   assert.equal(form.querySelectorAll("input")[0].checked, true);
   assert.match(form.textContent, /保存线路设置失败/);
   assert.doesNotMatch(form.textContent, /private|192\.0|https?:/);
+  assert.deepEqual(calls, ["backup"], "failure cannot retry on either line automatically");
   assert.deepEqual(notifications, []);
+});
+
+test("unchanged choices do not write configuration or report another success", async () => {
+  const calls = [];
+  const form = await card(async (line) => { calls.push(line); });
+  await form.querySelectorAll("input")[0].dispatch("change");
+  await form.querySelectorAll("input")[0].dispatch("click");
+  await form.dispatch("submit");
+  assert.deepEqual(calls, []);
+  assert.deepEqual(notifications, []);
+  assert.equal(getConfig().apiLine, "primary");
 });
 
 test("saving after leaving updates the real global line without mutating the abandoned form", async () => {
@@ -148,7 +160,7 @@ test("saving after leaving updates the real global line without mutating the aba
   assert.equal(getConfig().apiLine, "backup");
   assert.equal(getAPILineSnapshot().line, "backup");
   assert.equal(form.textContent, abandonedText);
-  assert.equal(form.querySelector("button").disabled, true);
+  assert.equal(form.querySelectorAll("input").every((radio) => radio.disabled), true);
   assert.deepEqual(notifications, []);
 });
 
@@ -166,7 +178,7 @@ test("a new card follows an earlier page's completed save", async () => {
   pending.resolve();
   await saving;
   assert.equal(latest.querySelectorAll("input")[1].checked, true);
-  assert.equal(old.querySelector("button").disabled, true);
+  assert.equal(old.querySelectorAll("input").every((radio) => radio.disabled), true);
 });
 
 test("saves across page visits are serialized so an older response cannot roll back the latest choice", async () => {
@@ -199,7 +211,7 @@ test("saves across page visits are serialized so an older response cannot roll b
   assert.equal(latest.querySelectorAll("input")[0].checked, true);
 });
 
-test("a same-value manual save is queued behind an older page's pending change", async () => {
+test("clicking a same-value line queues behind an older page's pending change", async () => {
   const pending = Promise.withResolvers();
   const calls = [];
   const old = await card(async (line) => { calls.push(line); await pending.promise; stored.apiLine = line; });
@@ -212,12 +224,34 @@ test("a same-value manual save is queued behind an older page's pending change",
   panel.id = "settings-panel-network";
   container.append(panel);
   const latest = await card(async (line) => { calls.push(line); stored.apiLine = line; });
-  const second = latest.dispatch("submit");
+  const second = latest.querySelectorAll("input")[0].dispatch("click");
   pending.resolve();
   await Promise.all([first, second]);
   assert.deepEqual(calls, ["backup", "primary"]);
   assert.equal(stored.apiLine, "primary");
   assert.equal(getConfig().apiLine, "primary");
+});
+
+test("a getter started before another page finishes cannot restore an outdated line", async () => {
+  const saveGate = Promise.withResolvers();
+  const readGate = Promise.withResolvers();
+  const old = await card(async () => { await saveGate.promise; stored.apiLine = "backup"; });
+  choose(old, "backup");
+  const saving = old.querySelectorAll("input")[1].dispatch("change");
+  await Promise.resolve();
+  panel.connected = false;
+  container = new Element();
+  panel = new Element();
+  panel.id = "settings-panel-network";
+  container.append(panel);
+  const loading = card(undefined, () => readGate.promise);
+  saveGate.resolve();
+  await saving;
+  readGate.resolve("primary");
+  const latest = await loading;
+  assert.equal(latest.querySelectorAll("input")[1].checked, true);
+  assert.equal(getConfig().apiLine, "backup");
+  assert.deepEqual(notifications, []);
 });
 
 test("loading failures are generic and stale settings pages do not receive a card", async () => {

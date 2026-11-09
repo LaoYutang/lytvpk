@@ -6,6 +6,7 @@ let pendingSave = Promise.resolve();
 let activeCard;
 let confirmedSettings;
 let savedRevision = 0;
+let queuedWrites = 0;
 let activeIPDropdown;
 const candidateRequests = new WeakMap();
 subscribeAPILineChange(() => activeIPDropdown?.invalidate());
@@ -70,10 +71,7 @@ export async function appendPreferredIPSettings(container, {
   const form = element("form", "setting-card settings-dns-card");
   form.id = "settings-preferred-ip-form";
   form.noValidate = true;
-  form.append(
-    element("div", "setting-card-title", "网络加速"),
-    element("div", "setting-row-desc", "修改后点击“保存”生效；未保存的更改不会影响当前加速。"),
-  );
+  form.append(element("div", "setting-card-title", "网络加速"));
   const error = element("div", "settings-dns-error");
   error.id = "settings-preferred-ip-error";
   error.setAttribute("role", "alert");
@@ -98,6 +96,7 @@ export async function appendPreferredIPSettings(container, {
   confirmedSettings = { ...saved };
   let saving = false;
   let dirty = false;
+  let renderedMode = saved.fixedIP ? "fixed" : "auto";
   let options = [];
   let statusSequence = 0;
   let stopSelection;
@@ -108,7 +107,9 @@ export async function appendPreferredIPSettings(container, {
   const status = element("div", "setting-row-status");
   status.id = "settings-ip-status";
   status.setAttribute("role", "status");
-  info.append(status);
+  const statusLine = element("div", "setting-row-status-line");
+  statusLine.append(status);
+  info.append(statusLine);
   const toggleLabel = element("label", "toggle-switch");
   const enabled = element("input");
   enabled.type = "checkbox";
@@ -152,26 +153,17 @@ export async function appendPreferredIPSettings(container, {
   input.setAttribute("aria-describedby", error.id);
   tools.append(dropdown, input);
   modeSection.append(element("div", "setting-row-label", "加速模式"), modes, tools);
-  const draftStatus = element("div", "setting-row-desc", "有尚未保存的更改。");
-  draftStatus.id = "settings-preferred-ip-draft";
-  draftStatus.hidden = true;
-  const actions = element("div", "settings-dns-actions");
-  const save = element("button", "btn btn-primary", "保存");
-  save.type = "submit";
-  const cancel = element("button", "btn btn-outline", "取消");
-  cancel.type = "button";
-  actions.append(save, cancel);
-  form.append(row, modeSection, draftStatus, error, actions);
+  form.append(row, modeSection, error);
 
   const isFixed = () => radios.find((radio) => radio.checked)?.value === "fixed";
   const updateDraftView = () => {
+    renderedMode = isFixed() ? "fixed" : "auto";
     modeSection.style.display = enabled.checked ? "" : "none";
     tools.style.display = isFixed() ? "" : "none";
     if (!["loading", "error", "idle"].includes(trigger.dataset.ipPoolState)) {
       updateIPOptionTrigger(trigger, options, input.value.trim());
     }
     syncIPOptionMenuActive(menu, input.value.trim());
-    draftStatus.hidden = !dirty;
   };
   const clearError = () => {
     error.hidden = true;
@@ -188,16 +180,17 @@ export async function appendPreferredIPSettings(container, {
   };
   const setSaving = (value) => {
     saving = value;
-    [...radios, enabled, input, save, cancel, ...menu.querySelectorAll(".settings-ip-option")].forEach((node) => { node.disabled = value; });
+    [...radios, enabled, input, ...menu.querySelectorAll(".settings-ip-option")].forEach((node) => { node.disabled = value; });
     updateTriggerAvailability(trigger, () => saving);
-    save.textContent = value ? "保存中…" : "保存";
+    form.setAttribute("aria-busy", String(value));
     if (value) menu.classList.add("hidden");
   };
   const markDirty = () => {
-    if (saving || !isCurrentPage()) return;
+    if (saving || !isCurrentPage()) return false;
     dirty = true;
     clearError();
     updateDraftView();
+    return true;
   };
   const refreshStatus = async () => {
     const request = ++statusSequence;
@@ -247,14 +240,88 @@ export async function appendPreferredIPSettings(container, {
     },
   };
   activeCard = controller;
-  enabled.addEventListener("change", markDirty);
-  radios.forEach((radio) => radio.addEventListener("change", markDirty));
-  input.addEventListener("input", markDirty);
-  input.addEventListener("change", markDirty);
-  cancel.addEventListener("click", () => {
+  const samePair = (left, right) => left.enabled === right.enabled && left.fixedIP === right.fixedIP;
+  const applyChange = async (source, override) => {
     if (saving || !isCurrentPage()) return;
     clearError();
-    restoreSaved();
+    const fixedIP = override ? override.fixedIP : isFixed() ? normalizeFixedIP(input.value) : "";
+    if (fixedIP === null) {
+      error.textContent = "请输入单个有效的 IPv4 或 IPv6 地址后，手动指定模式才会生效。";
+      error.hidden = false;
+      input.setAttribute("aria-invalid", "true");
+      return;
+    }
+    const next = override || { enabled: enabled.checked, fixedIP };
+    if (samePair(next, saved) && queuedWrites === 0) {
+      restoreSaved();
+      return;
+    }
+    setSaving(true);
+    queuedWrites++;
+    try {
+      const operation = pendingSave.then(async () => {
+        const applied = override
+          ? { enabled: false, fixedIP: confirmedSettings?.fixedIP ?? saved.fixedIP }
+          : next;
+        await SetWorkshopIPSettings(applied);
+        confirmedSettings = { ...applied };
+        savedRevision++;
+        updateConfigCache({ workshopPreferredIP: applied.enabled, workshopFixedIP: applied.fixedIP });
+        activeCard?.acceptSaved(applied);
+        return applied;
+      });
+      pendingSave = operation.catch(() => {}).finally(() => { queuedWrites--; });
+      saved = { ...await operation };
+      if (isCurrentPage()) restoreSaved();
+    } catch {
+      if (isCurrentPage()) {
+        if (source === "discrete") restoreSaved();
+        error.textContent = source === "discrete"
+          ? "更新 IP 设置失败，已恢复原设置，请重试。"
+          : "更新 IP 设置失败，请按 Enter 或离开输入框重试。";
+        error.hidden = false;
+      }
+    } finally {
+      if (isCurrentPage()) setSaving(false);
+      else saving = false;
+    }
+  };
+  enabled.addEventListener("change", async () => {
+    if (!markDirty()) return;
+    // Turning acceleration off discards unconfirmed text without changing the
+    // last effective fixed address or publishing an incomplete manual mode.
+    const next = enabled.checked ? undefined : { enabled: false, fixedIP: saved.fixedIP };
+    await applyChange("discrete", next);
+  });
+  radios.forEach((radio) => {
+    radio.addEventListener("change", async () => {
+      if (radio.checked && markDirty()) await applyChange("discrete");
+    });
+    // A checked radio emits no change event. An explicit same-value choice on
+    // a newer page must still follow an older page's pending write.
+    radio.addEventListener("click", async () => {
+      if (!radio.checked || saving || !isCurrentPage()) return;
+      const fixedIP = isFixed() ? normalizeFixedIP(input.value) : "";
+      if (radio.value === "fixed" && renderedMode === "fixed" &&
+          (fixedIP === null || !samePair({ enabled: enabled.checked, fixedIP }, saved))) {
+        if (markDirty()) await applyChange("manual");
+        return;
+      }
+      if (queuedWrites === 0) return;
+      if (fixedIP === null || !samePair({ enabled: enabled.checked, fixedIP }, saved)) return;
+      if (markDirty()) await applyChange("discrete");
+    });
+  });
+  input.addEventListener("input", markDirty);
+  input.addEventListener("change", markDirty);
+  input.addEventListener("blur", async (event) => {
+    const target = event.relatedTarget;
+    if (target === enabled || radios.includes(target) || target === trigger || target?.closest?.(".settings-ip-option")) return;
+    await applyChange("manual");
+  });
+  form.addEventListener("focusout", async (event) => {
+    if (!dirty || (event.relatedTarget && form.contains(event.relatedTarget))) return;
+    await applyChange("manual");
   });
   document.addEventListener("click", closeMenu);
   document.addEventListener("app:page-change", leavePage);
@@ -271,7 +338,12 @@ export async function appendPreferredIPSettings(container, {
       trigger, menu, fixedInput: input, getFixedIP: () => input.value.trim(),
       isLocked: () => saving,
       setOptions(next) { options = next; },
-      onSelect: markDirty,
+      onSelect: async () => {
+        if (!markDirty()) return;
+        radios.forEach((radio) => { radio.checked = radio.value === "fixed"; });
+        updateDraftView();
+        await applyChange("discrete");
+      },
       onStatusUpdate: refreshStatus,
     });
     return initialCandidateLoad;
@@ -279,42 +351,7 @@ export async function appendPreferredIPSettings(container, {
   if (!deferCandidateLoad) void form.loadIPOptions();
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (saving || !isCurrentPage()) return;
-    clearError();
-    const fixedIP = isFixed() ? normalizeFixedIP(input.value) : "";
-    if (fixedIP === null) {
-      error.textContent = "手动指定 IP 时请输入单个有效的 IPv4 或 IPv6 地址；关闭加速时也会保留此设置。";
-      error.hidden = false;
-      input.setAttribute("aria-invalid", "true");
-      input.focus();
-      return;
-    }
-    const next = { enabled: enabled.checked, fixedIP };
-    setSaving(true);
-    try {
-      const operation = pendingSave.then(async () => {
-        await SetWorkshopIPSettings(next);
-        confirmedSettings = { ...next };
-        savedRevision++;
-        updateConfigCache({ workshopPreferredIP: next.enabled, workshopFixedIP: next.fixedIP });
-        activeCard?.acceptSaved(next);
-      });
-      pendingSave = operation.catch(() => {});
-      await operation;
-      saved = { ...next };
-      if (isCurrentPage()) {
-        restoreSaved();
-        showNotification?.("优选 IP 设置已保存", "success");
-      }
-    } catch {
-      if (isCurrentPage()) {
-        error.textContent = "保存 IP 设置失败，请重试。";
-        error.hidden = false;
-      }
-    } finally {
-      if (isCurrentPage()) setSaving(false);
-      else saving = false;
-    }
+    await applyChange("manual");
   });
   return form;
 }
@@ -338,10 +375,11 @@ function renderIPOptionDropdown({ options, trigger, menu, fixedInput, getFixedIP
     content.append(element("span", "settings-ip-option-category", option.category), element("span", "settings-ip-option-address", option.ip));
     button.append(content);
     button.classList.toggle("active", option.ip === selected);
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       if (isLocked() || !isCurrentPage()) return;
       fixedInput.value = option.ip;
-      onSelect?.(option.ip);
+      await onSelect?.(option.ip);
+      if (!isCurrentPage()) return;
       updateIPOptionTrigger(trigger, options, getFixedIP());
       syncIPOptionMenuActive(menu, getFixedIP());
       menu.classList.add("hidden");
@@ -356,7 +394,7 @@ function renderIPOptionDropdown({ options, trigger, menu, fixedInput, getFixedIP
   };
 }
 
-// Candidate refreshes are metadata reads; only the form's Save can apply an IP.
+// Candidate refreshes only read metadata; selection uses the atomic change path.
 export async function loadIPOptionsForDropdown({
   isCurrentPage = () => true, layout, GetAPILineStatus, GetWorkshopIPOptions,
   fixedIP = "", trigger, menu, fixedInput, setOptions = () => {},

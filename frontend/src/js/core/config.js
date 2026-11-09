@@ -93,8 +93,12 @@ export function saveConfig(config) {
   configCache = normalizeConfig({
     ...configCache,
     ...config,
-    // General preference saves cannot change a separately persisted API line.
+    // Network cards publish their confirmed values through updateConfigCache.
+    // An older general-preference snapshot must not restore any network value.
     apiLine: configCache.apiLine,
+    workshopDNS: configCache.workshopDNS,
+    workshopPreferredIP: configCache.workshopPreferredIP,
+    workshopFixedIP: configCache.workshopFixedIP,
   });
   const savePromise = SaveAppConfig(configCache);
   savePromise.catch((error) => {

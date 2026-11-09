@@ -271,6 +271,13 @@ html.dark-mode .setting-row-status {
   max-width: 100%;
 }
 
+.setting-row-status-line > .setting-row-status {
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .setting-indent {
   margin-top: 16px;
   padding: 14px 16px;
