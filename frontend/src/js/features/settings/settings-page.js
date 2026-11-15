@@ -1,6 +1,7 @@
 import { appendWorkshopDNSSettings } from "./workshop-dns.js";
 import { appendAPILineSettings } from "./api-line.js";
 import { appendPreferredIPSettings } from "./preferred-ip.js";
+import { appendServerViewSettings } from "./server-view.js";
 export { loadIPOptionsForDropdown } from "./preferred-ip.js";
 import { getAPILineSnapshot, isCurrentAPILine } from "../../core/api-line.js";
 import { showWorkshopRequestError } from "../workshop/request-error.js";
@@ -218,6 +219,11 @@ export async function renderSettingsPage({
   // Each async continuation belongs to this layout, never a newer render's DOM.
   const layout = container.firstElementChild;
   const isCurrentPage = () => isCurrentRender() && layout.isConnected;
+  appendServerViewSettings(layout, {
+    isCurrentRender: isCurrentPage,
+    showNotification,
+    showError,
+  });
   const ipForm = await appendPreferredIPSettings(layout, {
     isCurrentRender: isCurrentPage,
     deferCandidateLoad: true,

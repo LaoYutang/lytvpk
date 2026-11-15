@@ -9,6 +9,7 @@ import {
   initConfig,
   migrateLegacyLocalStorageIfNeeded,
   saveConfig,
+  updateConfigCache,
 } from "../core/config.js";
 import { initTheme, setupThemeToggle } from "../core/theme.js";
 import { escapeHtml } from "../core/utils.js";
@@ -37,10 +38,7 @@ import { renderSettingsPage } from "./settings/settings-page.js";
 import {
   configureServers,
   setupServerModalListeners,
-  openServerModal,
   closeServerModal,
-  renderServers,
-  refreshAllServers,
   setupLaunchServerMenu,
   initServerStorage,
   getServers,
@@ -249,6 +247,7 @@ import {
   OnFileDrop,
   BrowserOpenURL,
   ClipboardGetText,
+  ClipboardSetText,
   WindowMinimise,
   WindowToggleMaximise,
   Quit,
@@ -279,6 +278,9 @@ const ChangePanelDifficulty = (serverID, difficulty) => {
 };
 
 configureServers({
+  getConfig,
+  saveConfig,
+  updateConfigCache,
   showError,
   showNotification,
   showConfirmModal,
@@ -292,6 +294,7 @@ configureServers({
   SaveServerStorage,
   BrowserOpenURL,
   ClipboardGetText,
+  ClipboardSetText,
   FetchPanelServerStatus,
   RestartPanelServer,
   FetchPanelMapList,
@@ -1021,11 +1024,6 @@ function setupBatchActionEvents() {
   document
     .getElementById("mod-rotation-btn")
     ?.addEventListener("click", toggleModRotation);
-
-  // 服务器收藏按钮
-  document
-    .getElementById("server-favorites-btn")
-    ?.addEventListener("click", openServerModal);
 
   setupServerModalListeners();
   setupLaunchServerMenu();

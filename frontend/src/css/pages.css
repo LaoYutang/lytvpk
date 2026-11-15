@@ -281,6 +281,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding: var(--spacing-2);
+  margin: 0 calc(-1 * var(--spacing-2)) calc(-1 * var(--spacing-2));
 }
 
 .servers-page .server-list-container {

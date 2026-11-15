@@ -32,6 +32,7 @@ const DEFAULT_CONFIG = {
   savedDirectories: [],
   lastActiveDirectory: "",
   displayMode: "list",
+  serverDisplayMode: "list",
   sortType: "name",
   sortOrder: "asc",
   filterLayoutMode: "compact",
@@ -99,6 +100,8 @@ export function saveConfig(config) {
     workshopDNS: configCache.workshopDNS,
     workshopPreferredIP: configCache.workshopPreferredIP,
     workshopFixedIP: configCache.workshopFixedIP,
+    // Server view changes use their own setter; old preference snapshots cannot undo them.
+    serverDisplayMode: configCache.serverDisplayMode,
   });
   const savePromise = SaveAppConfig(configCache);
   savePromise.catch((error) => {
@@ -135,6 +138,7 @@ function normalizeConfig(config = {}) {
     ? config.savedDirectories
     : [];
   next.displayMode = next.displayMode || DEFAULT_CONFIG.displayMode;
+  next.serverDisplayMode = next.serverDisplayMode === "card" ? "card" : "list";
   next.sortType = ["name", "date", "loadOrder"].includes(next.sortType)
     ? next.sortType
     : DEFAULT_CONFIG.sortType;

@@ -38,7 +38,7 @@ func TestAPILineDefaultsMigrationAndRestart(t *testing.T) {
 	if err != nil || json.Unmarshal(data, &migrated) != nil {
 		t.Fatalf("read migrated configuration: %v", err)
 	}
-	if migrated.APILine != "primary" || migrated.MigrationVersion != 5 || migrated.DefaultDirectory != "D:/Preserved" || migrated.Theme != "dark" {
+	if migrated.APILine != "primary" || migrated.MigrationVersion != configMigrationVersion || migrated.DefaultDirectory != "D:/Preserved" || migrated.Theme != "dark" {
 		t.Fatalf("unexpected migrated configuration: %+v", migrated)
 	}
 	if err := app.SetAPILine("backup"); err != nil {
