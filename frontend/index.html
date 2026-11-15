@@ -1193,7 +1193,7 @@
       <div id="server-modal" class="modal hidden">
         <div class="modal-content server-modal-content">
           <div class="modal-body">
-            <div class="server-toolbar">
+            <div class="server-toolbar server-toolbar-compact">
               <div class="server-toolbar-group">
                 <button id="open-add-server-modal-btn" class="btn btn-primary">
                   <svg
@@ -1232,10 +1232,15 @@
                   IP 直连
                 </button>
               </div>
+              <label class="server-search">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg>
+                <input id="server-search-input" type="search" class="form-input" placeholder="搜索服务器名称" aria-label="搜索服务器名称" autocomplete="off" spellcheck="false">
+              </label>
               <button
                 id="refresh-all-servers-btn"
-                class="btn btn-secondary"
+                class="btn btn-secondary server-toolbar-refresh"
                 title="刷新所有服务器"
+                aria-label="刷新所有服务器"
               >
                 <svg
                   class="icon-svg"
@@ -1250,7 +1255,6 @@
                   <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
                   <path d="M21 3v6h-6"></path>
                 </svg>
-                刷新
               </button>
             </div>
             <div class="server-scroll-content">

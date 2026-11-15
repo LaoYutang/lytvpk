@@ -17,6 +17,8 @@ import {
 } from "./panel-modal.js";
 import { normalizePanelUrl } from "./panel-url.js";
 import { normalizeServerAddress } from "./address.js";
+import { createServerItem, createEmptyServerItem, renderServerQueryState } from "./server-item.js";
+import { configureServerViewMode, getServerDisplayMode } from "./view-mode.js";
 import {
   configureDirectConnect,
   setupDirectConnectListeners,
@@ -35,6 +37,7 @@ let GetServerStorage;
 let SaveServerStorage;
 let BrowserOpenURL;
 let ClipboardGetText;
+let ClipboardSetText;
 let FetchPanelServerStatus;
 let RestartPanelServer;
 let FetchPanelMapList;
@@ -55,6 +58,7 @@ let CancelPanelMapUpload;
 let ClearCompletedPanelMapUploads;
 
 export function configureServers(deps) {
+  configureServerViewMode(deps);
   ({
     showError,
     showNotification,
@@ -69,6 +73,7 @@ export function configureServers(deps) {
     SaveServerStorage,
     BrowserOpenURL,
     ClipboardGetText,
+    ClipboardSetText,
     FetchPanelServerStatus,
     RestartPanelServer,
     FetchPanelMapList,
@@ -471,70 +476,32 @@ export async function resolveMapName(mapCode) {
   return mapCode;
 }
 
+const serverInfoRequests = new WeakMap();
+
 export async function fetchServerInfo(address, index) {
-  let detailsContainer = null;
+  const item = Array.from(document.querySelectorAll("li.server-item"))
+    .find((entry) => entry.dataset.address === address);
+  if (!item) return;
 
-  const listItems = document.querySelectorAll("li.server-item");
-  for (const li of listItems) {
-    if (li.dataset.address === address) {
-      detailsContainer = li.querySelector(".server-details");
-      break;
-    }
-  }
-
-  if (!detailsContainer) {
-    detailsContainer = document.getElementById(`server-details-${index}`);
-  }
-
-  if (!detailsContainer) return;
+  const request = {};
+  serverInfoRequests.set(item, request);
+  renderServerQueryState(item, { status: "loading" }, SERVER_ICONS);
+  const isCurrentRequest = () => item.isConnected && serverInfoRequests.get(item) === request;
 
   try {
     const info = await FetchServerInfo(address);
-
-    if (!document.body.contains(detailsContainer)) return;
-
-    detailsContainer.innerHTML = `
-      <div class="server-stats-grid">
-        <span class="stat-badge name-badge" title="${escapeAttr(info.name)}">${SERVER_ICONS.server}<span>${escapeHtml(info.name)}</span></span>
-        <span class="stat-badge mode-badge" title="游戏模式">${SERVER_ICONS.mode}<span>${escapeHtml(info.mode)}</span></span>
-        <span class="stat-badge map-badge" title="地图: ${escapeAttr(info.map)} (点击解析)" data-map-code="${escapeAttr(info.map)}">${SERVER_ICONS.map}<span>${escapeHtml(info.map)}</span></span>
-        <span class="stat-badge players-badge" title="在线人数">${SERVER_ICONS.users}<span>${info.players}/${info.max_players}</span></span>
-      </div>
-    `;
-
-    const mapBadge = detailsContainer.querySelector(".map-badge");
-    if (mapBadge) {
-      mapBadge.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (mapBadge.dataset.resolved === "true") return;
-
-        const originalHtml = mapBadge.innerHTML;
-        mapBadge.innerHTML = `${SERVER_ICONS.map}<span>解析中...</span>`;
-        mapBadge.style.cursor = "wait";
-
-        try {
-          const realName = await resolveMapName(info.map);
-          if (realName && realName !== info.map) {
-            mapBadge.innerHTML = `${SERVER_ICONS.map}<span>${escapeHtml(realName)}</span>`;
-            mapBadge.dataset.resolved = "true";
-            mapBadge.title = `地图: ${info.map}`;
-            mapBadge.style.cursor = "default";
-            mapBadge.style.textDecoration = "none";
-            mapBadge.style.color = "inherit";
-          } else {
-            mapBadge.innerHTML = originalHtml;
-            mapBadge.style.cursor = "pointer";
-          }
-        } catch (err) {
-          mapBadge.innerHTML = originalHtml;
-          mapBadge.style.cursor = "pointer";
-        }
-      });
+    if (!isCurrentRequest()) return;
+    if (!info || !Number.isInteger(info.players) || info.players < 0 ||
+        !Number.isInteger(info.max_players) || info.max_players < 0) {
+      throw new Error("服务器人数信息无效");
     }
+    item.dataset.serverQueryName = String(info.name || "");
+    renderServerQueryState(item, { status: "success", info }, SERVER_ICONS, resolveMapName);
+    applyServerSearch();
   } catch (err) {
     console.error("获取服务器信息失败:", err);
-    if (document.body.contains(detailsContainer)) {
-      detailsContainer.innerHTML = `<span class="error-text">获取失败</span>`;
+    if (isCurrentRequest()) {
+      renderServerQueryState(item, { status: "error" }, SERVER_ICONS);
     }
   }
 }
@@ -569,8 +536,6 @@ function getIPHost(ip) {
 
 export function openServerModal() {
   switchAppPage("servers");
-  renderServers();
-  refreshAllServers();
 }
 
 export function closeServerModal() {
@@ -590,19 +555,38 @@ export async function handleProtocolFavoriteServer(data) {
   }
 }
 
+export function applyServerDisplayMode() {
+  const mode = getServerDisplayMode();
+  document.getElementById("server-list")?.classList.toggle("server-list-card", mode === "card");
+  document.querySelectorAll("li.server-item").forEach((item) => {
+    item.tabIndex = mode === "card" ? 0 : -1;
+  });
+}
+
+export function applyServerSearch() {
+  const query = (document.getElementById("server-search-input")?.value || "").trim().toLocaleLowerCase();
+  const items = document.querySelectorAll("li.server-item");
+  let matches = 0;
+  items.forEach((item) => {
+    const savedName = item.querySelector(".server-name").textContent;
+    const names = [savedName, item.dataset.serverQueryName || ""];
+    const visible = names.some((name) => name.toLocaleLowerCase().includes(query));
+    item.classList.toggle("hidden", !visible);
+    if (visible) matches++;
+  });
+  document.getElementById("server-search-empty")?.classList.toggle("hidden", !items.length || matches > 0);
+}
+
 export function renderServers() {
   const servers = getServers();
   const list = document.getElementById("server-list");
-  list.innerHTML = "";
+  list.replaceChildren();
+  applyServerDisplayMode();
+  document.getElementById("global-dropdown")?.classList.add("hidden");
 
   if (servers.length === 0) {
-    list.innerHTML = `
-      <li class="server-empty-state">
-        <div class="server-empty-icon">${SERVER_ICONS.server}</div>
-        <div class="server-empty-title">还没有收藏服务器</div>
-        <div class="server-empty-text">添加一个常用服务器后，它会显示在这里。</div>
-      </li>
-    `;
+    list.appendChild(createEmptyServerItem(SERVER_ICONS));
+    applyServerSearch();
     return;
   }
 
@@ -611,50 +595,43 @@ export function renderServers() {
     list.appendChild(li);
     fetchServerInfo(server.address, index);
   });
+  const empty = document.createElement("li");
+  empty.id = "server-search-empty";
+  empty.className = "server-empty-state hidden";
+  const title = document.createElement("div");
+  title.className = "server-empty-title";
+  title.textContent = "没有匹配的服务器";
+  const description = document.createElement("div");
+  description.className = "server-empty-text";
+  description.textContent = "试试其他名称，或清空搜索。";
+  empty.append(title, description);
+  list.appendChild(empty);
+  applyServerDisplayMode();
+  applyServerSearch();
 }
 
 function createServerListItem(server, index) {
-  const li = document.createElement("li");
-  li.className = "server-item";
-  li.dataset.address = server.address;
+  const li = createServerItem(server, index, SERVER_ICONS);
+  const currentIndex = () => getServers().findIndex((entry) =>
+    server.id ? entry.id === server.id : entry.address === server.address
+  );
 
-  const panelBadge =
-    server.panelUrl && server.panelPasswordSet
-      ? `<span class="server-panel-badge" title="已配置面板高级控制">${SERVER_ICONS.panel}<span>面板</span></span>`
-      : "";
-  let detailsHtml = `
-        <div class="server-details" id="server-details-${index}">
-          <span class="server-loading-text">加载中...</span>
-        </div>
-      `;
-  li.innerHTML = `
-      <div class="server-info">
-        <span class="server-name" id="server-name-${index}">
-          ${escapeHtml(server.name)}
-        </span>
-        <div class="server-address-row">
-          <span class="server-address">${escapeHtml(server.address)}</span>
-          ${panelBadge}
-        </div>
-        ${detailsHtml}
-      </div>
-      <div class="server-actions">
-        <button class="btn btn-small btn-primary connect-server-btn" data-address="${escapeAttr(server.address)}">
-          ${SERVER_ICONS.play}
-          <span>连接</span>
-        </button>
-        <button class="btn btn-small btn-secondary server-action-icon refresh-server-btn" title="刷新" data-address="${escapeAttr(server.address)}" data-index="${index}" aria-label="刷新服务器">
-            ${SERVER_ICONS.refresh}
-        </button>
-        <button class="btn btn-small btn-secondary server-action-icon server-more-btn" title="更多操作" data-index="${index}" aria-label="更多操作">
-            ${SERVER_ICONS.more}
-        </button>
-      </div>
-    `;
-
-  li.addEventListener("dblclick", (e) => {
+  const openDetails = (e) => {
     if (e.target.closest("button")) return;
-    openServerDetailsModal(index);
+    const index = currentIndex();
+    if (index >= 0) openServerDetailsModal(index);
+  };
+  li.addEventListener("click", (e) => {
+    if (getServerDisplayMode() === "card") openDetails(e);
+  });
+  li.addEventListener("dblclick", (e) => {
+    if (getServerDisplayMode() === "list") openDetails(e);
+  });
+  li.addEventListener("keydown", (e) => {
+    if (e.target === li && getServerDisplayMode() === "card" && ["Enter", " "].includes(e.key)) {
+      e.preventDefault();
+      openDetails(e);
+    }
   });
 
   const connectBtn = li.querySelector(".connect-server-btn");
@@ -665,6 +642,21 @@ function createServerListItem(server, index) {
       connectServer(address);
     });
   }
+
+  li.querySelector(".copy-server-address-btn").addEventListener("click", async (event) => {
+    event.stopPropagation();
+    try {
+      await ClipboardSetText(server.address);
+      showNotification("服务器地址已复制", "success");
+    } catch (error) {
+      showError("复制服务器地址失败: " + error);
+    }
+  });
+  li.querySelector(".server-panel-link")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const index = currentIndex();
+    if (index >= 0) openServerDetailsModal(index);
+  });
 
   const refreshBtn = li.querySelector(".refresh-server-btn");
   if (refreshBtn) {
@@ -688,7 +680,9 @@ function createServerListItem(server, index) {
   if (moreBtn) {
     moreBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const idx = moreBtn.dataset.index;
+      const index = currentIndex();
+      if (index < 0) return;
+      const idx = String(index);
       const dropdown = document.getElementById("global-dropdown");
 
       if (
@@ -750,38 +744,25 @@ function deleteServer(index) {
   showConfirmModal(
     "删除服务器",
     `确定要删除服务器 "${server.name}" 吗？`,
-    () => {
+    async () => {
       const currentServers = getServers();
-      const idx = parseInt(index);
-
-      if (!isNaN(idx) && idx >= 0 && idx < currentServers.length) {
-        currentServers.splice(idx, 1);
-        saveServers(currentServers);
-        renderLaunchServerMenu();
-
-        const list = document.getElementById("server-list");
-        const itemToRemove = list.children[idx];
-        if (itemToRemove) {
-          list.removeChild(itemToRemove);
-
-          Array.from(list.children).forEach((li, newIndex) => {
-            const moreBtn = li.querySelector(".server-more-btn");
-            if (moreBtn) moreBtn.dataset.index = newIndex;
-
-            const details = li.querySelector(".server-details");
-            if (details) details.id = `server-details-${newIndex}`;
-
-            const nameEl = li.querySelector(".server-name");
-            if (nameEl) nameEl.id = `server-name-${newIndex}`;
-          });
-        } else {
-          renderServers();
-        }
-
-        showNotification("服务器已删除", "success");
-      } else {
-        showError("删除失败：索引无效");
+      const idx = currentServers.findIndex((entry) =>
+        server.id ? entry.id === server.id : entry.address === server.address
+      );
+      if (idx < 0) {
+        showError("删除失败：服务器已不存在");
+        return false;
       }
+      currentServers.splice(idx, 1);
+      try {
+        await saveServers(currentServers);
+      } catch {
+        await initServerStorage();
+        return false;
+      }
+      renderServers();
+      renderLaunchServerMenu();
+      showNotification("服务器已删除", "success");
     }
   );
 }
@@ -962,6 +943,17 @@ export function setupServerModalListeners() {
   setupDetailsListeners();
   setupPanelListeners();
   setupDirectConnectListeners();
+
+  const search = document.getElementById("server-search-input");
+  const searchServers = () => {
+    document.getElementById("global-dropdown")?.classList.add("hidden");
+    applyServerSearch();
+  };
+  search?.addEventListener("input", searchServers);
+  search?.addEventListener("search", searchServers);
+
+  window.addEventListener("server-display-mode-changed", applyServerDisplayMode);
+  applyServerDisplayMode();
 
   // 数据导入导出
   document

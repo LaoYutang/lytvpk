@@ -107,6 +107,7 @@ type App struct {
 	savedDirectories               []SavedDirectory
 	lastActiveDirectory            string
 	displayMode                    string
+	serverDisplayMode              string
 	sortType                       string
 	sortOrder                      string
 	filterLayoutMode               string
@@ -143,6 +144,7 @@ type ConfigFile struct {
 	SavedDirectories               []SavedDirectory   `json:"savedDirectories"`
 	LastActiveDirectory            string             `json:"lastActiveDirectory"`
 	DisplayMode                    string             `json:"displayMode"`
+	ServerDisplayMode              string             `json:"serverDisplayMode"`
 	SortType                       string             `json:"sortType"`
 	SortOrder                      string             `json:"sortOrder"`
 	FilterLayoutMode               string             `json:"filterLayoutMode"`
@@ -153,7 +155,7 @@ type ConfigFile struct {
 	LastUpdateCheckTime            string             `json:"lastUpdateCheckTime"`
 	WindowState                    *WindowState       `json:"windowState,omitempty"`
 	SnapshotDirectory              string             `json:"snapshotDirectory,omitempty"`
-	// v2: localStorage migrated; v3: workshop DNS; v4: sorting; v5: API line.
+	// v2: localStorage migrated; v3: workshop DNS; v4: sorting; v5: API line; v6: server view.
 	MigrationVersion int `json:"migrationVersion"`
 }
 
@@ -278,6 +280,7 @@ func NewApp() *App {
 		workshopBrowserTarget:     "mirror", // 默认使用镜像站
 		workshopTranslateProvider: workshopTranslateProviderMicrosoft,
 		displayMode:               "list",
+		serverDisplayMode:         "list",
 		sortType:                  "name",
 		sortOrder:                 "asc",
 		filterLayoutMode:          "compact",

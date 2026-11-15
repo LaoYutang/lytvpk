@@ -20,7 +20,7 @@ import { renderTagFilters, performSearch } from "./file-list/filters.js";
 import { applySort, refreshSortData } from "./file-list/sorting.js";
 import { refreshTaskList } from "./downloads/task-list.js";
 import { focusDownloadsTab } from "./downloads/downloads-page.js";
-import { renderServers, refreshAllServers } from "./servers/servers.js";
+import { renderServers } from "./servers/servers.js";
 import { renderWorkshopSidebar, browserState, loadWorkshopList } from "./workshop/workshop-browser.js";
 import { handleDropImportPaths } from "./drop-import.js";
 import {
@@ -232,7 +232,6 @@ export function setupPageChangeListeners() {
       focusDownloadsTab();
     } else if (page === "servers") {
       renderServers();
-      refreshAllServers();
     }
   });
 }

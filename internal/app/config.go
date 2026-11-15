@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	configMigrationVersion       = 5
+	configMigrationVersion       = 6
 	localStorageMigrationVersion = 2
 )
 
@@ -127,6 +127,7 @@ func (a *App) loadConfig() {
 	if config.DisplayMode != "" {
 		a.displayMode = config.DisplayMode
 	}
+	a.serverDisplayMode = normalizeServerDisplayMode(config.ServerDisplayMode)
 	a.sortType, a.sortOrder = normalizeFileSort(config.SortType, config.SortOrder)
 	if config.FilterLayoutMode != "" {
 		a.filterLayoutMode = config.FilterLayoutMode
@@ -211,6 +212,7 @@ func (a *App) snapshotConfigLocked() ConfigFile {
 		SavedDirectories:               cloneSavedDirectories(a.savedDirectories),
 		LastActiveDirectory:            a.lastActiveDirectory,
 		DisplayMode:                    defaultString(a.displayMode, "list"),
+		ServerDisplayMode:              normalizeServerDisplayMode(a.serverDisplayMode),
 		SortType:                       sortType,
 		SortOrder:                      sortOrder,
 		FilterLayoutMode:               defaultString(a.filterLayoutMode, "compact"),
@@ -290,6 +292,7 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.savedDirectories = cloneSavedDirectories(config.SavedDirectories)
 	a.lastActiveDirectory = config.LastActiveDirectory
 	a.displayMode = defaultString(config.DisplayMode, "list")
+	a.serverDisplayMode = normalizeServerDisplayMode(config.ServerDisplayMode)
 	a.sortType, a.sortOrder = normalizeFileSort(config.SortType, config.SortOrder)
 	a.filterLayoutMode = defaultString(config.FilterLayoutMode, "compact")
 	if config.BoxSelectionEnabled != nil {
@@ -318,6 +321,13 @@ func (a *App) SaveAppConfig(config ConfigFile) error {
 	a.mu.Unlock()
 
 	return a.writeConfigFile(a.snapshotConfig())
+}
+
+func normalizeServerDisplayMode(mode string) string {
+	if mode == "card" {
+		return "card"
+	}
+	return "list"
 }
 
 func normalizeFileSort(sortType, sortOrder string) (string, string) {

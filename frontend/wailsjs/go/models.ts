@@ -103,6 +103,7 @@ export namespace app {
 	    savedDirectories: SavedDirectory[];
 	    lastActiveDirectory: string;
 	    displayMode: string;
+	    serverDisplayMode: string;
 	    sortType: string;
 	    sortOrder: string;
 	    filterLayoutMode: string;
@@ -137,6 +138,7 @@ export namespace app {
 	        this.savedDirectories = this.convertValues(source["savedDirectories"], SavedDirectory);
 	        this.lastActiveDirectory = source["lastActiveDirectory"];
 	        this.displayMode = source["displayMode"];
+	        this.serverDisplayMode = source["serverDisplayMode"];
 	        this.sortType = source["sortType"];
 	        this.sortOrder = source["sortOrder"];
 	        this.filterLayoutMode = source["filterLayoutMode"];

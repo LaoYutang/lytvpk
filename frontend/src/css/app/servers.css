@@ -238,6 +238,365 @@
   font-size: var(--text-sm);
 }
 
+.server-item-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  min-width: 0;
+}
+
+.server-item-heading .server-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.server-population,
+.server-live-name,
+.server-card-control {
+  display: none;
+}
+
+.server-item .map-badge:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.server-toolbar.server-toolbar-compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.server-toolbar-compact .server-toolbar-group {
+  flex-shrink: 0;
+  flex-direction: row;
+}
+
+.server-toolbar-compact #refresh-all-servers-btn {
+  flex-shrink: 0;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+.server-search {
+  position: relative;
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  max-width: none;
+  margin-left: auto;
+}
+
+.server-search .icon-svg {
+  position: absolute;
+  top: 50%;
+  left: var(--spacing-3);
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-tertiary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.server-search .form-input {
+  width: 100%;
+  padding-left: 2.25rem;
+}
+
+@media (max-width: 900px) {
+  .server-toolbar-compact .server-search {
+    order: 1;
+    flex-basis: 100%;
+    max-width: none;
+    margin-left: 0;
+  }
+
+  .server-toolbar-compact #refresh-all-servers-btn {
+    margin-left: auto;
+  }
+}
+
+.server-list-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(260px, calc(25% - 0.75rem))), 1fr));
+  align-items: stretch;
+  gap: var(--spacing-4);
+}
+
+.server-list-card .server-item {
+  flex-direction: column;
+  gap: var(--spacing-4);
+  min-width: 0;
+  padding: var(--spacing-5);
+  background: var(--bg-app);
+  cursor: pointer;
+}
+
+.dark-mode .server-list-card .server-item {
+  background: var(--bg-surface);
+}
+
+.server-list-card .server-item:hover {
+  border-color: var(--primary-200);
+  box-shadow: var(--shadow-md);
+}
+
+.server-list-card .server-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.server-list-card .server-info {
+  width: 100%;
+  gap: 0;
+}
+
+.server-list-card .server-item-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--spacing-1) var(--spacing-3);
+  min-height: 3.5rem;
+}
+
+.server-list-card .server-name {
+  display: block;
+  white-space: nowrap;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 0;
+}
+
+.server-list-card .server-live-name {
+  display: block;
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.server-list-card .server-population {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 2px var(--spacing-1);
+  padding-top: 3px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.server-population .badge-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.server-population-count {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.server-population-label {
+  grid-column: 1 / -1;
+  text-align: right;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.server-item[data-query-state="online"] .server-population-count {
+  color: var(--success);
+}
+
+.server-list-card .server-item[data-query-state="online"] .server-population-label,
+.server-list-card .server-item[data-query-state="empty"] .server-population-label {
+  display: none;
+}
+
+.server-item[data-query-state="error"] .server-population-label {
+  color: var(--danger);
+}
+
+.server-list-card .server-address-row {
+  flex-wrap: nowrap;
+  min-height: 1.75rem;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-4);
+}
+
+.server-list-card .server-address {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.server-list-card .server-card-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.server-card-control .badge-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.server-list-card .server-panel-link {
+  margin-left: auto;
+  padding-right: 0;
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.server-list-card .server-card-control:hover {
+  color: var(--primary);
+}
+
+.dark-mode .server-list-card .server-card-control:hover,
+.dark-mode .server-list-card .server-panel-link,
+.dark-mode .server-list-card .server-item .map-badge:hover {
+  color: var(--primary-light);
+}
+
+.server-card-control:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.server-list-card .server-panel-badge,
+.server-list-card .name-badge,
+.server-list-card .players-badge {
+  display: none;
+}
+
+.server-list-card .server-details {
+  min-height: 4rem;
+  margin-top: var(--spacing-3);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--border-light);
+}
+
+.server-list-card .server-stats-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--spacing-2);
+}
+
+.server-list-card .stat-badge {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.server-list-card .mode-badge::before,
+.server-list-card .map-badge::before {
+  flex: 0 0 3rem;
+  text-align: left;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.server-list-card .mode-badge::before {
+  content: "模式";
+}
+
+.server-list-card .map-badge::before {
+  content: "地图";
+}
+
+.server-list-card .mode-badge .badge-icon,
+.server-list-card .map-badge .badge-icon {
+  display: none;
+}
+
+.server-list-card .server-item .map-badge {
+  justify-content: flex-start;
+  font-weight: 500;
+}
+
+.server-list-card .server-item .map-badge:hover {
+  background: transparent;
+  color: var(--primary);
+  box-shadow: none;
+  transform: none;
+}
+
+.server-list-card .server-item .map-badge:active {
+  transform: none;
+}
+
+.server-list-card .server-actions {
+  justify-content: flex-end;
+  width: 100%;
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--border-light);
+}
+
+.server-list-card .connect-server-btn {
+  margin-right: auto;
+  min-height: 2.25rem;
+  padding: var(--spacing-2) var(--spacing-3);
+  font-size: var(--text-sm);
+}
+
+.server-list-card .server-action-icon {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+}
+
+.server-list-card .server-empty-state {
+  grid-column: 1 / -1;
+}
+
+.servers-page .server-data-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-4) var(--spacing-5);
+}
+
+.servers-page .server-data-header {
+  margin-bottom: 0;
+  padding-right: var(--spacing-5);
+  border-right: 1px solid var(--border-light);
+}
+
+.servers-page .server-data-header h3 {
+  font-size: var(--text-base);
+}
+
+.server-item .map-badge {
+  font-family: inherit;
+}
+
 .api-key-section {
   margin-top: 20px;
   padding-top: 15px;
