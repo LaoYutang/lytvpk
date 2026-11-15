@@ -1,6 +1,7 @@
 import { workshopDeps } from "./deps.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { createWorkshopRequestError } from "./request-error.js";
+import { getWorkshopDetailScrollTop, restoreWorkshopDetailScroll } from "./detail-scroll.js";
 import {
   getWorkshopPreviewImages,
   renderThumbnails,
@@ -416,10 +417,19 @@ function splitDescriptionParagraphs(text) {
     .filter(Boolean);
 }
 
+function returnToParentDetail(options) {
+  detailRequestSequence++;
+  renderWorkshopDetail(options.parentDetail, {
+    ...options.parentOptions,
+    scrollTop: options.parentScrollTop ?? 0,
+  });
+}
+
 function renderWorkshopDetail(detail, options = {}) {
   const detailView = document.getElementById("browser-detail-view");
   const browserBody = detailView.closest(".browser-body");
   const parentDetail = options.parentDetail || null;
+  const sequence = detailRequestSequence;
 
   setWorkshopPreviewImages(getWorkshopPreviewImages(detail));
   if (isInWatchLater(detail.publishedfileid)) {
@@ -440,7 +450,7 @@ function renderWorkshopDetail(detail, options = {}) {
     .getElementById("back-to-list-btn")
     .addEventListener("click", () => {
       if (parentDetail) {
-        renderWorkshopDetail(parentDetail);
+        returnToParentDetail(options);
         return;
       }
       hideWorkshopDetailView(detailView, browserBody);
@@ -493,6 +503,8 @@ function renderWorkshopDetail(detail, options = {}) {
       );
       openWorkshopDetail(child || { publishedfileid: childId }, {
         parentDetail: detail,
+        parentOptions: options,
+        parentScrollTop: getWorkshopDetailScrollTop(detailView),
       });
     };
 
@@ -513,6 +525,8 @@ function renderWorkshopDetail(detail, options = {}) {
         startDownloadFromBrowser(button.dataset.workshopId);
       });
     });
+
+  restoreWorkshopDetailScroll(detailView, options.scrollTop, () => sequence === detailRequestSequence);
 }
 
 export async function openWorkshopDetail(item, options = {}) {
@@ -545,8 +559,7 @@ export async function openWorkshopDetail(item, options = {}) {
       onBack: () => {
         if (!isCurrentRequest()) return;
         if (options.parentDetail) {
-          detailRequestSequence++;
-          renderWorkshopDetail(options.parentDetail);
+          returnToParentDetail(options);
           return;
         }
         hideWorkshopDetailView(detailView, browserBody);
