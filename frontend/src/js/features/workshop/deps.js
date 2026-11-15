@@ -3,6 +3,7 @@ export const workshopDeps = {
   showNotification: undefined,
   showError: undefined,
   BrowserOpenURL: undefined,
+  ClipboardGetText: undefined,
   FetchWorkshopList: undefined,
   FetchWorkshopDetail: undefined,
   TranslateWorkshopDescription: undefined,

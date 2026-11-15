@@ -967,6 +967,34 @@ html.dark-mode .workshop-type-toggle-btn.active {
   margin-top: 20px;
 }
 
+.workshop-id-jump-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.workshop-id-jump-input-row .form-input {
+  min-width: 0;
+  flex: 1;
+}
+
+.workshop-id-jump-input-row .btn {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  height: 40px;
+  white-space: nowrap;
+}
+
+.workshop-id-jump-content .icon-svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+.workshop-id-jump-content .modal-footer {
+  margin-top: 0;
+}
+
 /* Workshop Browser Detail View - New Layout */
 .detail-container {
   height: 100%;
