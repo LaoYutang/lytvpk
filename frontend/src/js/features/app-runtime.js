@@ -393,6 +393,7 @@ configureWorkshopBrowser({
   showNotification,
   showError,
   BrowserOpenURL,
+  ClipboardGetText,
   FetchWorkshopList,
   FetchWorkshopDetail,
   TranslateWorkshopDescription,

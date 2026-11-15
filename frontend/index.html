@@ -1158,32 +1158,44 @@
 
       <!-- 工坊 ID 直达弹窗 -->
       <div id="workshop-id-jump-modal" class="modal hidden">
-        <div class="modal-content modal-small">
+        <div class="modal-content modal-small workshop-id-jump-content">
           <div class="modal-header">
             <h3>工坊 ID 直达</h3>
-            <button id="close-workshop-id-jump-btn" class="close-btn">
+            <button id="close-workshop-id-jump-btn" class="close-btn" type="button" aria-label="关闭工坊 ID 直达">
               &times;
             </button>
           </div>
           <div class="modal-body">
-            <div class="form-group mb-20">
+            <div class="form-group">
               <label for="workshop-id-jump-input" class="form-label"
                 >工坊 ID 或链接</label
               >
-              <input
-                type="text"
-                id="workshop-id-jump-input"
-                class="form-input w-100"
-                placeholder="例如: 3803082047 或工坊链接"
-              />
+              <div class="workshop-id-jump-input-row">
+                <input
+                  type="text"
+                  id="workshop-id-jump-input"
+                  class="form-input"
+                  placeholder="输入工坊 ID 或链接"
+                />
+                <button id="workshop-id-jump-paste-btn" class="btn btn-outline" type="button" title="从剪贴板粘贴工坊 ID 或链接">
+                  <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="8" y="3" width="8" height="4" rx="1"></rect>
+                    <path d="M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+                  </svg>
+                  <span>粘贴</span>
+                </button>
+              </div>
             </div>
           </div>
           <div class="modal-footer">
-            <button id="workshop-id-jump-cancel-btn" class="btn btn-outline">
+            <button id="workshop-id-jump-cancel-btn" class="btn btn-outline" type="button">
               取消
             </button>
-            <button id="workshop-id-jump-confirm-btn" class="btn btn-primary">
-              前往
+            <button id="workshop-id-jump-confirm-btn" class="btn btn-primary" type="button">
+              <span>前往</span>
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14M12 5l7 7-7 7"></path>
+              </svg>
             </button>
           </div>
         </div>
