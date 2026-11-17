@@ -32,7 +32,6 @@ Unicode true
 ####
 ## Include the wails tools
 ####
-!define PRODUCT_EXECUTABLE "LytVPK 求生工具箱.exe"
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts

@@ -6,7 +6,7 @@
       "type": "go",
       "request": "launch",
       "mode": "exec",
-      "program": "${workspaceFolder}/build/bin/LytVPK 求生工具箱.exe",
+      "program": "${workspaceFolder}/build/bin/lytvpk.exe",
       "preLaunchTask": "build",
       "cwd": "${workspaceFolder}"
     },
@@ -15,7 +15,7 @@
       "type": "go",
       "request": "launch",
       "mode": "exec",
-      "program": "${workspaceFolder}/build/bin/LytVPK 求生工具箱.exe",
+      "program": "${workspaceFolder}/build/bin/lytvpk.exe",
       "preLaunchTask": "build debug",
       "cwd": "${workspaceFolder}"
     },
@@ -24,7 +24,7 @@
       "type": "go",
       "request": "launch",
       "mode": "exec",
-      "program": "${workspaceFolder}/build/bin/LytVPK 求生工具箱.exe",
+      "program": "${workspaceFolder}/build/bin/lytvpk.exe",
       "preLaunchTask": "build dev",
       "cwd": "${workspaceFolder}"
     }
