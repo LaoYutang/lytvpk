@@ -36,7 +36,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:            "LytVPK MOD管理器",
+		Title:            "LytVPK 求生工具箱",
 		Width:            windowState.Width,
 		Height:           windowState.Height,
 		MinWidth:         backend.MinWindowWidth,
