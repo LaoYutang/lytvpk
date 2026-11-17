@@ -544,6 +544,8 @@ func (a *App) GetWorkshopPreferredIP() bool {
 
 // SetWorkshopMetaEnabled 开启/关闭工坊meta信息存储
 func (a *App) SetWorkshopMetaEnabled(enabled bool) {
+	a.vpkScanMu.Lock()
+	defer a.vpkScanMu.Unlock()
 	a.mu.Lock()
 	a.workshopMetaEnabled = enabled
 	a.mu.Unlock()
@@ -552,10 +554,9 @@ func (a *App) SetWorkshopMetaEnabled(enabled bool) {
 	a.saveConfig()
 
 	// 清空缓存，确保下次扫描应用新规则
-	a.vpkCache.Range(func(key, value interface{}) bool {
-		a.vpkCache.Delete(key)
-		return true
-	})
+	a.mu.Lock()
+	a.vpkCache.Clear()
+	a.mu.Unlock()
 }
 
 // GetWorkshopMetaEnabled 获取当前是否开启工坊meta信息存储

@@ -52,6 +52,7 @@ func (a *App) checkModUpdatesWithOperation(operation apiOperation) UpdateCheckRe
 		downloadedAt time.Time
 	}
 
+	a.mu.RLock()
 	a.vpkCache.Range(func(key, value interface{}) bool {
 		cache := value.(*VPKFileCache)
 		vpkFile := cache.File
@@ -61,7 +62,7 @@ func (a *App) checkModUpdatesWithOperation(operation apiOperation) UpdateCheckRe
 		}
 
 		meta, err := LoadWorkshopMeta(vpkFile.Path)
-		if meta == nil || err != nil || meta.DownloadedAt == "" {
+		if meta == nil || err != nil || meta.WorkshopID != vpkFile.WorkshopID || meta.DownloadedAt == "" {
 			return true
 		}
 
@@ -88,6 +89,7 @@ func (a *App) checkModUpdatesWithOperation(operation apiOperation) UpdateCheckRe
 
 		return true
 	})
+	a.mu.RUnlock()
 
 	log.Printf("需要检测更新的Mod数量: %d（已确认有更新: %d）", len(toCheck), confirmedCount)
 

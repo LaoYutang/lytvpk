@@ -1,6 +1,7 @@
 import { showError, showNotification } from "../../core/toast.js";
 import { showConfirmModal } from "../modals/confirm.js";
 import { appState } from "../state.js";
+import { appendInstalledBadge, normalizeWorkshopID, updateInstalledBadge } from "../workshop/installed.js";
 import { refreshFilesKeepFilter } from "../file-list/filters.js";
 import { renameFile } from "../file-list/operations.js";
 import { openSetTagsModal } from "../file-list/tags.js";
@@ -197,7 +198,7 @@ export function createTaskElement(task) {
   const notice = createNode("div", "task-notice", "color: var(--text-secondary); font-size: 11px; margin-top: 2px; overflow-wrap: anywhere;");
   content.append(heading, filename, bar, progress, notice, error);
   row.append(preview, content);
-  const record = { task, preview, content, title, status, copy, pause, resume, cancel, retry, filename, fill, size, percent, notice, error, previewUrl: null, completedActions: null };
+  const record = { task, preview, content, title, controls, status, copy, pause, resume, cancel, retry, filename, fill, size, percent, notice, error, previewUrl: null, completedActions: null, installedBadge: null };
   rowRecords.set(row, record);
   copy.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -237,6 +238,13 @@ function patchTaskElement(row, task) {
   const record = rowRecords.get(row);
   if (!record) return;
   record.task = task;
+  const workshopId = normalizeWorkshopID(task.workshop_id);
+  if ((record.installedBadge?.dataset.installedWorkshopId || "") !== workshopId) {
+    record.installedBadge?.remove();
+    record.installedBadge = appendInstalledBadge(record.controls, task);
+    if (record.installedBadge) record.controls.insertBefore(record.installedBadge, record.status);
+  }
+  if (record.installedBadge) updateInstalledBadge(record.installedBadge);
   row.dataset.status = task.status;
   const colors = { pending: "#ff9800", selecting_ip: "#9c27b0", downloading: "#2196f3", pausing: "#ff9800", cancelling: "#ff9800", failing: "#ff9800", paused: "#ff9800", finalizing: "#2196f3", completed: "#4caf50", failed: "#f44336", cancelled: "#888" };
   const labels = { pending: "等待中", selecting_ip: "优选线路中...", downloading: "下载中", pausing: "正在暂停...", cancelling: "正在取消...", failing: "正在结束...", paused: "已暂停", finalizing: "正在完成...", completed: "已完成", failed: "失败", cancelled: "已取消" };

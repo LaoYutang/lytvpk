@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import test from "node:test";
 import { setAPILineState } from "../src/js/core/api-line.js";
+import { setWorkshopInstallationState } from "../src/js/features/workshop/installed.js";
 
 const modalUrl = new URL("../src/js/features/downloads/workshop-modal.js", import.meta.url).href;
 const importNames = {
@@ -79,7 +80,16 @@ test.beforeEach(() => {
     },
     createElement: () => new Element(),
     createTextNode: (text) => ({ textContent: text }),
+    querySelectorAll: (selector) => {
+      const visit = (node) => [
+        ...(node.dataset?.installedWorkshopId ? [node] : []),
+        ...(node.childNodes || []).flatMap(visit),
+        ...[...(node.nodes?.values() || [])].flatMap(visit),
+      ];
+      return selector === "[data-installed-workshop-id]" ? [...elements.values()].flatMap(visit) : [];
+    },
   };
+  setWorkshopInstallationState({}, "unknown");
   calls = { errors: [], info: [], created: [], history: [], tabs: [], tasks: [], finished: [] };
   config = { workshopPreferredIP: false };
   globalThis.__workshopFlowTest = {
@@ -387,4 +397,33 @@ test("parse errors retain safe line guidance without showing transport details",
   assert.match(text, /重新解析/);
   assert.match(text, /设置/);
   assert.doesNotMatch(text, /private\.invalid|192\.0\.2\.10|token=secret/);
+});
+
+test("parse results share installation badges without replacing groups or triggering downloads", () => {
+  const state = {};
+  setWorkshopInstallationState(state, "ready", [{ workshopId: "123456" }]);
+  applyWorkshopGroups([group("123456")]);
+  const renderedGroup = input("workshop-result").childNodes[0];
+  const actions = renderedGroup.querySelector(".workshop-group-actions");
+  const itemNode = renderedGroup.querySelector(".workshop-group-body").childNodes[0];
+  const headerBadge = actions.childNodes.find((node) => node.className === "workshop-installed-badge");
+  const itemBadge = itemNode.querySelector(".workshop-item-heading").childNodes[0];
+  assert.equal(headerBadge.hidden, false);
+  assert.equal(itemBadge.hidden, false);
+  setWorkshopInstallationState(state, "ready", []);
+  assert.equal(headerBadge.hidden, true);
+  assert.equal(itemBadge.hidden, true);
+  assert.equal(input("workshop-result").childNodes[0], renderedGroup);
+  assert.equal(renderedGroup.querySelector(".workshop-group-body").childNodes[0], itemNode);
+  assert.deepEqual(calls.tasks, []);
+});
+
+test("collection parse results mark installed children but never the collection header", () => {
+  setWorkshopInstallationState({}, "ready", [{ workshopId: "123456" }, { workshopId: "234567" }]);
+  const main = { ...item("123456"), file_type: 2 };
+  applyWorkshopGroups([{ root_id: "123456", main, items: [main, item("234567")] }]);
+  const renderedGroup = input("workshop-result").childNodes[0];
+  assert.equal(renderedGroup.querySelector(".workshop-group-actions").childNodes.length, 0);
+  const child = renderedGroup.querySelector(".workshop-group-body").childNodes[0];
+  assert.equal(child.querySelector(".workshop-item-heading").childNodes[0].hidden, false);
 });

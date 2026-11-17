@@ -26,8 +26,8 @@ type VPKFile struct {
 	Version    string `json:"version"`    // addonversion (若有)
 	Desc       string `json:"desc"`       // addonDescription (若有)
 	AddonURL0  string `json:"addonURL0"`  // addonURL0 (若有)
-	WorkshopID string `json:"workshopId"` // 工坊ID (从meta文件读取)
-	HasUpdate  bool   `json:"hasUpdate"`   // 远端更新时间 > 下载时间且开启了更新检测
+	WorkshopID string `json:"workshopId"` // 工坊ID（meta、工坊文件名或 addonURL0）
+	HasUpdate  bool   `json:"hasUpdate"`  // 远端更新时间 > 下载时间且开启了更新检测
 }
 
 // Campaign 战役信息

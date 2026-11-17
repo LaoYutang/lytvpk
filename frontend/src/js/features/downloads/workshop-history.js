@@ -1,6 +1,7 @@
 import { showError, showInfo } from "../../core/toast.js";
 import { escapeHtml } from "../../core/utils.js";
 import { showConfirmModal } from "../modals/confirm.js";
+import { appendInstalledBadge } from "../workshop/installed.js";
 import {
   GetWorkshopHistory,
   AddWorkshopHistoryEntries,
@@ -76,6 +77,7 @@ function renderHistoryList() {
       <span class="workshop-history-sep">-</span>
       <span class="workshop-history-title">${escapeHtml(label)}</span>
     `;
+    appendInstalledBadge(row, item);
     row.addEventListener("click", () => selectHistoryItem(item));
     listEl.appendChild(row);
   });

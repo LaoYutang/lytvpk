@@ -432,8 +432,18 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string, download
 	var oldFilePath string
 	var oldLocation string
 
+	// The shared WorkshopID now also identifies filename/URL-only installs.
+	// Keep automatic replacement limited to the original meta-backed scope.
+	a.mu.RLock()
+	if !a.workshopMetaEnabled {
+		a.mu.RUnlock()
+		return newFilePath
+	}
 	a.vpkCache.Range(func(key, value interface{}) bool {
 		cache := value.(*VPKFileCache)
+		if cache.MetaWorkshopID != workshopID {
+			return true
+		}
 		rel, relErr := filepath.Rel(downloadRoot, cache.File.Path)
 		if relErr == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && cache.File.WorkshopID == workshopID && cache.File.Path != newFilePath {
 			oldFilePath = cache.File.Path
@@ -442,6 +452,7 @@ func (a *App) replaceExistingMod(newFilePath string, workshopID string, download
 		}
 		return true
 	})
+	a.mu.RUnlock()
 
 	if oldFilePath == "" {
 		return newFilePath

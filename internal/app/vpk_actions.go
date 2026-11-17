@@ -39,6 +39,8 @@ func validateWindowsRenamePath(path string, filename string) error {
 }
 
 func (a *App) GetVPKPreviewImage(filePath string) string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if cached, ok := a.vpkCache.Load(filePath); ok {
 		cache := cached.(*VPKFileCache)
 		return cache.File.PreviewImage
@@ -256,6 +258,8 @@ func (a *App) SetVPKTags(filePath string, primaryTag string, secondaryTags []str
 
 // RenameVPKFile 重命名VPK文件
 func (a *App) RenameVPKFile(filePath string, newFilename string) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	// 尝试保留自定义标签
 	oldName := filepath.Base(filePath)
 	pTag, sTags, _, oldHasTags := parser.ParseFilenameTags(oldName)

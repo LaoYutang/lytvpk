@@ -1,10 +1,12 @@
 import { appState, updateStatusBar, showFileListLoading, hideFileListLoading } from "../state.js";
-import { showError } from "../../core/toast.js";
+import { showError, showNotification } from "../../core/toast.js";
 import { renderFileList } from "./render.js";
 import { getLocationDisplayName, escapeHtml } from "../../core/utils.js";
 import { applySort, refreshSortData, saveSortPreference, updateSortButtonUI } from "./sorting.js";
 import { resetBoxSelection } from "./box-selection.js";
-import { GetPrimaryTags, GetSecondaryTags, SearchVPKFiles, ScanVPKFiles, GetVPKFiles } from "../../../../wailsjs/go/app/App";
+import { GetPrimaryTags, GetSecondaryTags, SearchVPKFiles, ScanVPKFiles, GetVPKFiles, GetRootDirectory, SetRootDirectory, ValidateDirectory } from "../../../../wailsjs/go/app/App";
+import { createFileScanCoordinator } from "./scan.js";
+import { setWorkshopInstallationState } from "../workshop/installed.js";
 
 const LOCATION_FILTERS = ["root", "workshop", "disabled"];
 
@@ -622,7 +624,10 @@ export function handleSearch(event) {
   performSearch();
 }
 
-export async function performSearch() {
+let searchSequence = 0;
+
+export async function performSearch(isCurrent = () => true) {
+  const sequence = ++searchSequence;
   try {
     console.log(
       "执行搜索，查询词:", appState.searchQuery,
@@ -643,9 +648,11 @@ export async function performSearch() {
         appState.selectedPrimaryTag,
         appState.selectedSecondaryTags
       );
+      if (!isCurrent() || sequence !== searchSequence) return;
       appState.vpkFiles = results;
     }
 
+    if (!isCurrent() || sequence !== searchSequence) return;
     if (appState.selectedLocations.length > 0) {
       appState.vpkFiles = appState.vpkFiles.filter((file) =>
         appState.selectedLocations.includes(file.location)
@@ -664,6 +671,7 @@ export async function performSearch() {
 
     console.log(`搜索完成，显示 ${appState.vpkFiles.length} 个文件`);
   } catch (error) {
+    if (!isCurrent() || sequence !== searchSequence) return;
     console.error("搜索失败:", error);
     showError("搜索失败: " + error);
   }
@@ -689,72 +697,77 @@ export function closeFilterMenus(exceptMenu = null) {
   });
 }
 
-export async function refreshFilesKeepFilter() {
-  resetBoxSelection();
-
-  if (!appState.currentDirectory) {
-    showNotification("请先选择目录", "info");
-    return;
-  }
-
-  if (appState.isLoading) {
-    console.log("正在加载中，请稍候...");
-    return;
-  }
-
-  const currentFilters = {
-    searchText: document.getElementById("search-input")?.value || "",
-    primaryTag: appState.selectedPrimaryTag || "",
-    secondaryTags: [...appState.selectedSecondaryTags],
-    locationTags: [...appState.selectedLocations],
-  };
-
-  appState.isLoading = true;
-  showFileListLoading("正在刷新文件列表...");
-
-  try {
+const fileScanCoordinator = createFileScanCoordinator({
+  getDirectory: () => appState.currentDirectory,
+  async load(directory, isCurrent) {
+    // Compare with the actual backend directory, including when an older
+    // SetRootDirectory completed after a newer directory was requested.
+    const root = await GetRootDirectory();
+    if (!isCurrent()) return null;
+    if (root !== directory) {
+      await ValidateDirectory(directory);
+      if (!isCurrent()) return null;
+      await SetRootDirectory(directory);
+      if (!isCurrent()) return null;
+    }
+    if (appState.currentDirectory !== directory) {
+      appState.allVpkFiles = [];
+      appState.vpkFiles = [];
+      appState.selectedFiles.clear();
+    }
+    appState.currentDirectory = directory;
     await ScanVPKFiles();
-
+    if (!isCurrent()) return null;
     const [files, primaryTags] = await Promise.all([
       GetVPKFiles(),
       GetPrimaryTags(),
     ]);
-
+    return { files, primaryTags };
+  },
+  async apply({ files, primaryTags }, isCurrent) {
     await refreshSortData();
+    if (!isCurrent()) return;
     applySort(files);
-
     appState.allVpkFiles = files;
     appState.primaryTags = primaryTags;
-
-    appState.searchQuery = currentFilters.searchText || "";
-    appState.selectedPrimaryTag = currentFilters.primaryTag || "";
-    appState.selectedSecondaryTags = currentFilters.secondaryTags || [];
-    appState.selectedLocations = currentFilters.locationTags || [];
-
+    // Read current controls instead of restoring a stale filter snapshot if the
+    // user changed the search while the filesystem scan was running.
+    appState.searchQuery = document.getElementById("search-input")?.value ?? appState.searchQuery;
     await renderTagFilters();
-
-    const searchInput = document.getElementById("search-input");
-    if (searchInput) {
-      searchInput.value = currentFilters.searchText || "";
-    }
-
-    await performSearch();
-
+    if (!isCurrent()) return;
+    await performSearch(isCurrent);
+    if (!isCurrent()) return;
     const currentFilePaths = new Set(appState.allVpkFiles.map((f) => f.path));
     for (const path of appState.selectedFiles) {
       if (!currentFilePaths.has(path)) {
         appState.selectedFiles.delete(path);
       }
     }
-
     updateStatusBar();
-
-    console.log("文件列表已刷新，筛选状态已恢复");
-  } catch (error) {
+  },
+  onState(status, files) {
+    setWorkshopInstallationState(appState, status, files);
+    if (status === "loading") {
+      searchSequence++;
+      appState.isLoading = true;
+      showFileListLoading("正在刷新文件列表...");
+    }
+  },
+  onError(error) {
     console.error("刷新文件列表失败:", error);
     showError("刷新失败: " + error);
-  } finally {
+  },
+  onIdle() {
     appState.isLoading = false;
     hideFileListLoading();
+  },
+});
+
+export function refreshFilesKeepFilter(options = {}) {
+  resetBoxSelection();
+  if (!options.directory && !appState.currentDirectory && !appState.isLoading) {
+    showNotification("请先选择目录", "info");
+    return Promise.resolve(null);
   }
+  return fileScanCoordinator.request(options);
 }

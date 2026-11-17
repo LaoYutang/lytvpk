@@ -15,14 +15,24 @@ import (
 )
 
 func (a *App) SetRootDirectory(path string) error {
+	a.vpkScanMu.Lock()
+	defer a.vpkScanMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return fmt.Errorf("目录不存在: %s", path)
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("无法访问目录 %s: %w", path, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("路径不是目录: %s", path)
 	}
 
-	a.rootDir = path
+	path = filepath.Clean(path)
+	if a.rootDir != path {
+		a.rootDir = path
+		a.vpkCache.Clear()
+	}
 	return nil
 }
 
@@ -40,7 +50,12 @@ func (a *App) GetAppVersion() string {
 
 // ScanVPKFiles 扫描所有VPK文件（智能缓存版本）
 func (a *App) ScanVPKFiles() error {
-	if a.rootDir == "" {
+	a.vpkScanMu.Lock()
+	defer a.vpkScanMu.Unlock()
+	a.mu.RLock()
+	options := a.vpkScanOptionsLocked()
+	a.mu.RUnlock()
+	if options.rootDir == "" {
 		return fmt.Errorf("请先设置根目录")
 	}
 
@@ -50,27 +65,31 @@ func (a *App) ScanVPKFiles() error {
 	vpkPaths := make([]string, 0)
 
 	// 扫描根目录（仅扫描根目录本身的VPK文件，不包含子目录）
-	err := a.scanRootDirectory(a.rootDir, &vpkPaths)
+	err := a.scanRootDirectory(options.rootDir, &vpkPaths)
 	if err != nil {
 		return err
 	}
 
 	// 扫描workshop目录
-	workshopDir := filepath.Join(a.rootDir, "workshop")
+	workshopDir := filepath.Join(options.rootDir, "workshop")
 	if _, err := os.Stat(workshopDir); err == nil {
 		err = a.scanDirectory(workshopDir, &vpkPaths)
 		if err != nil {
 			return err
 		}
+	} else if !os.IsNotExist(err) {
+		return err
 	}
 
 	// 扫描disabled目录
-	disabledDir := filepath.Join(a.rootDir, "disabled")
+	disabledDir := filepath.Join(options.rootDir, "disabled")
 	if _, err := os.Stat(disabledDir); err == nil {
 		err = a.scanDirectory(disabledDir, &vpkPaths)
 		if err != nil {
 			return err
 		}
+	} else if !os.IsNotExist(err) {
+		return err
 	}
 
 	// 创建当前文件路径集合，用于清理不存在的缓存
@@ -79,28 +98,74 @@ func (a *App) ScanVPKFiles() error {
 		currentPaths[path] = true
 	}
 
-	// 清理缓存中不存在的文件
-	a.vpkCache.Range(func(key, value interface{}) bool {
-		path := key.(string)
-		if !currentPaths[path] {
-			a.vpkCache.Delete(path)
-			log.Printf("清理缓存: 文件已删除 %s", path)
+	// Workers build independent snapshots. Publish together after all workers
+	// finish, so readers never observe a half-scanned directory.
+	results := make([]*VPKFileCache, len(vpkPaths))
+	var submitErr error
+	for index, path := range vpkPaths {
+		a.mu.RLock()
+		var cached *VPKFileCache
+		if value, ok := a.vpkCache.Load(path); ok {
+			copy := *value.(*VPKFileCache)
+			cached = &copy
 		}
-		return true
-	})
-
-	// 并发处理所有文件（使用智能缓存）
-	for _, path := range vpkPaths {
+		a.mu.RUnlock()
 		wg.Add(1)
-		filePath := path // 捕获变量
-		a.goroutinePool.Submit(func() {
-			a.processVPKFileWithCache(filePath)
+		run := func() {
+			defer wg.Done()
+			cache, err := scanVPKFile(path, options, cached)
+			if err != nil {
+				a.logVPKScanError(path, err)
+				return
+			}
+			results[index] = cache
+		}
+		if a.goroutinePool == nil {
+			run()
+		} else if err := a.goroutinePool.Submit(run); err != nil {
 			wg.Done()
-		})
+			submitErr = fmt.Errorf("无法提交 VPK 扫描任务: %w", err)
+		}
 	}
 	wg.Wait()
 
-	return nil
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.vpkCache.Range(func(key, _ interface{}) bool {
+		if !currentPaths[key.(string)] {
+			a.vpkCache.Delete(key)
+		}
+		return true
+	})
+	for index, path := range vpkPaths {
+		cache := results[index]
+		info, err := os.Stat(path)
+		if cache == nil || err != nil || info.Size() != cache.Size || !info.ModTime().Equal(cache.ModTime) {
+			a.vpkCache.Delete(path)
+			continue
+		}
+		a.vpkCache.Store(path, cache)
+	}
+	return submitErr
+}
+
+type vpkScanOptions struct {
+	rootDir            string
+	metaEnabled        bool
+	updateCheckEnabled bool
+}
+
+// Caller holds mu (for reads or writes).
+func (a *App) vpkScanOptionsLocked() vpkScanOptions {
+	return vpkScanOptions{a.rootDir, a.workshopMetaEnabled, a.workshopUpdateCheckEnabled}
+}
+
+func (a *App) logVPKScanError(path string, err error) {
+	if a.ctx != nil {
+		a.LogError("VPK解析", err.Error(), path)
+	} else {
+		log.Printf("无法扫描 VPK %s: %v", path, err)
+	}
 }
 
 // scanRootDirectory 扫描根目录中的VPK文件（不包含子目录）
@@ -133,12 +198,26 @@ func (a *App) scanDirectory(dir string, vpkPaths *[]string) error {
 	})
 }
 
-// processVPKFileWithCache 处理单个VPK文件（智能缓存版本）
+// processVPKFileWithCache is used by file operations while mu is held.
 func (a *App) processVPKFileWithCache(filePath string) {
+	var cached *VPKFileCache
+	if value, ok := a.vpkCache.Load(filePath); ok {
+		copy := *value.(*VPKFileCache)
+		cached = &copy
+	}
+	cache, err := scanVPKFile(filePath, a.vpkScanOptionsLocked(), cached)
+	if err != nil {
+		a.vpkCache.Delete(filePath)
+		a.logVPKScanError(filePath, err)
+		return
+	}
+	a.vpkCache.Store(filePath, cache)
+}
+
+func scanVPKFile(filePath string, options vpkScanOptions, cached *VPKFileCache) (*VPKFileCache, error) {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		log.Printf("无法读取文件信息: %s, 错误: %v", filePath, err)
-		return
+		return nil, err
 	}
 
 	modTime := info.ModTime()
@@ -157,27 +236,28 @@ func (a *App) processVPKFileWithCache(filePath string) {
 
 	// 检查meta文件状态
 	var metaModTime time.Time
+	var metaSize int64
 	if metaInfo, statErr := os.Stat(basePath + ".meta"); statErr == nil {
 		metaModTime = metaInfo.ModTime()
+		metaSize = metaInfo.Size()
 	}
 
 	// 检查缓存
-	if cached, ok := a.vpkCache.Load(filePath); ok {
-		cache := cached.(*VPKFileCache)
+	if cached != nil {
+		copy := *cached
+		cache := &copy
 
 		// 判断文件是否变化（通过修改时间和大小）以及图片/meta是否变化
-		if cache.ModTime.Equal(modTime) && cache.Size == size && cache.ImageModTime.Equal(imgModTime) && cache.MetaModTime.Equal(metaModTime) {
+		if cache.ModTime.Equal(modTime) && cache.Size == size && cache.ImageModTime.Equal(imgModTime) && cache.MetaModTime.Equal(metaModTime) && cache.MetaSize == metaSize {
 			// 文件、图片和meta都未变化，使用缓存
 			// 但需要更新位置信息（因为文件可能被移动）
-			location := a.getLocationFromPath(filePath)
+			location := getLocationFromRoot(options.rootDir, filePath)
 			cache.File.Location = location
 			cache.File.Enabled = location != "disabled"
 			cache.File.Path = filePath // 更新路径（处理移动情况）
 
-			// 更新缓存
-			a.vpkCache.Store(filePath, cache)
-			log.Printf("使用缓存: %s (未变化)", filepath.Base(filePath))
-			return
+			cache.File.WorkshopID = resolveLocalWorkshopID(options.rootDir, filePath, cache.MetaWorkshopID, cache.File.AddonURL0)
+			return cache, nil
 		}
 
 		log.Printf("文件或图片已变化，重新解析: %s", filepath.Base(filePath))
@@ -186,21 +266,22 @@ func (a *App) processVPKFileWithCache(filePath string) {
 	// 文件不在缓存中或已变化，需要重新解析
 	vpkFile, err := parser.ParseVPKFile(filePath)
 	if err != nil {
-		a.LogError("VPK解析", err.Error(), filePath)
-		return
+		return nil, err
 	}
 
 	// 设置文件系统相关信息
-	location := a.getLocationFromPath(filePath)
+	location := getLocationFromRoot(options.rootDir, filePath)
 	vpkFile.Size = size
 	vpkFile.Location = location
 	vpkFile.Enabled = location != "disabled"
 	vpkFile.LastModified = modTime.Format(time.RFC3339)
 	vpkFile.Path = filePath
 
-	// 应用meta数据（如果开启且存在）
-	if a.workshopMetaEnabled {
-		if meta, err := LoadWorkshopMeta(filePath); meta != nil && err == nil {
+	// Read identity even when title/author overrides and meta writes are disabled.
+	var metaWorkshopID string
+	if meta, err := LoadWorkshopMeta(filePath); meta != nil && err == nil {
+		metaWorkshopID = meta.WorkshopID
+		if options.metaEnabled {
 			if meta.Title != "" {
 				vpkFile.Title = meta.Title
 			}
@@ -210,10 +291,7 @@ func (a *App) processVPKFileWithCache(filePath string) {
 			if meta.Description != "" {
 				vpkFile.Desc = meta.Description
 			}
-			if meta.WorkshopID != "" && !strings.HasPrefix(meta.WorkshopID, "direct-") && protocol.IsValidWorkshopID(meta.WorkshopID) {
-				vpkFile.WorkshopID = meta.WorkshopID
-			}
-			if a.workshopUpdateCheckEnabled && meta.TimeUpdated != "" && meta.DownloadedAt != "" {
+			if options.updateCheckEnabled && meta.TimeUpdated != "" && meta.DownloadedAt != "" {
 				timeUpdated, tErr := time.Parse(time.RFC3339, meta.TimeUpdated)
 				downloadedAt, dErr := time.Parse(time.RFC3339, meta.DownloadedAt)
 				if tErr == nil && dErr == nil && timeUpdated.After(downloadedAt) {
@@ -222,24 +300,47 @@ func (a *App) processVPKFileWithCache(filePath string) {
 			}
 		}
 	}
+	vpkFile.WorkshopID = resolveLocalWorkshopID(options.rootDir, filePath, metaWorkshopID, vpkFile.AddonURL0)
 
 	// 存入缓存
 	cache := &VPKFileCache{
-		File:         *vpkFile,
-		ModTime:      modTime,
-		Size:         size,
-		ImageModTime: imgModTime,
-		MetaModTime:  metaModTime,
-		CachedAt:     time.Now(),
+		File:           *vpkFile,
+		ModTime:        modTime,
+		Size:           size,
+		ImageModTime:   imgModTime,
+		MetaModTime:    metaModTime,
+		MetaSize:       metaSize,
+		MetaWorkshopID: metaWorkshopID,
+		CachedAt:       time.Now(),
 	}
-	a.vpkCache.Store(filePath, cache)
-
 	log.Printf("已解析并缓存: %s", filepath.Base(filePath))
+	return cache, nil
+}
+
+func resolveLocalWorkshopID(rootDir, filePath, metaID, addonURL string) string {
+	if protocol.IsValidWorkshopID(metaID) {
+		return metaID
+	}
+	if strings.HasPrefix(metaID, "direct-") {
+		return ""
+	}
+	if rel, err := filepath.Rel(filepath.Join(rootDir, "workshop"), filePath); err == nil && filepath.Dir(rel) == "." && strings.EqualFold(filepath.Ext(rel), ".vpk") {
+		id := strings.TrimSuffix(rel, filepath.Ext(rel))
+		if protocol.IsValidWorkshopID(id) {
+			return id
+		}
+	}
+	id, _ := protocol.ParseWorkshopID(addonURL)
+	return id
 }
 
 // getLocationFromPath 根据文件路径判断位置
 func (a *App) getLocationFromPath(filePath string) string {
-	rel, _ := filepath.Rel(a.rootDir, filePath)
+	return getLocationFromRoot(a.rootDir, filePath)
+}
+
+func getLocationFromRoot(rootDir, filePath string) string {
+	rel, _ := filepath.Rel(rootDir, filePath)
 	parts := strings.Split(rel, string(filepath.Separator))
 
 	if len(parts) > 0 {
@@ -257,6 +358,8 @@ func (a *App) getLocationFromPath(filePath string) string {
 
 // GetVPKFiles 获取所有VPK文件（从缓存中读取）
 func (a *App) GetVPKFiles() []VPKFile {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	result := make([]VPKFile, 0)
 
 	a.vpkCache.Range(func(key, value interface{}) bool {
@@ -272,6 +375,8 @@ func (a *App) GetVPKFiles() []VPKFile {
 }
 
 func (a *App) SearchVPKFiles(query string, primaryTag string, secondaryTags []string) []VPKFile {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	result := make([]VPKFile, 0)
 	query = strings.ToLower(query)
 
@@ -343,6 +448,8 @@ func (a *App) GetPrimaryTags() []string {
 
 // GetSecondaryTags 获取指定主标签下的所有二级标签（从缓存中获取）
 func (a *App) GetSecondaryTags(primaryTag string) []string {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	// 从缓存中收集所有文件
 	vpkFiles := make([]VPKFile, 0)
 	a.vpkCache.Range(func(key, value interface{}) bool {
