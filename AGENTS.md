@@ -99,7 +99,7 @@ wails dev
 wails build
 
 # 发布构建（CI 自动执行）
-wails build -platform windows/amd64 -ldflags "-X main.AppVersion=<version>" -o "LytVPK MOD管理器.exe"
+wails build -platform windows/amd64 -ldflags "-X main.AppVersion=<version>" -o "LytVPK 求生工具箱.exe"
 
 # 运行测试（通过不代表完整集成验证）
 go test ./...

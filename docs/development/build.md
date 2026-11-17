@@ -46,4 +46,6 @@ go test ./...
 wails build
 ```
 
+`wails build` 在 Windows 上的默认产物为 `build/bin/lytvpk.exe`。自动发布流程通过 `-o "LytVPK 求生工具箱.exe"` 指定发布文件名，ZIP 包内使用该名称。
+
 在受限环境中，`wails build` 可能因为权限问题失败，需要在本机正常权限下重新验证。
