@@ -78,7 +78,7 @@ export async function renderDiagnosticsPage({
             <div class="diagnostics-tool-icon is-model">${modelIcon()}</div>
             <div class="diagnostics-tool-main">
               <div class="diagnostics-tool-title-row">
-                <h3>Mod 模型面数检测 <span class="diagnostics-beta-badge">Beta</span></h3>
+                <h3>Mod 模型面数检测</h3>
                 <span class="diagnostics-status">可检测</span>
               </div>
               <p>读取启用和创意工坊 Mod 内模型的 LOD0 顶点数与三角形数量，快速定位高面数资源。</p>
