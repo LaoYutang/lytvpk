@@ -264,6 +264,8 @@ export default {
 // ----------------------------------------------------
 // Handler 1: 列表查询 (IPublishedFileService/QueryFiles)
 // ----------------------------------------------------
+const WORKSHOP_PAGE_SIZE = 50;
+
 function buildListUrl(url, env, filetype) {
   const steamApiUrl = new URL(
     "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/"
@@ -273,7 +275,7 @@ function buildListUrl(url, env, filetype) {
   params.set("key", env.STEAM_API_KEY);
   params.set("appid", "550"); // L4D2
   params.set("return_details", "true"); // 返回详情
-  params.set("numperpage", "20");
+  params.set("numperpage", String(WORKSHOP_PAGE_SIZE));
   params.set("cache_max_age_seconds", "300"); // 其实 Steam 忽略这个，但我们可以加
   if (filetype !== null && filetype !== undefined && filetype !== "") {
     params.set("filetype", filetype);
@@ -342,7 +344,7 @@ async function fetchListData(url, env, filetype) {
   return data;
 }
 
-function mergeListData(itemData, collectionData, limit = 20) {
+function mergeListData(itemData, collectionData, limit = WORKSHOP_PAGE_SIZE) {
   const itemResponse = itemData?.response || {};
   const collectionResponse = collectionData?.response || {};
   const items = Array.isArray(itemResponse.publishedfiledetails)
