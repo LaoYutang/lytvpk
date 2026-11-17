@@ -1,15 +1,7 @@
 import { getConfig, saveConfig, MAX_DIRECTORIES } from "../core/config.js";
-import { appState, showFileListLoading, hideFileListLoading } from "./state.js";
+import { appState } from "./state.js";
 import { showError, showNotification } from "../core/toast.js";
-import {
-  SetRootDirectory,
-  ScanVPKFiles,
-  ValidateDirectory,
-  GetVPKFiles,
-  GetPrimaryTags,
-} from "../../../wailsjs/go/app/App";
-import { applySort } from "./file-list/sorting.js";
-import { renderTagFilters, performSearch } from "./file-list/filters.js";
+import { refreshFilesKeepFilter } from "./file-list/filters.js";
 
 // 截取路径显示（保留最后几级目录）
 function truncatePath(path, maxLen = 40) {
@@ -217,23 +209,10 @@ function removeDirectory(index) {
 export async function switchToDirectory(path) {
   if (!path) return;
 
-  if (path === appState.currentDirectory) {
-    closeDropdown();
-    return; // 已经是当前目录
-  }
-
   try {
-    showFileListLoading("正在切换目录...");
     closeDropdown();
-
-    // 验证目录
-    await ValidateDirectory(path);
-
-    // 设置新目录
-    await SetRootDirectory(path);
-
-    // 更新状态
-    appState.currentDirectory = path;
+    const result = await refreshFilesKeepFilter({ directory: path });
+    if (!result) return null;
 
     // 更新配置中的lastUsed和lastActiveDirectory
     const config = getConfig();
@@ -250,34 +229,17 @@ export async function switchToDirectory(path) {
       lastActiveDirectory: path,
     });
 
-    // 加载文件
-    await ScanVPKFiles();
-
-    const [files, primaryTags] = await Promise.all([
-      GetVPKFiles(),
-      GetPrimaryTags(),
-    ]);
-
-    applySort(files);
-
-    appState.allVpkFiles = files;
-    appState.primaryTags = primaryTags;
-
-    await renderTagFilters();
-    await performSearch();
-
     updateTriggerDisplay();
     renderDirectoryList();
 
     showNotification(`已切换目录`, "success");
+    return result;
   } catch (error) {
     console.error("切换目录失败:", error);
     showError("切换目录失败: " + error);
 
     // 尝试恢复原目录显示
     updateTriggerDisplay();
-  } finally {
-    hideFileListLoading();
   }
 }
 

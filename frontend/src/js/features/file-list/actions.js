@@ -259,11 +259,13 @@ export async function deleteSelected() {
         console.log(`批量删除 ${filesToDelete.length} 个文件...`);
         await DeleteVPKFiles(filesToDelete);
         filesToDelete.forEach((filePath) => appState.selectedFiles.delete(filePath));
-        await refreshFilesKeepFilter();
         showNotification(`成功删除 ${filesToDelete.length} 个文件`, "success");
       } catch (error) {
         console.error("批量删除失败:", error);
         showError("批量删除失败: " + error);
+      } finally {
+        // The backend can remove some files before reporting a batch failure.
+        await refreshFilesKeepFilter();
       }
     }
   );

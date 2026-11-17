@@ -4,6 +4,7 @@ import { browserState } from "./state.js";
 import { openWorkshopDetail } from "./detail.js";
 import { getWorkshopPreviewImages } from "./detail-images.js";
 import { formatNumber, getWorkshopItemId } from "./utils.js";
+import { appendInstalledBadge } from "./installed.js";
 
 let watchLaterItems = [];
 
@@ -191,6 +192,10 @@ export function renderWatchLaterDrawer() {
     const title = document.createElement("div");
     title.className = "watch-later-item-title";
     title.textContent = item.title;
+    const heading = document.createElement("div");
+    heading.className = "watch-later-item-heading";
+    heading.appendChild(title);
+    appendInstalledBadge(heading, item);
 
     const meta = document.createElement("div");
     meta.className = "watch-later-item-meta";
@@ -204,7 +209,7 @@ export function renderWatchLaterDrawer() {
       <span>收藏 ${formatNumber(item.favorited)}</span>
     `;
 
-    content.append(title, meta, stats);
+    content.append(heading, meta, stats);
 
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";

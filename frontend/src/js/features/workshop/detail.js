@@ -1,4 +1,5 @@
 import { workshopDeps } from "./deps.js";
+import { appendInstalledBadge } from "./installed.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { createWorkshopRequestError } from "./request-error.js";
 import { getWorkshopDetailScrollTop, restoreWorkshopDetailScroll } from "./detail-scroll.js";
@@ -444,6 +445,7 @@ function renderWorkshopDetail(detail, options = {}) {
   detailView.innerHTML = isWorkshopCollection(detail)
     ? renderCollectionDetail(detail, parentDetail)
     : renderItemDetail(detail, parentDetail);
+  appendInstalledBadge(detailView.querySelector(".detail-tags-row"), detail);
   bindDescriptionTranslation(detailView, detail);
 
   document
@@ -495,13 +497,16 @@ function renderWorkshopDetail(detail, options = {}) {
     });
   }
 
+  const childItemsById = new Map(
+    [...(detail.child_items || []), ...(detail.required_items || [])]
+      .map((child) => [getWorkshopItemId(child), child]),
+  );
   detailView.querySelectorAll(".collection-child-card").forEach((card) => {
+    const childId = card.dataset.workshopId;
+    const item = childItemsById.get(childId);
+    appendInstalledBadge(card.querySelector(".collection-child-meta"), item || childId);
     const openChild = () => {
-      const childId = card.dataset.workshopId;
-      const child = (detail.child_items || []).find(
-        (item) => getWorkshopItemId(item) === childId
-      );
-      openWorkshopDetail(child || { publishedfileid: childId }, {
+      openWorkshopDetail(item || { publishedfileid: childId }, {
         parentDetail: detail,
         parentOptions: options,
         parentScrollTop: getWorkshopDetailScrollTop(detailView),

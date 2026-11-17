@@ -14,6 +14,8 @@ export function setDefaultDirectory(directory) {
 // 应用状态
 export const appState = {
   allVpkFiles: [],
+  installedWorkshopIds: new Set(),
+  workshopInstallationStatus: "unknown",
   vpkFiles: [],
   primaryTags: [],
   selectedPrimaryTag: "",

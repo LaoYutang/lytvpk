@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -368,40 +367,7 @@ func parseFileSize(sizeStr string) int64 {
 
 // ParseWorkshopID extracts the ID from a Steam Workshop URL or a direct ID.
 func (a *App) ParseWorkshopID(workshopUrl string) (string, error) {
-	workshopUrl = strings.TrimSpace(workshopUrl)
-	if protocol.IsValidWorkshopID(workshopUrl) {
-		return workshopUrl, nil
-	}
-
-	u, err := url.Parse(workshopUrl)
-	if err != nil {
-		return "", fmt.Errorf("invalid URL")
-	}
-
-	// 只有 Steam 相关域名才提取 id 参数
-	host := strings.ToLower(u.Hostname())
-	isSteamHost := strings.HasSuffix(host, "steamcommunity.com") ||
-		strings.HasSuffix(host, "steampowered.com") ||
-		strings.HasSuffix(host, "steamworkshop.download")
-
-	if isSteamHost {
-		q := u.Query()
-		id := q.Get("id")
-		if id != "" && protocol.IsValidWorkshopID(id) {
-			return id, nil
-		}
-	}
-
-	// 回退：仅当 URL 整体看起来像 Steam 链接时才用正则匹配
-	if isSteamHost || strings.Contains(workshopUrl, "steamcommunity.com/sharedfiles") {
-		re := regexp.MustCompile(`\d+`)
-		matches := re.FindStringSubmatch(workshopUrl)
-		if len(matches) > 0 && protocol.IsValidWorkshopID(matches[0]) {
-			return matches[0], nil
-		}
-	}
-
-	return "", fmt.Errorf("could not find valid workshop ID in URL")
+	return protocol.ParseWorkshopID(workshopUrl)
 }
 
 func (a *App) parseWorkshopIDs(workshopInput string) ([]string, error) {

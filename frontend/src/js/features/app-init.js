@@ -6,18 +6,16 @@ import {
   addDirectory,
   updateTriggerDisplay,
   renderDirectoryList,
+  switchToDirectory,
 } from "./directory-dropdown.js";
 import {
   appState,
   showLoadingScreen,
   showMainScreen,
   updateLoadingMessage,
-  showFileListLoading,
-  hideFileListLoading,
   enableActionButtons,
 } from "./state.js";
-import { renderTagFilters, performSearch } from "./file-list/filters.js";
-import { applySort, refreshSortData } from "./file-list/sorting.js";
+import { refreshFilesKeepFilter } from "./file-list/filters.js";
 import { refreshTaskList } from "./downloads/task-list.js";
 import { focusDownloadsTab } from "./downloads/downloads-page.js";
 import { renderServers } from "./servers/servers.js";
@@ -30,9 +28,6 @@ import {
   AutoDiscoverAddons,
   SelectDirectory,
   SelectFiles,
-  ScanVPKFiles,
-  GetVPKFiles,
-  GetPrimaryTags,
   LaunchL4D2,
   SetWorkshopPreferredIP,
 } from "../../../wailsjs/go/app/App";
@@ -127,14 +122,8 @@ export async function selectDirectory() {
   try {
     const directory = await SelectDirectory();
     if (directory) {
-      await ValidateDirectory(directory);
-      await SetRootDirectory(directory);
-
-      // 先更新状态，再添加到保存列表（确保渲染时选中项正确）
-      appState.currentDirectory = directory;
-      addDirectory(directory);
-      updateTriggerDisplay();
-      await loadFiles();
+      const result = await switchToDirectory(directory);
+      if (result) addDirectory(directory);
     }
   } catch (error) {
     console.error("选择目录失败:", error);
@@ -167,40 +156,8 @@ export function updateDirectoryDisplay() {
   updateTriggerDisplay();
 }
 
-export async function loadFiles() {
-  if (appState.isLoading) {
-    console.log("正在加载中，请稍候...");
-    return;
-  }
-
-  appState.isLoading = true;
-  showFileListLoading("正在扫描VPK文件...");
-
-  try {
-    await ScanVPKFiles();
-
-    const [files, primaryTags] = await Promise.all([
-      GetVPKFiles(),
-      GetPrimaryTags(),
-    ]);
-
-    await refreshSortData();
-    applySort(files);
-
-    appState.allVpkFiles = files;
-    appState.primaryTags = primaryTags;
-
-    await renderTagFilters();
-    await performSearch();
-
-    console.log("扫描完成，找到", files.length, "个文件");
-  } catch (error) {
-    console.error("扫描文件失败:", error);
-    showError("扫描文件失败: " + error);
-  } finally {
-    appState.isLoading = false;
-    hideFileListLoading();
-  }
+export function loadFiles() {
+  return refreshFilesKeepFilter();
 }
 
 export async function refreshFiles() {

@@ -50,12 +50,14 @@ type ErrorInfo struct {
 
 // VPKFileCache 缓存的VPK文件信息
 type VPKFileCache struct {
-	File         VPKFile
-	ModTime      time.Time
-	Size         int64
-	ImageModTime time.Time // 外部图片修改时间
-	MetaModTime  time.Time // meta文件修改时间
-	CachedAt     time.Time
+	File           VPKFile
+	ModTime        time.Time
+	Size           int64
+	ImageModTime   time.Time // 外部图片修改时间
+	MetaModTime    time.Time // meta文件修改时间
+	MetaSize       int64
+	MetaWorkshopID string // 原始 meta 身份；与文件名/URL 后备身份分开缓存
+	CachedAt       time.Time
 }
 
 // App struct
@@ -63,6 +65,7 @@ type App struct {
 	ctx                    context.Context
 	vpkCache               sync.Map // map[string]*VPKFileCache, key是文件路径
 	mu                     sync.RWMutex
+	vpkScanMu              sync.Mutex // 扫描与根目录切换必须串行，先于 mu 获取
 	configWriteMu          sync.Mutex
 	downloadPersistMu      sync.Mutex
 	downloadPersistTimer   *time.Timer

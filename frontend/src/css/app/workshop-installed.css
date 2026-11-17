@@ -1,0 +1,44 @@
+.workshop-installed-badge,
+.collection-child-meta .workshop-installed-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-surface));
+  color: #047857;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.workshop-installed-badge[hidden] {
+  display: none;
+}
+
+html.dark-mode .workshop-installed-badge {
+  color: #6ee7b7;
+}
+
+.watch-later-item-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.watch-later-item-heading .watch-later-item-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-meta > .workshop-installed-badge {
+  margin-left: auto;
+}
+
+.detail-tags-row > .workshop-installed-badge {
+  order: -1;
+}

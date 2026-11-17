@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import test from "node:test";
+import { setWorkshopInstallationState } from "../src/js/features/workshop/installed.js";
 
 const moduleUrl = new URL("../src/js/features/downloads/task-list.js", import.meta.url).href;
 const dependencies = {
@@ -104,12 +105,17 @@ test.beforeEach(async () => {
   container.id = "download-tasks-list";
   body.appendChild(container);
   const visit = (node, id) => node.id === id ? node : node.children.map((child) => visit(child, id)).find(Boolean);
+  const installedBadges = (node) => [
+    ...(node.dataset.installedWorkshopId ? [node] : []),
+    ...node.children.flatMap(installedBadges),
+  ];
   globalThis.document = {
     body,
     documentElement: { clientHeight: 900 },
     createElement: (tag) => new Element(tag),
     createElementNS: (_, tag) => new Element(tag),
     getElementById: (id) => visit(body, id),
+    querySelectorAll: (selector) => selector === "[data-installed-workshop-id]" ? installedBadges(body) : [],
   };
   globalThis.window = { innerHeight: 900, matchMedia: () => ({ matches: false }) };
   frames = new Map();
@@ -127,6 +133,7 @@ test.beforeEach(async () => {
     CancelDownloadTask() {}, RetryDownloadTask() {}, ClearCompletedTasks() {},
   };
   await refreshTaskList();
+  setWorkshopInstallationState({}, "unknown");
   requests = 0;
 });
 
@@ -353,4 +360,40 @@ test("reduced motion still inserts and updates new tasks without movement effect
   assert.deepEqual(container.children.map((node) => node.id), ["task-703", "task-702", "task-701"]);
   assert.equal(document.getElementById("task-703").querySelector(".task-percent").textContent, "33%");
   assert.equal(animations.length, 0);
+});
+
+test("completed tasks only show installed after a local scan and patch their badge without replacing rows", async () => {
+  snapshot = [task("installed", { workshop_id: "123456", status: "completed" })];
+  await refreshTaskList();
+  const row = document.getElementById("task-installed");
+  const badge = row.querySelector(".workshop-installed-badge");
+  const progress = row.querySelector(".progress-fill");
+  assert.equal(badge.hidden, true, "download completion alone does not confirm installation");
+  const state = {};
+  setWorkshopInstallationState(state, "ready", [{ workshopId: "123456", enabled: false }]);
+  assert.equal(badge.hidden, false);
+  setWorkshopInstallationState(state, "loading");
+  assert.equal(badge.hidden, true);
+  setWorkshopInstallationState(state, "ready", []);
+  assert.equal(badge.hidden, true, "deleting the file hides the existing task's badge");
+  assert.equal(document.getElementById("task-installed"), row);
+  assert.equal(row.querySelector(".progress-fill"), progress);
+  assert.equal(requests, 1, "badge updates never refetch task snapshots");
+  assert.equal(refreshes, 0, "badge updates never request local rescans");
+});
+
+test("a task can gain a workshop ID later without duplicating its installation badge", () => {
+  const state = {};
+  setWorkshopInstallationState(state, "ready", [{ workshopId: "123456" }]);
+  updateTaskInList(task("identity"));
+  flushFrames();
+  const row = document.getElementById("task-identity");
+  assert.equal(row.querySelector(".workshop-installed-badge"), null);
+  updateTaskInList({ id: "identity", workshop_id: "123456" });
+  const badge = row.querySelector(".workshop-installed-badge");
+  assert.equal(badge.hidden, false);
+  updateTaskProgress({ id: "identity", progress: 45 });
+  updateTaskInList({ id: "identity", workshop_id: "123456" });
+  assert.equal(row.querySelector(".workshop-installed-badge"), badge);
+  assert.equal(document.querySelectorAll("[data-installed-workshop-id]").length, 1);
 });

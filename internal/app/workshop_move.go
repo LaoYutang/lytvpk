@@ -154,6 +154,8 @@ func uniqueWorkshopTransferPaths(filePaths []string) []string {
 }
 
 func (a *App) isWorkshopTransferCandidate(filePath string) bool {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	if cached, ok := a.vpkCache.Load(filePath); ok {
 		return cached.(*VPKFileCache).File.Location == "workshop"
 	}
@@ -195,6 +197,7 @@ func (a *App) moveWorkshopVPKToAddons(filePath string) (WorkshopTransferItemResu
 	cache.File.Path = newPath
 	cache.File.Location = "root"
 	cache.File.Enabled = true
+	cache.File.WorkshopID = resolveLocalWorkshopID(a.rootDir, newPath, cache.MetaWorkshopID, cache.File.AddonURL0)
 	a.vpkCache.Delete(filePath)
 	a.vpkCache.Store(newPath, cache)
 	log.Printf("文件已转移: %s -> %s", filePath, newPath)
@@ -318,8 +321,10 @@ func (a *App) applyWorkshopMetaToCache(filePath string, meta WorkshopMeta) {
 		cache.File.Desc = meta.Description
 	}
 	cache.File.WorkshopID = meta.WorkshopID
+	cache.MetaWorkshopID = meta.WorkshopID
 	if metaInfo != nil {
 		cache.MetaModTime = metaInfo.ModTime()
+		cache.MetaSize = metaInfo.Size()
 	}
 	a.vpkCache.Store(filePath, cache)
 }

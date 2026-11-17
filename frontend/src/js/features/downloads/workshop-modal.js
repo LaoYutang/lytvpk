@@ -1,4 +1,5 @@
 import { switchAppPage } from "../../core/ui-shell.js";
+import { appendInstalledBadge } from "../workshop/installed.js";
 import { showError, showNotification, showInfo } from "../../core/toast.js";
 import { getConfig } from "../../core/config.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
@@ -419,6 +420,10 @@ function renderWorkshopGroup(group, groupIndex) {
   `;
 
   const body = groupDiv.querySelector(".workshop-group-body");
+  appendInstalledBadge(groupDiv.querySelector(".workshop-group-actions"), {
+    ...group.main,
+    publishedfileid: rootId,
+  });
   const collectionGroup = isCollectionGroup(group);
   let renderedCount = 0;
   getGroupItems(group).forEach((details, itemIndex) => {
@@ -490,6 +495,7 @@ function renderWorkshopItem(details, groupIndex, itemIndex, collectionGroup = fa
     </div>
   `;
 
+  appendInstalledBadge(itemDiv.querySelector(".workshop-item-heading"), details);
   bindPreviewLoading(itemDiv, previewUrl);
   return itemDiv;
 }

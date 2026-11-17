@@ -1,4 +1,5 @@
 import { workshopDeps } from "./deps.js";
+import { appendInstalledBadge } from "./installed.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { openWorkshopDetail, resetWorkshopDetailView } from "./detail.js";
 import { createWorkshopRequestError } from "./request-error.js";
@@ -337,6 +338,7 @@ function renderWorkshopGrid(items) {
             </div>
         `;
 
+    appendInstalledBadge(card.querySelector(".card-meta"), item);
     card.addEventListener("click", () => {
       openWorkshopDetail(item);
     });
