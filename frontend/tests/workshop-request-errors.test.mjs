@@ -250,6 +250,7 @@ test("pagination errors retain cards and retry the failed page without skipping 
   const retrying = retry.click();
   await element("browser-load-more").click();
   await settle();
+  assert.equal(element("browser-grid").querySelector(".workshop-request-error"), card, "keep the error's space until retry completes");
   assert.deepEqual(pages, [1, 2, 2]);
   assert.equal(browserState.page, 2);
   pending.resolve({ items: [item("second")] });
@@ -258,6 +259,166 @@ test("pagination errors retain cards and retry the failed page without skipping 
   assert.equal(element("browser-grid").querySelector(".workshop-request-error"), null);
   assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, 2);
   assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), ["first", "second"]);
+});
+
+test("initial loading and successive append requests use distinct modes without replacing cards or scrolling", async () => {
+  let pending = Promise.withResolvers();
+  workshopDeps.FetchWorkshopList = () => pending.promise;
+  element("browser-scroll-container").scrollTop = 150;
+  const first = loadWorkshopList();
+  await settle();
+  assert.equal(element("browser-loading").dataset.loadingMode, "initial");
+  assert.equal(element("browser-scroll-container").scrollTop, 0);
+  pending.resolve({ items: [item("first")] });
+  await first;
+  const existing = element("browser-grid").querySelector(".workshop-card");
+  element("browser-scroll-container").scrollTop = 250;
+
+  for (const page of [2, 3]) {
+    pending = Promise.withResolvers();
+    browserState.page = page;
+    const request = loadWorkshopList();
+    await settle();
+    assert.equal(element("browser-loading").dataset.loadingMode, "more");
+    assert.equal(element("browser-loading").classList.contains("hidden"), false);
+    assert.equal(element("browser-grid").querySelector(".workshop-card"), existing);
+    assert.equal(element("browser-scroll-container").scrollTop, 250);
+    pending.resolve({ items: [item(String(page))] });
+    await request;
+    assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, page);
+    assert.equal(element("browser-scroll-container").scrollTop, 250);
+    assert.equal(element("browser-loading").classList.contains("hidden"), true);
+  }
+});
+
+for (const page of [1, 2]) {
+  test(`page ${page} keeps its loading mode and blocks duplicate paging while IP selection is pending`, async (t) => {
+    t.mock.timers.enable({ apis: ["setInterval"] });
+    if (page === 2) await loadWorkshopList();
+    const existing = element("browser-grid").children.slice();
+    const pending = Promise.withResolvers();
+    let selecting = true;
+    const pages = [];
+    workshopDeps.IsSelectingIP = async () => selecting;
+    workshopDeps.FetchWorkshopList = (opts) => { pages.push(opts.page); return pending.promise; };
+    browserState.page = page;
+    element("browser-scroll-container").scrollTop = page === 2 ? 450 : 0;
+    await loadWorkshopList();
+    assert.equal(browserState.loading, true);
+    assert.equal(element("browser-loading").dataset.loadingMode, page > 1 ? "more" : "initial");
+    assert.match(element("browser-loading").textContent, /正在优选/);
+    await element("browser-scroll-container").dispatch("scroll");
+    await element("browser-load-more").click();
+    assert.equal(browserState.page, page);
+    assert.deepEqual(pages, []);
+
+    selecting = false;
+    t.mock.timers.tick(1000);
+    await settle();
+    assert.deepEqual(pages, [page]);
+    assert.equal(browserState.loading, true);
+    assert.equal(element("browser-loading").dataset.loadingMode, page > 1 ? "more" : "initial");
+    if (page === 2) {
+      assert.deepEqual(element("browser-grid").children, existing);
+      assert.equal(element("browser-scroll-container").scrollTop, 450);
+      assert.match(element("browser-loading").textContent, /正在加载更多/);
+    }
+    pending.resolve({ items: [item("resolved")] });
+    await settle();
+    assert.equal(browserState.loading, false);
+    assert.equal(element("browser-loading").classList.contains("hidden"), true);
+  });
+}
+
+test("a failed IP wait on an append page unlocks a footer-mode retry without discarding cards", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  workshopDeps.FetchWorkshopList = async () => ({ items: [item("first")] });
+  await loadWorkshopList();
+  const existing = element("browser-grid").querySelector(".workshop-card");
+  let checks = 0;
+  workshopDeps.IsSelectingIP = async () => {
+    if (++checks === 1) return true;
+    throw new Error("metadata unavailable");
+  };
+  browserState.page = 2;
+  await loadWorkshopList();
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.equal(browserState.loading, false);
+  assert.equal(element("browser-loading").classList.contains("hidden"), true);
+  assert.equal(element("browser-grid").querySelector(".workshop-card"), existing);
+  const pending = Promise.withResolvers();
+  workshopDeps.IsSelectingIP = async () => false;
+  workshopDeps.FetchWorkshopList = () => pending.promise;
+  const retry = button(errorCard(), "重新查询").click();
+  await settle();
+  assert.equal(element("browser-loading").dataset.loadingMode, "more");
+  assert.equal(element("browser-loading").classList.contains("hidden"), false);
+  pending.resolve({ items: [item("second")] });
+  await retry;
+  assert.equal(element("browser-grid").querySelector(".workshop-card"), existing);
+});
+
+for (const change of ["search", "type"]) {
+  test(`replacing an active append request with a new ${change} ignores the old result and cleanup`, async () => {
+    workshopDeps.FetchWorkshopList = async () => ({ items: [item("first")] });
+    await loadWorkshopList();
+    const old = Promise.withResolvers();
+    const latest = Promise.withResolvers();
+    workshopDeps.FetchWorkshopList = ({ page }) => page === 2 ? old.promise : latest.promise;
+    browserState.page = 2;
+    const append = loadWorkshopList();
+    await settle();
+    assert.equal(element("browser-loading").dataset.loadingMode, "more");
+    if (change === "search") {
+      element("browser-search-input").value = "new query";
+      await element("browser-search-btn").click();
+    } else {
+      browserState.filetype = "1";
+      resetWorkshopPaging();
+      loadWorkshopList();
+    }
+    await settle();
+    assert.equal(element("browser-loading").dataset.loadingMode, "initial");
+    assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, 0);
+    if (change === "search") old.resolve({ items: [item("stale")] });
+    else old.reject(new Error("stale failure"));
+    await append;
+    assert.equal(browserState.loading, true);
+    assert.equal(element("browser-loading").classList.contains("hidden"), false);
+    assert.equal(element("browser-loading").dataset.loadingMode, "initial");
+    assert.equal(element("browser-grid").children.length, 0);
+    latest.resolve({ items: [item("latest")] });
+    await settle();
+    assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), ["latest"]);
+    assert.equal(element("browser-loading").classList.contains("hidden"), true);
+  });
+}
+
+test("a replaced append's delayed readiness result cannot reopen an IP wait over a new query", async (t) => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  workshopDeps.FetchWorkshopList = async () => ({ items: [item("first")] });
+  await loadWorkshopList();
+  const readiness = Promise.withResolvers();
+  const latest = Promise.withResolvers();
+  workshopDeps.IsSelectingIP = () => readiness.promise;
+  browserState.page = 2;
+  const append = loadWorkshopList();
+  workshopDeps.IsSelectingIP = async () => false;
+  workshopDeps.FetchWorkshopList = () => latest.promise;
+  element("browser-search-input").value = "new query";
+  await element("browser-search-btn").click();
+  await settle();
+  readiness.resolve(true);
+  await append;
+  t.mock.timers.tick(2000);
+  await settle();
+  assert.equal(element("browser-loading").dataset.loadingMode, "initial");
+  assert.doesNotMatch(element("browser-loading").textContent, /正在优选/);
+  assert.equal(browserState.loading, true);
+  latest.resolve({ items: [item("latest")] });
+  await settle();
+  assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), ["latest"]);
 });
 
 test("IP-selection metadata failures show a retryable error without sending a list request", async () => {
