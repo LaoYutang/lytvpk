@@ -42,6 +42,44 @@ func setAPIRequestTestTransport(operation apiOperation, fixture workshopRoundTri
 	operation.mapClient.Transport = fixture
 }
 
+func TestWorkshopSortRequestsAndCacheKeys(t *testing.T) {
+	for _, line := range []network.APILine{network.APILinePrimary, network.APILineBackup} {
+		t.Run(string(line), func(t *testing.T) {
+			app, operation := newAPIRequestTestOperation(t, line)
+			calls := 0
+			var last url.Values
+			setAPIRequestTestTransport(operation, workshopRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+				calls++
+				last = request.URL.Query()
+				return workshopJSONResponse(request, `{"response":{"publishedfiledetails":[{"publishedfileid":"17","title":"Fixture"}],"total":50}}`), nil
+			}))
+			for _, sort := range []string{"relevance", "trend", "recent", "top", "subs"} {
+				opts := WorkshopQueryOptions{Page: 1, SearchText: "未花", Sort: sort, FileType: "0"}
+				before := calls
+				if _, err := app.fetchWorkshopListWithOperation(operation, opts); err != nil {
+					t.Fatal(err)
+				}
+				if calls != before+1 || last.Get("sort") != sort || last.Get("q") != "未花" {
+					t.Fatalf("sort/keyword changed or reused another sort cache: calls=%d query=%v", calls, last)
+				}
+				if _, err := app.fetchWorkshopListWithOperation(operation, opts); err != nil || calls != before+1 {
+					t.Fatalf("same query was not cached: calls=%d error=%v", calls, err)
+				}
+			}
+			for _, opts := range []WorkshopQueryOptions{
+				{Page: 2, SearchText: "未花", Sort: "subs", FileType: "0"},
+				{Page: 1, SearchText: "海岸", Sort: "subs", FileType: "0"},
+				{Page: 1, SearchText: "未花", Sort: "subs", FileType: "1"},
+			} {
+				before := calls
+				if _, err := app.fetchWorkshopListWithOperation(operation, opts); err != nil || calls != before+1 {
+					t.Fatalf("page/keyword/type cache collision: calls=%d error=%v", calls, err)
+				}
+			}
+		})
+	}
+}
+
 func TestAPILineRequestsPreserveProtocols(t *testing.T) {
 	for _, line := range []network.APILine{network.APILinePrimary, network.APILineBackup} {
 		t.Run(string(line), func(t *testing.T) {

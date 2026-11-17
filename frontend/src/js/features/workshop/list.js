@@ -9,7 +9,7 @@ import {
   updateBrowserCategoryIndicator,
   updateBrowserSortIndicator,
 } from "./sidebar.js";
-import { browserState, resetWorkshopPaging } from "./state.js";
+import { browserState, resetWorkshopPaging, setWorkshopSearchQuery } from "./state.js";
 import {
   escapeHtml,
   formatNumber,
@@ -68,6 +68,16 @@ function setupWorkshopTypeToggle() {
       loadWorkshopList();
     });
   });
+}
+
+function updateWorkshopSortSelection() {
+  document.querySelectorAll("#browser-sort-list .filter-item").forEach((item) => {
+    const available = item.dataset.sort !== "relevance" || Boolean(browserState.query);
+    item.classList.toggle("hidden", !available);
+    item.classList.toggle("active", item.dataset.sort === browserState.sort);
+    item.setAttribute("aria-current", item.dataset.sort === browserState.sort ? "true" : "false");
+  });
+  updateBrowserSortIndicator();
 }
 
 function updateWorkshopLoadMoreButton() {
@@ -163,6 +173,7 @@ export function openBrowser(options = {}) {
 
 export async function loadWorkshopList() {
   if (browserState.loading) return;
+  updateWorkshopSortSelection();
   const line = getAPILineSnapshot();
   const page = browserState.page;
   const sequence = ++listRequestSequence;
@@ -347,12 +358,12 @@ document.addEventListener("DOMContentLoaded", () => {
     .querySelectorAll("#browser-sort-list .filter-item")
     .forEach((item) => {
       item.addEventListener("click", () => {
-        document.querySelectorAll("#browser-sort-list .filter-item").forEach((sortItem) => sortItem.classList.remove("active"));
-        item.classList.add("active");
-
-        updateBrowserSortIndicator();
-
+        if (item.dataset.sort === "relevance" && !browserState.query) return;
         browserState.sort = item.dataset.sort;
+        clearTimeout(searchDebounceTimer);
+        const input = document.getElementById("browser-search-input");
+        if (input) browserState.query = input.value.trim();
+        if (!browserState.query && browserState.sort === "relevance") browserState.sort = "trend";
         resetWorkshopPaging();
         loadWorkshopList();
       });
@@ -395,7 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const performBrowserSearch = () => {
     clearTimeout(searchDebounceTimer);
     if (browserSearch) {
-      browserState.query = browserSearch.value.trim();
+      setWorkshopSearchQuery(browserSearch.value);
     }
     resetWorkshopPaging();
     loadWorkshopList();
@@ -426,6 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (browserResetBtn) {
     browserResetBtn.addEventListener("click", () => {
+      clearTimeout(searchDebounceTimer);
       if (browserSearch) browserSearch.value = "";
 
       browserState.query = "";
@@ -434,11 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
       browserState.filetype = "0";
       resetWorkshopPaging();
 
-      document.querySelectorAll("#browser-sort-list .filter-item").forEach((item) => item.classList.remove("active"));
-      const defaultSortItem = document.querySelector("#browser-sort-list .filter-item[data-sort='trend']");
-      if (defaultSortItem) {
-        defaultSortItem.classList.add("active");
-      }
+      updateWorkshopSortSelection();
 
       document.querySelectorAll("#browser-sidebar-content .filter-item").forEach((item) => item.classList.remove("active"));
 

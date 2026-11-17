@@ -21,6 +21,33 @@ func TestValidWorkshopIDs(t *testing.T) {
 	}
 }
 
+func TestWorkshopSortingQueries(t *testing.T) {
+	for _, sort := range []string{"", "relevance", "trend", "recent", "top", "subs"} {
+		for _, keyword := range []string{"", "未花"} {
+			for _, filetype := range []string{"0", "1"} {
+				t.Run(sort+"_"+keyword+"_"+filetype, func(t *testing.T) {
+					q := url.Values{"sort": {sort}, "q": {keyword}, "page": {"2"}, "filetype": {filetype}}
+					r := httptest.NewRequest("GET", "/list?"+q.Encode(), nil)
+					dest := selectRoute(r)
+					if err := validateQuery(r, &dest); err != nil {
+						t.Fatal(err)
+					}
+					if dest.query.Get("sort") != sort || dest.query.Get("q") != keyword || dest.query.Get("page") != "2" || dest.query.Get("filetype") != filetype {
+						t.Fatalf("sorting query changed: %v", dest.query)
+					}
+				})
+			}
+		}
+	}
+	for _, sort := range []string{"invalid", "__proto__", "9", "subs\n"} {
+		r := httptest.NewRequest("GET", "/list?sort="+url.QueryEscape(sort), nil)
+		dest := selectRoute(r)
+		if err := validateQuery(r, &dest); err == nil {
+			t.Fatalf("accepted unsupported sort %q", sort)
+		}
+	}
+}
+
 func TestParseBodyValidation(t *testing.T) {
 	for _, body := range []string{`[1]`, `["1"]`, `[9007199254740993,"18446744073709551615"]`, " [ 123 , \"456\" ] \n", `["\u0031"]`} {
 		t.Run("valid_"+body, func(t *testing.T) {

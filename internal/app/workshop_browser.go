@@ -24,7 +24,7 @@ var WorkshopWorkerURL = network.EndpointsForAPILine(network.APILinePrimary).Work
 type WorkshopQueryOptions struct {
 	Page       int      `json:"page"`
 	SearchText string   `json:"search_text"`
-	Sort       string   `json:"sort"` // trend, recent, top
+	Sort       string   `json:"sort"` // relevance, trend, recent, top, subs
 	Tags       []string `json:"tags"`
 	FileType   string   `json:"filetype"`
 }

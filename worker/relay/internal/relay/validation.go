@@ -63,7 +63,7 @@ func validateQuery(r *http.Request, dest *route) error {
 				return fmt.Errorf("page must be an integer between 0 and 1000000")
 			}
 		}
-		if !oneOf(q.Get("sort"), "", "trend", "recent", "top") || !oneOf(q.Get("filetype"), "", "0", "1") {
+		if !oneOf(q.Get("sort"), "", "relevance", "trend", "recent", "top", "subs") || !oneOf(q.Get("filetype"), "", "0", "1") {
 			return fmt.Errorf("invalid sort or filetype")
 		}
 		if !safeText(q.Get("q"), 512) || !safeText(q.Get("tags"), 1024) || len(strings.Split(q.Get("tags"), ",")) > 32 {
