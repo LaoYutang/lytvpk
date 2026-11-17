@@ -421,6 +421,47 @@ test("a replaced append's delayed readiness result cannot reopen an IP wait over
   assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), ["latest"]);
 });
 
+test("list pagination accepts cached 20-item pages followed by 50 items, retries and a short final page", async () => {
+  const pages = [];
+  const firstItems = Array.from({ length: 20 }, (_, index) => item(String(index + 1)));
+  const secondItems = Array.from({ length: 50 }, (_, index) => item(String(index + 51)));
+  const lastItems = Array.from({ length: 7 }, (_, index) => item(String(index + 101)));
+  let failSecondPage = true;
+  workshopDeps.FetchWorkshopList = async ({ page, filetype }) => {
+    pages.push(page);
+    assert.equal(filetype, "0");
+    if (page === 2 && failSecondPage) {
+      failSecondPage = false;
+      throw new Error("主线路请求失败（HTTP 503），请稍后重试");
+    }
+    return { items: page === 1 ? firstItems : page === 2 ? secondItems : page === 3 ? lastItems : [] };
+  };
+  await loadWorkshopList();
+  const existing = element("browser-grid").querySelector(".workshop-card");
+  assert.equal(browserState.data.length, 20);
+  assert.equal(browserState.hasMore, true, "a cached 20-item response must not end pagination");
+  browserState.page = 2;
+  await loadWorkshopList();
+  assert.equal(browserState.data.length, 20);
+  await button(errorCard(), "重新查询").click();
+  await settle();
+  assert.equal(browserState.data.length, 70);
+  assert.equal(browserState.hasMore, true);
+  assert.equal(element("browser-grid").querySelector(".workshop-card"), existing);
+  assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, 70);
+  assert.equal(browserState.data[20].publishedfileid, "51", "the client appends the server response without compensating for mixed-size page gaps");
+  browserState.page = 3;
+  await loadWorkshopList();
+  assert.equal(browserState.data.length, 77);
+  assert.equal(browserState.hasMore, true, "only an empty page ends pagination");
+  browserState.page = 4;
+  await loadWorkshopList();
+  assert.equal(browserState.hasMore, false);
+  assert.equal(browserState.data.length, 77);
+  assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), [...firstItems, ...secondItems, ...lastItems].map((entry) => entry.publishedfileid));
+  assert.deepEqual(pages, [1, 2, 2, 3, 4]);
+});
+
 test("IP-selection metadata failures show a retryable error without sending a list request", async () => {
   let requests = 0;
   workshopDeps.IsSelectingIP = async () => { throw new Error("metadata unavailable"); };
