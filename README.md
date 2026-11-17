@@ -1,6 +1,6 @@
-# LytVPK
+# LytVPK 求生工具箱
 
-一个专为 Left 4 Dead 2 (L4D2) 设计的现代化 VPK 插件管理工具。
+面向 Left 4 Dead 2 (L4D2) 的实用工具集合，提供 VPK Mod 管理、创意工坊浏览与下载、服务器收藏和诊断维护功能。
 > 该项目通篇使用AI生成，本人只在AI陷入困境时进行少量修改。仔细阅读代码你就会发现大量无用变量、不符合规范的函数定义，一个文件几千行的屎山，均不代表本人水平，谢谢！
 
 ![LytVPK](https://img.shields.io/badge/Platform-Windows-blue)

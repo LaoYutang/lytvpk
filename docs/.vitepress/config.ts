@@ -2,8 +2,8 @@ import { defineConfig } from "vitepress";
 
 export default defineConfig({
   lang: "zh-CN",
-  title: "LytVPK",
-  description: "Left 4 Dead 2 VPK Mod 管理器使用文档",
+  title: "LytVPK 求生工具箱",
+  description: "LytVPK 求生工具箱使用说明，涵盖 Left 4 Dead 2 的 Mod 管理、创意工坊下载、服务器收藏与实用工具。",
   cleanUrls: true,
   sitemap: {
     hostname: "https://lytvpk-docs.laoyutang.cn",

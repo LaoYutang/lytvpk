@@ -22,9 +22,9 @@ export async function renderAboutPage({
           <img src="${logoUrl}" alt="" />
         </div>
         <div class="about-hero-copy">
-          <div class="about-kicker">Left 4 Dead 2 MOD Manager</div>
-          <h2>LytVpk</h2>
-          <p>轻量、清爽的 Left 4 Dead 2 MOD 管理工具，用来整理 VPK、创意工坊下载、服务器收藏和常用维护流程。</p>
+          <div class="about-kicker">Left 4 Dead 2 Toolbox</div>
+          <h2>LytVPK 求生工具箱</h2>
+          <p>面向 Left 4 Dead 2 的实用工具集合，提供 VPK Mod 管理、创意工坊浏览与下载、服务器收藏和常用诊断维护功能。</p>
         </div>
       </section>
 
