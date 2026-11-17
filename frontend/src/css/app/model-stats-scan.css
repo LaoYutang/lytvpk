@@ -137,6 +137,10 @@
   flex-shrink: 0;
 }
 
+html.dark-mode .model-stats-view-toggle {
+  box-shadow: none;
+}
+
 .model-stats-view-indicator {
   position: absolute;
   top: 2px;
@@ -573,29 +577,6 @@
   font-size: 1.08rem;
   font-weight: 800;
   line-height: 1.2;
-}
-
-.model-stats-beta-badge,
-.diagnostics-beta-badge {
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid rgba(79, 70, 229, 0.2);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 8%, var(--bg-surface));
-  color: var(--primary);
-  font-weight: 800;
-  letter-spacing: 0;
-  white-space: nowrap;
-}
-
-.model-stats-beta-badge {
-  padding: 2px 7px;
-  font-size: 0.68rem;
-}
-
-.diagnostics-beta-badge {
-  padding: 2px 6px;
-  font-size: 0.66rem;
 }
 
 .model-stats-error-icon {
