@@ -46,4 +46,6 @@ go test ./...
 wails build
 ```
 
+Windows 构建产物为 `build/bin/LytVPK 求生工具箱.exe`，正式发布的 ZIP 包内也使用同一文件名。
+
 在受限环境中，`wails build` 可能因为权限问题失败，需要在本机正常权限下重新验证。

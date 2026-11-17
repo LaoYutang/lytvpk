@@ -82,7 +82,7 @@ wails build
 发布流程在推送 `v*` tag 时触发，运行环境为 `windows-latest`，使用 Go 1.25.x、Node.js 20 和 Wails v2.10.2。核心构建命令为：
 
 ```powershell
-wails build -platform windows/amd64 -ldflags "-X main.AppVersion=<version>" -o "LytVPK MOD管理器.exe"
+wails build -platform windows/amd64 -ldflags "-X main.AppVersion=<version>" -o "LytVPK 求生工具箱.exe"
 ```
 
 `main.AppVersion` 本地默认值为 `0.0.0`，发布时通过 `-ldflags` 注入版本号。

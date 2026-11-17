@@ -33,7 +33,7 @@
 				"-gcflags",
 				"all=-N -l",
 				"-o",
-				"build/bin/lytvpk.exe"
+				"build/bin/LytVPK 求生工具箱.exe"
 			]
 		},
 		{
@@ -68,7 +68,7 @@
 				"-gcflags",
 				"all=-N -l",
 				"-o",
-				"build/bin/lytvpk.exe"
+				"build/bin/LytVPK 求生工具箱.exe"
 			]
 		},
 		{
@@ -103,7 +103,7 @@
 				"-gcflags",
 				"all=-N -l",
 				"-o",
-				"build/bin/lytvpk.exe"
+				"build/bin/LytVPK 求生工具箱.exe"
 			]
 		},
 		{

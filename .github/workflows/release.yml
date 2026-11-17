@@ -44,8 +44,8 @@ jobs:
 
           # 3. 运行 Wails 构建
           # -ldflags "-X main.AppVersion=$VERSION" 会将版本号注入到 main.go 的 AppVersion 变量中
-          # -o 指定输出文件名为 "LytVPK MOD管理器.exe"
-          wails build -platform windows/amd64 -ldflags "-X main.AppVersion=$VERSION" -o "LytVPK MOD管理器.exe"
+          # -o 指定输出文件名为 "LytVPK 求生工具箱.exe"
+          wails build -platform windows/amd64 -ldflags "-X main.AppVersion=$VERSION" -o "LytVPK 求生工具箱.exe"
 
       - name: Generate Changelog
         id: changelog
@@ -73,7 +73,7 @@ jobs:
           cd build/bin
           # 将 exe 压缩为 zip (go-github-selfupdate 要求 zip 格式)
           # 命名格式建议: 应用名_版本_系统_架构.zip
-          Compress-Archive -Path "LytVPK MOD管理器.exe" -DestinationPath "../../LytVPK-MOD-Manager_${{ github.ref_name }}_windows_amd64.zip"
+          Compress-Archive -Path "LytVPK 求生工具箱.exe" -DestinationPath "../../LytVPK-MOD-Manager_${{ github.ref_name }}_windows_amd64.zip"
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
