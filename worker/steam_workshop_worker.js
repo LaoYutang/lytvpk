@@ -206,7 +206,10 @@ export default {
     }
 
     // 0. 检查缓存 (CF Cache)
-    const cache = caches.default;
+    // 独立命名空间隔离旧列表排序缓存，不删除旧缓存或改变详情缓存。
+    const cache = path === "/list"
+      ? await caches.open("workshop-list-sorting-v2")
+      : caches.default;
     let cachedResponse = await cache.match(request);
     if (cachedResponse) {
       return cachedResponse;
@@ -265,6 +268,15 @@ export default {
 // Handler 1: 列表查询 (IPublishedFileService/QueryFiles)
 // ----------------------------------------------------
 const WORKSHOP_PAGE_SIZE = 50;
+// IPublishedFileService Web API 枚举，与 ISteamUGC SDK 的编号不同。
+// https://partner.steamgames.com/doc/webapi/IPublishedFileService#EPublishedFileQueryType
+const WORKSHOP_SORT_TYPES = {
+  relevance: "12", // RankedByTextSearch
+  trend: "3", // RankedByTrend
+  recent: "1", // RankedByPublicationDate
+  top: "0", // RankedByVote
+  subs: "9", // RankedByTotalUniqueSubscriptions（不是收藏数）
+};
 
 function buildListUrl(url, env, filetype) {
   const steamApiUrl = new URL(
@@ -276,40 +288,21 @@ function buildListUrl(url, env, filetype) {
   params.set("appid", "550"); // L4D2
   params.set("return_details", "true"); // 返回详情
   params.set("numperpage", String(WORKSHOP_PAGE_SIZE));
-  params.set("cache_max_age_seconds", "300"); // 其实 Steam 忽略这个，但我们可以加
+  params.set("cache_max_age_seconds", "300"); // 允许 Steam 返回至多 300 秒前的数据
   if (filetype !== null && filetype !== undefined && filetype !== "") {
     params.set("filetype", filetype);
   }
 
   // 转发参数
-  const q = url.searchParams.get("q");
-  if (q) {
-    params.set("search_text", q);
-    params.set("query_type", "12"); // 12-RankedByTextSearch 如果有搜索词
-  } else {
-    const sort = url.searchParams.get("sort") || "trend";
-    // 映射排序
-    // 0: RankedByVote 1: RankedByPublicationDate 2: RankedByAcceptedForGame
-    // 3: RankedByTrend 4: RankedByTotalUniqueSubscriptions 5: RankedByAccountID
-    // ... 查看 Steam 文档
-    // 常用: trend -> 3, recent -> 1, top -> 4?
-    // QueryFiles sort order:
-    // 1 = trend most recently updated? No.
-    // Let's use the standard enumeration for QueryFiles:
-    // k_PublishedFileQueryType_RankedByVote = 0
-    // k_PublishedFileQueryType_RankedByPublicationDate = 1
-    // k_PublishedFileQueryType_RankedByAcceptedForGame = 2
-    // k_PublishedFileQueryType_RankedByTrend = 3
-    // k_PublishedFileQueryType_RankedByTotalUniqueSubscriptions = 4
-
-    // 注意：Steam API "query_type" 的定义有点混乱，QueryFiles v1 经常混用。
-    // 为了保险，我们用最常用的：
-    if (sort === "recent")
-      params.set("query_type", "1"); // Date
-    else if (sort === "top")
-      params.set("query_type", "0"); // Vote
-    else params.set("query_type", "3"); // Trend (Default)
-  }
+  const q = (url.searchParams.get("q") || "").trim();
+  if (q) params.set("search_text", q);
+  const fallbackSort = q ? "relevance" : "trend";
+  const requestedSort = url.searchParams.get("sort") || fallbackSort;
+  const sort = requestedSort === "relevance" && !q ? "trend" : requestedSort;
+  const queryType = Object.hasOwn(WORKSHOP_SORT_TYPES, sort)
+    ? WORKSHOP_SORT_TYPES[sort]
+    : WORKSHOP_SORT_TYPES[fallbackSort];
+  params.set("query_type", queryType);
 
   const page = url.searchParams.get("page") || "0";
   params.set("page", page);

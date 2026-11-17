@@ -14,6 +14,10 @@ async function rateLimitFixture(t, env = {}) {
   t.mock.method(globalThis, "fetch", async () => assert.fail("rate-limit tests must not call Steam"));
   const previousCaches = globalThis.caches;
   globalThis.caches = {
+    async open(name) {
+      assert.equal(name, "workshop-list-sorting-v2");
+      return this.default;
+    },
     default: {
       async match(request) {
         cacheMatches++;

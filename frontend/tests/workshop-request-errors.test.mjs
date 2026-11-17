@@ -98,10 +98,16 @@ class Element {
 let elements;
 let frames;
 let navigations;
+let sortItems;
 test.beforeEach(() => {
   elements = new Map();
   frames = [];
   navigations = [];
+  sortItems = new Map(["relevance", "trend", "recent", "top", "subs"].map((sort) => {
+    const node = new Element("li");
+    node.dataset.sort = sort;
+    return [sort, node];
+  }));
   const body = new Element("body");
   globalThis.document = {
     body,
@@ -118,7 +124,7 @@ test.beforeEach(() => {
     createElementNS: (_, tag) => new Element(tag),
     addEventListener() {},
     dispatchEvent(event) { navigations.push(event.type); return true; },
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => selector === "#browser-sort-list .filter-item" ? [...sortItems.values()] : [],
   };
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); };
   setAPILineState("primary");
@@ -150,6 +156,97 @@ function button(card, text) {
 }
 async function settle() { for (let index = 0; index < 12; index++) await Promise.resolve(); }
 function flushFrames() { const callbacks = frames.splice(0); callbacks.forEach((callback) => callback()); }
+
+test("a new search selects visible relevance and clearing it restores browsing trend", async () => {
+  const requests = [];
+  workshopDeps.FetchWorkshopList = async (opts) => { requests.push(opts); return { items: [item("result")] }; };
+  element("browser-search-input").value = "  未花  ";
+  await element("browser-search-btn").click();
+  await settle();
+  assert.equal(requests[0].search_text, "未花");
+  assert.equal(requests[0].sort, "relevance");
+  assert.equal(sortItems.get("relevance").classList.contains("active"), true);
+  assert.equal(sortItems.get("relevance").classList.contains("hidden"), false);
+  element("browser-search-input").value = " ";
+  await element("browser-search-btn").click();
+  await settle();
+  assert.equal(browserState.sort, "trend");
+  assert.equal(sortItems.get("relevance").classList.contains("hidden"), true);
+  assert.equal(sortItems.get("trend").classList.contains("active"), true);
+});
+
+for (const sort of ["trend", "recent", "top", "subs"]) {
+  test(`search respects explicit ${sort} across keyword changes, paging and clearing`, async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const requests = [];
+    workshopDeps.FetchWorkshopList = async (opts) => { requests.push(opts); return { items: [item(String(requests.length))] }; };
+    const input = element("browser-search-input");
+    input.value = "未花";
+    await element("browser-search-btn").click();
+    await settle();
+    assert.equal(browserState.sort, "relevance");
+    input.value = "海岸";
+    await input.dispatch("input");
+    await sortItems.get(sort).click();
+    await settle();
+    t.mock.timers.tick(1000);
+    await settle();
+    assert.equal(requests.length, 2, "choosing a sort consumes the pending search debounce");
+    assert.equal(requests.at(-1).search_text, "海岸");
+    assert.equal(requests.at(-1).sort, sort);
+    assert.equal(sortItems.get(sort).classList.contains("active"), true);
+    input.value = "river";
+    await element("browser-search-btn").click();
+    await settle();
+    assert.equal(requests.at(-1).sort, sort);
+    browserState.page = 2;
+    await loadWorkshopList();
+    assert.equal(requests.at(-1).page, 2);
+    assert.equal(requests.at(-1).sort, sort);
+    input.value = "";
+    await element("browser-search-btn").click();
+    await settle();
+    assert.equal(browserState.page, 1);
+    assert.equal(requests.at(-1).sort, sort);
+    assert.equal(requests.at(-1).search_text, "");
+    input.value = "new search";
+    await element("browser-search-btn").click();
+    await settle();
+    assert.equal(requests.at(-1).sort, "relevance");
+    await element("browser-reset-btn").click();
+    await settle();
+    assert.equal(browserState.sort, "trend");
+    assert.equal(browserState.query, "");
+  });
+}
+
+for (const staleFailure of [false, true]) {
+  test(`changing sort supersedes a pending page and ignores stale ${staleFailure ? "failure" : "success"}`, async () => {
+    const old = Promise.withResolvers();
+    const latest = Promise.withResolvers();
+    element("browser-search-input").value = "未花";
+    browserState.query = "未花";
+    browserState.sort = "relevance";
+    browserState.page = 2;
+    workshopDeps.FetchWorkshopList = () => old.promise;
+    const request = loadWorkshopList();
+    await settle();
+    workshopDeps.FetchWorkshopList = () => latest.promise;
+    await sortItems.get("subs").click();
+    await settle();
+    assert.equal(browserState.page, 1);
+    assert.equal(browserState.sort, "subs");
+    if (staleFailure) old.reject(new Error("stale error"));
+    else old.resolve({ items: [item("stale")] });
+    await request;
+    assert.equal(browserState.loading, true);
+    assert.equal(element("browser-grid").children.length, 0);
+    latest.resolve({ items: [item("latest")] });
+    await settle();
+    assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), ["latest"]);
+    assert.equal(element("browser-loading").classList.contains("hidden"), true);
+  });
+}
 
 test("initial list failures show shared error details and retry only after a user query", async () => {
   const pages = [];

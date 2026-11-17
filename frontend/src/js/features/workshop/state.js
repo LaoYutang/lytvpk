@@ -12,6 +12,16 @@ export const browserState = {
   data: [],
 };
 
+export function setWorkshopSearchQuery(value) {
+  const hadQuery = Boolean(browserState.query);
+  browserState.query = String(value ?? "").trim();
+  if (browserState.query && !hadQuery) {
+    browserState.sort = "relevance";
+  } else if (!browserState.query && browserState.sort === "relevance") {
+    browserState.sort = "trend";
+  }
+}
+
 export function resetWorkshopPaging() {
   // A new query starts its own request sequence instead of waiting for an old page.
   browserState.loading = false;
