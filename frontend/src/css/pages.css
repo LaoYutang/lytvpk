@@ -70,6 +70,16 @@
   backdrop-filter: blur(2px);
 }
 
+.workshop-page #browser-loading[data-loading-mode="more"] {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  padding: var(--spacing-4);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .workshop-page #browser-loading.hidden {
   display: none !important;
 }

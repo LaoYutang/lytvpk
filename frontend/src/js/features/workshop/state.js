@@ -13,6 +13,8 @@ export const browserState = {
 };
 
 export function resetWorkshopPaging() {
+  // A new query starts its own request sequence instead of waiting for an old page.
+  browserState.loading = false;
   browserState.page = 1;
   browserState.data = [];
   browserState.hasMore = true;

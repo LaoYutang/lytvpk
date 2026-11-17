@@ -169,6 +169,8 @@ export async function loadWorkshopList() {
   const isCurrentRequest = () => isCurrentAPILine(line) && sequence === listRequestSequence;
   clearInterval(ipSelectionTimer);
   browserState.loading = true;
+  const loadingEl = document.getElementById("browser-loading");
+  if (loadingEl) loadingEl.dataset.loadingMode = page > 1 ? "more" : "initial";
 
   let isSelecting;
   try {
@@ -185,10 +187,7 @@ export async function loadWorkshopList() {
   }
   if (!isCurrentRequest()) return;
   if (isSelecting) {
-    browserState.loading = false;
-
     const grid = document.getElementById("browser-grid");
-    const loadingEl = document.getElementById("browser-loading");
     const loadMoreBtn = document.getElementById("browser-load-more");
 
     browserState.loadFailed = false;
@@ -212,6 +211,7 @@ export async function loadWorkshopList() {
       } catch (error) {
         if (isCurrentRequest()) {
           clearInterval(ipSelectionTimer);
+          browserState.loading = false;
           renderWorkshopListRequestError(error, {
             page, line, isCurrentRequest,
             fallback: "无法读取网络优选状态，请点击“重新查询”再试。",
@@ -222,7 +222,7 @@ export async function loadWorkshopList() {
       if (!isCurrentRequest()) return;
       if (!stillSelecting) {
         clearInterval(ipSelectionTimer);
-        if (loadingEl) loadingEl.innerHTML = renderWorkshopLoading();
+        browserState.loading = false;
         loadWorkshopList();
       }
     }, 1000);
@@ -236,11 +236,10 @@ export async function loadWorkshopList() {
   }
 
   const grid = document.getElementById("browser-grid");
-  const loadingEl = document.getElementById("browser-loading");
 
   loadingEl.classList.remove("hidden");
   loadingEl.innerHTML = renderWorkshopLoading(
-    browserState.page === 1 ? "正在加载创意工坊列表..." : "正在加载更多内容..."
+    page === 1 ? "正在加载创意工坊列表..." : "正在加载更多内容..."
   );
   browserState.loadFailed = false;
   updateWorkshopLoadMoreButton();
@@ -251,9 +250,6 @@ export async function loadWorkshopList() {
     const scrollContainer = document.getElementById("browser-scroll-container");
     if (scrollContainer) scrollContainer.scrollTop = 0;
   } else {
-    const errorEl = grid.querySelector(".error-state");
-    if (errorEl) errorEl.remove();
-
     const emptyEl = grid.querySelector(".empty-state");
     if (emptyEl) emptyEl.remove();
   }
@@ -269,6 +265,7 @@ export async function loadWorkshopList() {
 
     const result = await workshopDeps.FetchWorkshopList(opts);
     if (!isCurrentRequest()) return;
+    if (page > 1) grid.querySelector(".error-state")?.remove();
 
     if (result.items && result.items.length > 0) {
       renderWorkshopGrid(result.items);
