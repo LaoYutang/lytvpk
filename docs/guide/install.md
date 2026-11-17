@@ -2,11 +2,13 @@
 
 ## 系统要求
 
-LytVPK 是 Windows 桌面应用，建议在 Windows 10 或 Windows 11 上使用。
+LytVPK 求生工具箱是 Windows 桌面应用，建议在 Windows 10 或 Windows 11 上使用。
 
 ## 启动应用
 
 下载发布版后，运行 `LytVPK MOD管理器.exe`。应用启动后会进入主界面，并尝试读取上次保存的配置。
+
+应用介绍使用“LytVPK 求生工具箱”这一展示名称，顶部标题和启动文件名保留原有名称。
 
 首次启动通常需要手动选择 L4D2 的 `addons` 目录。
 
