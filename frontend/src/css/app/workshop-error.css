@@ -55,6 +55,10 @@
 .workshop-request-error--compact { width: 100%; margin: 8px 0; padding: 20px; }
 .workshop-detail-view > .workshop-request-error { max-height: calc(100% - 72px); overflow-y: auto; }
 .workshop-request-error--notice { width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow-y: auto; margin: 0; pointer-events: auto; box-shadow: var(--shadow-lg); }
+/* 通知卡片比容器宽时，沿容器右边缘向窗口内侧展开。 */
+#toast-container > .workshop-request-error--notice {
+  align-self: auto;
+}
 body > .workshop-request-error--notice { position: fixed; z-index: var(--z-toast); bottom: 20px; right: 20px; max-height: calc(100vh - 64px); overflow-y: auto; }
 html.dark-mode .workshop-request-error__icon { color: var(--danger-light); background: rgba(239, 68, 68, 0.12); border-color: rgba(248, 113, 113, 0.2); }
 
