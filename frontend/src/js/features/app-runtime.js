@@ -84,6 +84,7 @@ import {
 import { showError, showNotification, handleError } from "../core/toast.js";
 import { getAPILineSnapshot, isCurrentAPILine } from "../core/api-line.js";
 import { showWorkshopRequestError } from "./workshop/request-error.js";
+import { showWorkshopUpdateResult } from "./update/workshop-check.js";
 import { appState, applyConfigToAppState } from "./state.js";
 import { renderFileList } from "./file-list/render.js";
 import {
@@ -433,18 +434,7 @@ async function runScheduledWorkshopUpdateCheck() {
   try {
     const result = await CheckModUpdates();
     if (!isCurrentAPILine(snapshot) || !isEnabled()) return;
-    if (!Number.isInteger(result?.failed_count) || result.failed_count !== 0 || !Number.isInteger(result?.total_updates) || result.total_updates < 0) {
-      showWorkshopRequestError({
-        title: "更新检查未完成",
-        error: result?.first_error,
-        line: result?.line || line,
-        fallback: "部分工坊项目未取得有效检查结果，请重新检查。",
-        retryLabel: "重新检查",
-        retryHint: "可以点击“重新检查”再次检查，或在设置中切换线路后重试。",
-        onRetry: runScheduledWorkshopUpdateCheck,
-      });
-      return;
-    }
+    if (!showWorkshopUpdateResult(result, { line, onRetry: runScheduledWorkshopUpdateCheck, notify: showNotification })) return;
     const nextConfig = getConfig();
     nextConfig.lastUpdateCheckTime = String(Date.now());
     saveConfig(nextConfig);
@@ -1282,8 +1272,11 @@ function setupWailsEvents() {
   });
 
   // 监听Mod更新检测事件
-  EventsOn("mod_update_check_complete", () => {
+  EventsOn("mod_update_check_complete", (result, fromSetting) => {
     refreshFilesKeepFilter();
+    if (fromSetting && result?.line === getAPILineSnapshot().line) {
+      showWorkshopUpdateResult(result, { line: result.line, onRetry: runScheduledWorkshopUpdateCheck, notify: showNotification });
+    }
   });
 }
 

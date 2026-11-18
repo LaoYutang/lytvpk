@@ -31,6 +31,8 @@ func selectRoute(r *http.Request) route {
 		return route{"list", "GET", "l4d2-workshop.laoyutang.cn", "/list", nil}
 	case "/detail":
 		return route{"detail", "GET", "l4d2-workshop.laoyutang.cn", "/detail", nil}
+	case "/updates":
+		return route{"updates", "GET", "l4d2-workshop.laoyutang.cn", "/updates", nil}
 	case "/parse", "/":
 		return route{"parse", "POST", "l4d2-workshop-parse.laoyutang.cn", "/", nil}
 	case "/ips":
@@ -73,6 +75,17 @@ func validateQuery(r *http.Request, dest *route) error {
 		allowed = map[string]bool{"id": true, "with_previews": true}
 		if !validID(q.Get("id")) || !oneOf(strings.ToLower(q.Get("with_previews")), "", "0", "1", "false", "true") {
 			return fmt.Errorf("invalid id or with_previews")
+		}
+	case "updates":
+		allowed = map[string]bool{"ids": true}
+		ids := strings.Split(q.Get("ids"), ",")
+		if len(ids) > 100 {
+			return fmt.Errorf("at most 100 workshop IDs per update check")
+		}
+		for _, id := range ids {
+			if !validID(id) {
+				return fmt.Errorf("invalid update workshop ID")
+			}
 		}
 	case "maps":
 		code := strings.TrimPrefix(dest.path, "/")

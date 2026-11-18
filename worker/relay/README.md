@@ -19,6 +19,7 @@ worker/relay/
 | --- | --- |
 | `GET /list` | `https://l4d2-workshop.laoyutang.cn/list` |
 | `GET /detail` | `https://l4d2-workshop.laoyutang.cn/detail` |
+| `GET /updates?ids=ID,ID`（每批 1–100 个正整数工坊 ID） | `https://l4d2-workshop.laoyutang.cn/updates` |
 | `POST /parse`，兼容 `POST /` | `https://l4d2-workshop-parse.laoyutang.cn/` |
 | `GET /maps/{mapCode}` | `https://l4d2-maps.laoyutang.cn/{mapCode}` |
 | `GET /ips` | `https://lytvpk-get-ips.laoyutang.cn/` |

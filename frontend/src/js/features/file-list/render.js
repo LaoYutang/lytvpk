@@ -60,13 +60,6 @@ export function createFileItem(file) {
   const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
   const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
   const locationBadgeClass = `location-${file.location || "unknown"}`;
-  const hasUpdate = file.hasUpdate;
-
-  const updateTagHtml = hasUpdate
-    ? `<span class="update-available-tag" data-workshop-id="${file.workshopId}" title="点击更新此Mod">待更新</span>`
-    : "";
-
-  // 列表模式：更新标签放在文件名后面
 
   const moreActionsHtml = `
     <div class="more-actions-dropdown">
@@ -131,9 +124,9 @@ export function createFileItem(file) {
 
   item.innerHTML = `
     <div class="file-checkbox-container"></div>
-    <div class="file-name" title="${file.path}">
-      <div class="file-title">${displayTitle}</div>
-      <div class="file-filename">${file.name}${updateTagHtml}</div>
+    <div class="file-name">
+      <div class="file-title">${escapeHtml(displayTitle)}</div>
+      <div class="file-filename"><span class="file-filename-text">${escapeHtml(file.name)}</span></div>
     </div>
     <div class="file-size">${formatFileSize(file.size)}</div>
     <div class="file-location">
@@ -154,6 +147,16 @@ export function createFileItem(file) {
   `;
 
   item.querySelector(".file-checkbox-container").appendChild(checkbox);
+  item.querySelector(".file-name").title = file.path;
+  if (file.hasUpdate) {
+    const update = document.createElement("button");
+    update.type = "button";
+    update.className = "update-available-tag";
+    update.dataset.workshopId = file.workshopId;
+    update.title = "点击更新此Mod";
+    update.textContent = "待更新";
+    item.querySelector(".file-filename").prepend(update);
+  }
 
   item.addEventListener("click", function (e) {
     if (

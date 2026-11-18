@@ -1969,6 +1969,7 @@ html.dark-mode .load-order-row.is-invalid .load-order-action:disabled {
 .file-name {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: var(--spacing-1);
   overflow: hidden;
 }
@@ -1984,13 +1985,21 @@ html.dark-mode .load-order-row.is-invalid .load-order-action:disabled {
 }
 
 .file-filename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   font-weight: 400;
   font-size: var(--text-xs);
   color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.file-filename-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.2;
   opacity: 0.75;
 }
 
@@ -2108,11 +2117,11 @@ html.dark-mode .load-order-row.is-invalid .load-order-action:disabled {
   color: var(--text-muted);
 }
 
-/* 更新可用标签 - 列表模式（文件名后面内联） */
+/* 列表模式下只截断文件名，保留更新按钮。 */
 .update-available-tag {
   display: inline-flex;
   align-items: center;
-  margin-left: 6px;
+  flex: none;
   min-height: 1.6rem;
   padding: 0 var(--spacing-2);
   background: rgba(16, 185, 129, 0.12);
