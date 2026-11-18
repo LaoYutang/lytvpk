@@ -640,7 +640,7 @@ func (a *App) SetWorkshopUpdateCheckEnabled(enabled bool) {
 
 	// 如果开启，立即触发一次检测
 	if enabled && metaEnabled {
-		go a.CheckModUpdates()
+		go a.runModUpdateCheck(true)
 	}
 }
 

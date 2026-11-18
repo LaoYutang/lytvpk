@@ -5,6 +5,7 @@ import { appendServerViewSettings } from "./server-view.js";
 export { loadIPOptionsForDropdown } from "./preferred-ip.js";
 import { getAPILineSnapshot, isCurrentAPILine } from "../../core/api-line.js";
 import { showWorkshopRequestError } from "../workshop/request-error.js";
+import { showWorkshopUpdateResult } from "../update/workshop-check.js";
 
 const SETTINGS_NAV_ICONS = {
   network: `<svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 0 20"/><path d="M12 2a15.3 15.3 0 0 0 0 20"/></svg>`,
@@ -428,22 +429,10 @@ function bindSettingsPage(deps) {
     try {
       const result = await deps.CheckModUpdates();
       if (!isCurrentAPILine(snapshot)) return;
-      if (!Number.isInteger(result?.failed_count) || result.failed_count !== 0 || !Number.isInteger(result?.total_updates) || result.total_updates < 0) {
-        showWorkshopRequestError({
-          title: "更新检查未完成",
-          error: result?.first_error,
-          line: result?.line || line,
-          fallback: "部分工坊项目未取得有效检查结果，请重新检查。",
-          retryLabel: "重新检查",
-          retryHint: "可以点击“重新检查”再次检查，或在设置中切换线路后重试。",
-          onRetry: runManualUpdateCheck,
-        });
-      } else {
+      if (showWorkshopUpdateResult(result, { line, onRetry: runManualUpdateCheck, notify: deps.showNotification, announceSuccess: true })) {
         const config = deps.getConfig();
         config.lastUpdateCheckTime = String(Date.now());
         deps.saveConfig(config);
-        const count = result.total_updates || 0;
-        deps.showNotification(count > 0 ? `检测完成，发现 ${count} 个Mod有更新` : "检测完成，所有Mod均为最新版本", count > 0 ? "info" : "success");
       }
       await deps.refreshFilesKeepFilter();
     } catch (err) {

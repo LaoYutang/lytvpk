@@ -35,6 +35,7 @@ export function getWorkshopMetadataWarning(items) {
 // Shared by browsing, details and parsing. Error text is always inserted as text.
 export function createWorkshopRequestError({
   title = "工坊请求未完成",
+  summary,
   error,
   fallback = "请求未能完成，请稍后重试。",
   line,
@@ -77,6 +78,7 @@ export function createWorkshopRequestError({
   }
   card.appendChild(header);
 
+  if (summary) card.appendChild(element("p", "workshop-request-error__message", summary));
   const message = element("p", "workshop-request-error__message", info.message);
   message.id = `${id}-message`;
   card.appendChild(message);

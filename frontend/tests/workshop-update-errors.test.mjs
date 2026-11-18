@@ -6,6 +6,7 @@ import { getAPILineSnapshot, isCurrentAPILine, setAPILineState } from '../src/js
 
 const settings = await readFile(new URL('../src/js/features/settings/settings-page.js', import.meta.url), 'utf8');
 const runtime = await readFile(new URL('../src/js/features/app-runtime.js', import.meta.url), 'utf8');
+const feedback = await readFile(new URL('../src/js/features/update/workshop-check.js', import.meta.url), 'utf8');
 // Execute the actual production blocks with local bridge and DOM fixtures.
 const manualSource = settings.slice(settings.lastIndexOf('  const manualCheckBtn = document.getElementById("settings-manual-check-btn");'), settings.indexOf('\n  document.querySelectorAll(\'input[name="settings-browser-target"]\')'));
 const scheduledSource = runtime.slice(runtime.indexOf('let _updateCheckPending = false;'), runtime.indexOf('\nasync function initUpdateCheck()'));
@@ -18,8 +19,9 @@ function harness(mode) {
   let response = { failed_count: 1, first_error: '主线路请求失败（HTTP 500），请稍后重试', total_updates: 0, line: 'primary' };
   let calls = 0, refreshes = 0;
   const check = async () => { calls++; return typeof response === 'function' ? response() : response; };
-  const common = { document, getAPILineSnapshot, isCurrentAPILine, showWorkshopRequestError(options) { notices.push(options); }, getConfig() { return config; }, saveConfig(value) { saved.push({ ...value }); }, CheckModUpdates: check };
+  const common = { document, getAPILineSnapshot, isCurrentAPILine, showNotification(...args) { notifications.push(args); }, showWorkshopRequestError(options) { notices.push(options); }, getConfig() { return config; }, saveConfig(value) { saved.push({ ...value }); }, CheckModUpdates: check };
   const context = vm.createContext(common);
+  vm.runInContext(feedback.slice(feedback.indexOf('export function ') + 'export '.length), context);
   if (mode === 'manual') {
     context.deps = { ...common, showNotification(...args) { notifications.push(args); }, async refreshFilesKeepFilter() { refreshes++; } };
     vm.runInContext(`function install(deps) { ${manualSource}\nreturn runManualUpdateCheck; } globalThis.run = install(deps);`, context);
@@ -30,6 +32,27 @@ function harness(mode) {
 }
 
 for (const mode of ['manual', 'scheduled']) {
+  test(`${mode}: unavailable workshop items finish the check with a counted notice`, async () => {
+    setAPILineState('primary');
+    const h = harness(mode);
+    h.setResponse({ failed_count: 0, total_updates: 0, unavailable_count: 2, line: 'primary' });
+    await h.run();
+    assert.equal(h.saved.length, 1);
+    assert.equal(h.notices.length, 0);
+    assert.match(h.notifications[0][0], /2 个工坊项目云端已失效，可能已被作者删除或设为私人/);
+    assert.doesNotMatch(h.notifications[0][0], /所有Mod均为最新/);
+  });
+
+  test(`${mode}: mixed failures preserve distinct counts and last success`, async () => {
+    setAPILineState('primary');
+    const h = harness(mode);
+    h.setResponse({ failed_count: 3, first_error: '主线路暂时不可用（HTTP 503）', total_updates: 2, unavailable_count: 4, line: 'primary' });
+    await h.run();
+    assert.equal(h.saved.length, 0);
+    assert.match(h.notices[0].error, /HTTP 503/);
+    assert.match(h.notices[0].summary, /2 个Mod有更新.*4 个工坊项目云端已失效.*3 个本地 Mod 未能完成检查/);
+  });
+
   test(`${mode}: partial failure keeps success time and awaits explicit retry`, async () => {
     setAPILineState('primary');
     const h = harness(mode);
@@ -141,3 +164,24 @@ for (const setting of ['workshopUpdateCheckEnabled', 'workshopMetaEnabled']) {
     });
   }
 }
+
+test('enabling update checks reports its unavailable result once on the selected line', () => {
+  const start = runtime.indexOf('  EventsOn("mod_update_check_complete"');
+  const eventSource = runtime.slice(start, runtime.indexOf('\n}', start));
+  const reports = [], notified = [];
+  let received, refreshes = 0;
+  const context = vm.createContext({
+    EventsOn(_event, fn) { received = fn; }, refreshFilesKeepFilter() { refreshes++; },
+    getAPILineSnapshot: () => ({ line: 'primary' }), runScheduledWorkshopUpdateCheck() {},
+    showNotification(...args) { notified.push(args); }, showWorkshopRequestError(info) { reports.push(info); },
+  });
+  vm.runInContext(feedback.slice(feedback.indexOf('export function ') + 'export '.length) + '\n' + eventSource, context);
+  const result = { total_updates: 0, failed_count: 0, unavailable_count: 1, line: 'primary' };
+  received(result, false);
+  received({ ...result, line: 'backup' }, true);
+  received(result, true);
+  assert.equal(refreshes, 3);
+  assert.equal(reports.length, 0);
+  assert.equal(notified.length, 1);
+  assert.match(notified[0][0], /1 个工坊项目云端已失效/);
+});

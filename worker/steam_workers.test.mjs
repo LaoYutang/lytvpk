@@ -390,3 +390,101 @@ test("browser uses official collection and dependency endpoints and preserves ch
     });
   }
 });
+
+test("100 update IDs use one Steam call and share a cache key across orderings", async (t) => {
+  const ids = Array.from({ length: 99 }, (_, i) => String(i + 1)).concat("18446744073709551615");
+  const stored = new Map();
+  const cache = {
+    match: async request => stored.get(request.url)?.clone(),
+    put: async (request, response) => stored.set(request.url, response.clone()),
+  };
+  let calls = 0;
+  const runtime = fixtureRuntime(t, (url, init) => {
+    calls++;
+    assert.equal(url.pathname, "/ISteamRemoteStorage/GetPublishedFileDetails/v1/");
+    assert.equal(init.method, "POST");
+    assert.equal(init.body.get("itemcount"), "100");
+    const sent = Array.from({ length: 100 }, (_, i) => init.body.get(`publishedfileids[${i}]`));
+    assert.deepEqual(sent, [...ids].sort());
+    return json({ response: { result: 1, resultcount: sent.length, publishedfiledetails: sent.reverse().map(id => ({
+      publishedfileid: id, result: 1, time_updated: "1700000000", description: "unused",
+    })) } });
+  }, cache);
+  for (const group of [ids, [...ids].reverse()]) {
+    const res = await browser.fetch(new Request("https://worker.invalid/updates?ids=" + group.join(",")), {}, runtime.ctx);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("cache-control"), /s-maxage=3600/);
+    const { items } = await res.json();
+    assert.deepEqual(items, [...ids].sort().map(id => ({ publishedfileid: id, result: 1, time_updated: 1700000000 })));
+    await runtime.flush();
+  }
+  assert.equal(calls, 1);
+  assert.equal(stored.size, 1);
+});
+
+test("update batches isolate unavailable, missing, duplicate and malformed rows and do not cache them", async (t) => {
+  let calls = 0;
+  const runtime = fixtureRuntime(t, (url, init) => {
+    calls++;
+    assert.equal(url.pathname, "/ISteamRemoteStorage/GetPublishedFileDetails/v1/");
+    assert.equal(init.body.get("itemcount"), "6");
+    return json({ response: { result: 1, publishedfiledetails: [
+      { publishedfileid: "99", result: 9 },
+      { publishedfileid: "5", result: 1, time_updated: 0 },
+      { publishedfileid: "3", result: 15 },
+      { publishedfileid: "6", result: 9 },
+      { publishedfileid: "2", result: 9, time_updated: 1800000000 },
+      { publishedfileid: "1", result: 1, time_updated: 1700000000 },
+      { publishedfileid: "6", result: 1, time_updated: 1700000000 },
+    ] } });
+  }, { match: async () => undefined, put: async () => assert.fail("partial responses cannot be cached") });
+  for (let n = 0; n < 2; n++) {
+    const res = await browser.fetch(new Request("https://worker.invalid/updates?ids=2,1,3,2,4,5,6"), {}, runtime.ctx);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    assert.deepEqual((await res.json()).items, [
+      { publishedfileid: "1", result: 1, time_updated: 1700000000 },
+      { publishedfileid: "2", result: 9 }, { publishedfileid: "3", result: 15 },
+      { publishedfileid: "4", result: 0 }, { publishedfileid: "5", result: 1 }, { publishedfileid: "6", result: 0 },
+    ]);
+    await runtime.flush();
+  }
+  assert.equal(calls, 2);
+});
+
+test("updates reject bad batches before Steam and preserve retryable upstream failures", async (t) => {
+  let calls = 0;
+  const runtime = fixtureRuntime(t, () => {
+    calls++;
+    if (calls === 1) return new Response("", { status: 429, headers: { "Retry-After": "7" } });
+    return json({ response: { result: 2, publishedfiledetails: [{ publishedfileid: "1", result: 9 }] } });
+  });
+  for (const qs of ["", "ids=0", "ids=01", "ids=1,,3", "ids=-1", "ids=18446744073709551616", "ids=1&ids=2", "ids=2&foo=1", "ids=" + Array(101).fill("1").join(",")]) {
+    const r = await browser.fetch(new Request("https://worker.invalid/updates?" + qs), {}, runtime.ctx);
+    assert.equal(r.status, 400, qs);
+  }
+  const endpoint = "https://worker.invalid/updates?ids=1";
+  assert.equal((await browser.fetch(new Request(endpoint, { method: "POST" }), {}, runtime.ctx)).status, 405);
+  assert.equal(calls, 0);
+  const limited = await browser.fetch(new Request(endpoint), {}, runtime.ctx);
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get("Retry-After"), "7");
+  assert.equal((await browser.fetch(new Request(endpoint), {}, runtime.ctx)).status, 502);
+  await runtime.flush();
+});
+
+test("legacy detail clients still receive the Steam result 9 envelope", async (t) => {
+  const row = { publishedfileid: "767890855", result: 9 };
+  const calls = [];
+  const runtime = fixtureRuntime(t, (url) => {
+    const method = url.pathname.split("/")[2];
+    calls.push(method);
+    const key = method === "GetPublishedFileDetails" ? "publishedfiledetails" : "collectiondetails";
+    return json({ response: { result: 1, resultcount: 1, [key]: [row] } });
+  });
+  const r = await browser.fetch(new Request("https://worker.invalid/detail?id=767890855"), {}, runtime.ctx);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { response: { result: 1, resultcount: 1, publishedfiledetails: [row] } });
+  assert.deepEqual(calls, ["GetPublishedFileDetails", "GetCollectionDetails"]);
+  await runtime.flush();
+});

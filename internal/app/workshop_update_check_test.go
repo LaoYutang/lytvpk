@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,44 +37,130 @@ func addUpdateCheckFixture(t *testing.T, app *App, id string, confirmed bool) st
 	return path
 }
 
+func addUpdateCheckCopy(t *testing.T, app *App, id, name string, downloaded int64) string {
+	t.Helper()
+	path := filepath.Join(app.configDir, name+".vpk")
+	if err := os.WriteFile(path, []byte("copy"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeWorkshopMeta(path, WorkshopMeta{WorkshopID: id, DownloadedAt: time.Unix(downloaded, 0).UTC().Format(time.RFC3339)}); err != nil {
+		t.Fatal(err)
+	}
+	app.vpkCache.Store(path, &VPKFileCache{File: VPKFile{Path: path, WorkshopID: id}})
+	return path
+}
+
+func updateRequestIDs(request *http.Request) []string {
+	return strings.Split(request.URL.Query().Get("ids"), ",")
+}
+
+func currentUpdateResponse(request *http.Request) *http.Response {
+	var items []map[string]any
+	for _, id := range updateRequestIDs(request) {
+		items = append(items, map[string]any{"publishedfileid": id, "result": 1, "time_updated": 1590000000})
+	}
+	data, _ := json.Marshal(map[string]any{"items": items})
+	return workshopJSONResponse(request, string(data))
+}
+
 func TestWorkshopUpdateCheckKeepsSuccessAndReportsFailures(t *testing.T) {
 	app, operation := newAPIRequestTestOperation(t, network.APILineBackup)
 	updatedPath := addUpdateCheckFixture(t, app, "17", false)
-	addUpdateCheckFixture(t, app, "18", false)
+	newerPath := addUpdateCheckCopy(t, app, "00017", "newer", 1800000000)
+	missingPath := addUpdateCheckFixture(t, app, "18", false)
+	addUpdateCheckCopy(t, app, "18", "missing-copy", 1600000001)
 	addUpdateCheckFixture(t, app, "19", false)
 	addUpdateCheckFixture(t, app, "20", false)
 	addUpdateCheckFixture(t, app, "21", true)
+	addUpdateCheckFixture(t, app, "22", false)
+	badID := addUpdateCheckFixture(t, app, "0", false)
 	var calls atomic.Int32
 	setAPIRequestTestTransport(operation, workshopRoundTripFunc(func(request *http.Request) (*http.Response, error) {
-		calls.Add(1)
-		id := request.URL.Query().Get("id")
-		switch id {
-		case "17":
-			return workshopJSONResponse(request, `{"response":{"publishedfiledetails":[{"publishedfileid":"17","time_updated":1700000000}]}}`), nil
-		case "18":
-			return workshopJSONResponse(request, `{"response":{"publishedfiledetails":[{"publishedfileid":"18","time_updated":"1590000000"}]}}`), nil
-		case "19":
-			response := workshopJSONResponse(request, `{"error":"https://private.invalid 192.0.2.9 token=secret"}`)
-			response.StatusCode = http.StatusTooManyRequests
-			response.Header.Set("Retry-After", "17")
-			return response, nil
-		case "20":
-			return workshopJSONResponse(request, `{"response":{"publishedfiledetails":[{"publishedfileid":"20","time_updated":"https://private.invalid/192.0.2.9?token=secret"}]}}`), nil
-		default:
-			return nil, fmt.Errorf("unexpected local fixture ID")
+		n := calls.Add(1)
+		want := []string{"17", "18", "19", "20", "22"}
+		if n == 2 {
+			want = []string{"18", "19", "20", "22"}
 		}
+		if request.Method != "GET" || request.URL.Path != "/workshop/updates" || !slices.Equal(updateRequestIDs(request), want) {
+			t.Errorf("unexpected request %s %s", request.Method, request.URL)
+		}
+		if n == 2 {
+			return currentUpdateResponse(request), nil
+		}
+		return workshopJSONResponse(request, `{"items":[
+			{"publishedfileid":"22","result":"bad"},
+			{"publishedfileid":"20","result":1,"time_updated":1700000000},
+			{"publishedfileid":"19","result":15},
+			{"publishedfileid":"18","result":9,"time_updated":1900000000},
+			{"publishedfileid":"20","result":9},
+			{"publishedfileid":"17","result":1,"time_updated":"1700000000"},
+			{"publishedfileid":"999","result":9}
+		]}`), nil
 	}))
 
-	result := app.checkModUpdatesWithOperation(operation)
-	if result.TotalUpdates != 2 || result.NewDetected != 1 || result.FailedCount != 2 || result.Line != "backup" || result.FirstError == "" || calls.Load() != 4 {
-		t.Fatalf("incomplete result lost successes or failures: %+v, requests=%d", result, calls.Load())
+	first := app.checkModUpdatesWithOperation(operation)
+	if first.TotalUpdates != 2 || first.NewDetected != 1 || first.UnavailableCount != 1 || first.FailedCount != 4 || first.Line != "backup" || first.FirstError == "" || calls.Load() != 1 {
+		t.Fatalf("unexpected mixed result: %+v, requests=%d", first, calls.Load())
 	}
-	if strings.Contains(result.FirstError, "private.invalid") || strings.Contains(result.FirstError, "192.0.2.9") || strings.Contains(result.FirstError, "secret") {
-		t.Fatalf("public update failure contains private response data: %q", result.FirstError)
+	for path, expected := range map[string]string{updatedPath: time.Unix(1700000000, 0).UTC().Format(time.RFC3339), newerPath: "", missingPath: "", badID: ""} {
+		meta, err := LoadWorkshopMeta(path)
+		if err != nil || meta == nil || meta.TimeUpdated != expected {
+			t.Fatalf("%s: meta=%+v err=%v", path, meta, err)
+		}
 	}
-	meta, err := LoadWorkshopMeta(updatedPath)
-	if err != nil || meta == nil || meta.TimeUpdated != time.Unix(1700000000, 0).UTC().Format(time.RFC3339) {
-		t.Fatalf("successful update was not saved: %+v, %v", meta, err)
+	second := app.checkModUpdatesWithOperation(operation)
+	if second.TotalUpdates != 2 || second.NewDetected != 0 || second.UnavailableCount != 0 || second.FailedCount != 1 || calls.Load() != 2 {
+		t.Fatalf("recheck: %+v, calls=%d", second, calls.Load())
+	}
+}
+
+func TestWorkshopUpdateCheckThreeHundredIDsUseThreeRequests(t *testing.T) {
+	app, op := newAPIRequestTestOperation(t, network.APILinePrimary)
+	for i := 0; i < 300; i++ {
+		addUpdateCheckFixture(t, app, fmt.Sprint(100000+i), false)
+	}
+	var mu sync.Mutex
+	seen := make(map[string]bool)
+	calls := 0
+	setAPIRequestTestTransport(op, workshopRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		ids := updateRequestIDs(request)
+		mu.Lock()
+		defer mu.Unlock()
+		calls++
+		if len(ids) != 100 {
+			t.Errorf("batch size %d", len(ids))
+		}
+		for _, id := range ids {
+			if seen[id] {
+				t.Errorf("repeated ID %s", id)
+			}
+			seen[id] = true
+		}
+		return currentUpdateResponse(request), nil
+	}))
+	first := app.checkModUpdatesWithOperation(op)
+	second := app.checkModUpdatesWithOperation(op)
+	if calls != 3 || len(seen) != 300 || first != second || first.FailedCount != 0 || first.TotalUpdates != 0 || first.UnavailableCount != 0 {
+		t.Fatalf("first=%+v second=%+v calls=%d ids=%d", first, second, calls, len(seen))
+	}
+}
+
+func TestWorkshopUpdateCheckIsolatesFailedBatches(t *testing.T) {
+	app, op := newAPIRequestTestOperation(t, network.APILinePrimary)
+	for i := 0; i < 101; i++ {
+		addUpdateCheckFixture(t, app, fmt.Sprint(100000+i), false)
+	}
+	setAPIRequestTestTransport(op, workshopRoundTripFunc(func(request *http.Request) (*http.Response, error) {
+		if len(updateRequestIDs(request)) == 1 {
+			return workshopJSONResponse(request, `{"items":[{"publishedfileid":"100100","result":1,"time_updated":1700000000}]}`), nil
+		}
+		resp := workshopJSONResponse(request, `{}`)
+		resp.StatusCode = 503
+		return resp, nil
+	}))
+	got := app.checkModUpdatesWithOperation(op)
+	if got.TotalUpdates != 1 || got.NewDetected != 1 || got.FailedCount != 100 || got.UnavailableCount != 0 || !strings.Contains(got.FirstError, "HTTP 503") {
+		t.Fatal(got)
 	}
 }
 
@@ -89,7 +177,7 @@ func TestWorkshopUpdateCheckAllAPIFailuresKeepSpecificStatus(t *testing.T) {
 		return response, nil
 	}))
 	result := app.checkModUpdatesWithOperation(operation)
-	if result.TotalUpdates != 0 || result.NewDetected != 0 || result.FailedCount != 3 || result.Line != "primary" || calls.Load() != 3 {
+	if result.TotalUpdates != 0 || result.NewDetected != 0 || result.FailedCount != 3 || result.Line != "primary" || calls.Load() != 1 {
 		t.Fatalf("all failures incorrectly completed: %+v, requests=%d", result, calls.Load())
 	}
 	if !strings.Contains(result.FirstError, "主线路暂时不可用（HTTP 503）") || strings.Contains(result.FirstError, "private.invalid") || strings.Contains(result.FirstError, "secret") {
@@ -99,10 +187,12 @@ func TestWorkshopUpdateCheckAllAPIFailuresKeepSpecificStatus(t *testing.T) {
 
 func TestWorkshopUpdateCheckMissingDetailsAreIncomplete(t *testing.T) {
 	for _, body := range []string{
-		`{"response":{"publishedfiledetails":[]}}`,
-		`{"response":{"publishedfiledetails":[{"publishedfileid":"17"}]}}`,
-		`{"response":{"publishedfiledetails":[{"publishedfileid":"17","time_updated":0}]}}`,
-		`{"response":{"publishedfiledetails":[{"publishedfileid":"18","time_updated":1700000000}]}}`,
+		`{}`, `{"items":[]}`, `{"items":null}`, `not JSON`,
+		`{"items":[{"publishedfileid":"17"}]}`,
+		`{"items":[{"publishedfileid":"17","result":1,"time_updated":0}]}`,
+		`{"items":[{"publishedfileid":"18","result":9}]}`,
+		`{"items":[{"publishedfileid":"17","result":"9"}]}`,
+		`{"items":[{"publishedfileid":"17","result":9},{"publishedfileid":"17","result":9}]}`,
 	} {
 		t.Run(body, func(t *testing.T) {
 			app, operation := newAPIRequestTestOperation(t, network.APILinePrimary)
@@ -111,7 +201,7 @@ func TestWorkshopUpdateCheckMissingDetailsAreIncomplete(t *testing.T) {
 				return workshopJSONResponse(request, body), nil
 			}))
 			result := app.checkModUpdatesWithOperation(operation)
-			if result.FailedCount != 1 || result.FirstError == "" || result.TotalUpdates != 0 {
+			if result.FailedCount != 1 || result.FirstError == "" || result.TotalUpdates != 0 || result.UnavailableCount != 0 {
 				t.Fatalf("invalid details were reported as latest: %+v", result)
 			}
 		})
@@ -124,9 +214,9 @@ func TestWorkshopUpdateCheckInvalidDataDoesNotBlockExplicitRecheck(t *testing.T)
 	var calls atomic.Int32
 	setAPIRequestTestTransport(operation, workshopRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		if calls.Add(1) == 1 {
-			return workshopJSONResponse(request, `{"response":{"publishedfiledetails":[{"publishedfileid":"17"}]}}`), nil
+			return workshopJSONResponse(request, `{"items":[{"publishedfileid":"17","result":1}]}`), nil
 		}
-		return workshopJSONResponse(request, `{"response":{"publishedfiledetails":[{"publishedfileid":"17","time_updated":1590000000}]}}`), nil
+		return workshopJSONResponse(request, `{"items":[{"publishedfileid":"17","result":1,"time_updated":1590000000}]}`), nil
 	}))
 	first := app.checkModUpdatesWithOperation(operation)
 	second := app.checkModUpdatesWithOperation(operation)
@@ -137,7 +227,7 @@ func TestWorkshopUpdateCheckInvalidDataDoesNotBlockExplicitRecheck(t *testing.T)
 
 func TestWorkshopUpdateCheckCancellationIncludesUnsubmittedItems(t *testing.T) {
 	app, operation := newAPIRequestTestOperation(t, network.APILinePrimary)
-	for n := 17; n < 25; n++ {
+	for n := 100000; n < 100401; n++ {
 		addUpdateCheckFixture(t, app, fmt.Sprint(n), false)
 	}
 	addUpdateCheckFixture(t, app, "99", true)
@@ -171,7 +261,7 @@ func TestWorkshopUpdateCheckCancellationIncludesUnsubmittedItems(t *testing.T) {
 	cancel()
 	select {
 	case result := <-finished:
-		if result.FailedCount != 8 || result.TotalUpdates != 1 || result.NewDetected != 0 || !strings.Contains(result.FirstError, "请求已取消") || calls.Load() != 4 {
+		if result.FailedCount != 401 || result.TotalUpdates != 1 || result.NewDetected != 0 || !strings.Contains(result.FirstError, "请求已取消") || calls.Load() != 4 {
 			t.Fatalf("cancellation lost unfinished items or confirmed result: %+v, requests=%d", result, calls.Load())
 		}
 	case <-time.After(5 * time.Second):
@@ -181,7 +271,7 @@ func TestWorkshopUpdateCheckCancellationIncludesUnsubmittedItems(t *testing.T) {
 
 func TestWorkshopUpdateCheckBatchKeepsPinnedLine(t *testing.T) {
 	app, operation := newAPIRequestTestOperation(t, network.APILinePrimary)
-	for n := 17; n < 23; n++ {
+	for n := 100000; n < 100401; n++ {
 		addUpdateCheckFixture(t, app, fmt.Sprint(n), false)
 	}
 	started := make(chan struct{}, 6)
@@ -193,8 +283,7 @@ func TestWorkshopUpdateCheckBatchKeepsPinnedLine(t *testing.T) {
 		oldCalls.Add(1)
 		started <- struct{}{}
 		<-release
-		body := fmt.Sprintf(`{"response":{"publishedfiledetails":[{"publishedfileid":%q,"time_updated":1590000000}]}}`, request.URL.Query().Get("id"))
-		return workshopJSONResponse(request, body), nil
+		return currentUpdateResponse(request), nil
 	}))
 	pool, err := ants.NewPool(1)
 	if err != nil {
@@ -222,7 +311,7 @@ func TestWorkshopUpdateCheckBatchKeepsPinnedLine(t *testing.T) {
 	releaseOnce.Do(func() { close(release) })
 	select {
 	case result := <-finished:
-		if result.Line != "primary" || result.FailedCount != 0 || result.FirstError != "" || result.TotalUpdates != 0 || oldCalls.Load() != 6 || newCalls.Load() != 0 {
+		if result.Line != "primary" || result.FailedCount != 0 || result.FirstError != "" || result.TotalUpdates != 0 || oldCalls.Load() != 5 || newCalls.Load() != 0 {
 			t.Fatalf("batch crossed lines or lost valid old results: %+v, old=%d new=%d", result, oldCalls.Load(), newCalls.Load())
 		}
 	case <-time.After(5 * time.Second):
@@ -247,6 +336,34 @@ func TestWorkshopUpdateCheckTimeUpdatedValidation(t *testing.T) {
 	for _, value := range []interface{}{float64(1700000000), int64(1700000000), "1700000000"} {
 		if got, ok := updateCheckTimeUpdated(value); !ok || got.Unix() != 1700000000 {
 			t.Errorf("valid update time rejected: %v => %v, %v", value, got, ok)
+		}
+	}
+}
+
+func TestWorkshopUpdateCheckDoesNotMarkReinstalledOrReplacedCopies(t *testing.T) {
+	app, op := newAPIRequestTestOperation(t, network.APILinePrimary)
+	reinstalled := addUpdateCheckFixture(t, app, "17", false)
+	replaced := addUpdateCheckFixture(t, app, "18", false)
+	setAPIRequestTestTransport(op, workshopRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		for path, id := range map[string]string{reinstalled: "17", replaced: "19"} {
+			meta := WorkshopMeta{WorkshopID: id, DownloadedAt: time.Unix(1800000000, 0).UTC().Format(time.RFC3339)}
+			if path == replaced {
+				meta.DownloadedAt = time.Unix(1500000000, 0).UTC().Format(time.RFC3339)
+			}
+			if err := writeWorkshopMeta(path, meta); err != nil {
+				return nil, err
+			}
+		}
+		return workshopJSONResponse(r, `{"items":[{"publishedfileid":"17","result":1,"time_updated":1700000000},{"publishedfileid":"18","result":1,"time_updated":1700000000}]}`), nil
+	}))
+	got := app.checkModUpdatesWithOperation(op)
+	if got.TotalUpdates != 0 || got.NewDetected != 0 || got.FailedCount != 0 || got.UnavailableCount != 0 {
+		t.Fatal(got)
+	}
+	for _, path := range []string{reinstalled, replaced} {
+		meta, err := LoadWorkshopMeta(path)
+		if err != nil || meta == nil || meta.TimeUpdated != "" {
+			t.Fatalf("%s modified: %+v %v", path, meta, err)
 		}
 	}
 }

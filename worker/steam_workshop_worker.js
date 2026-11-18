@@ -1,7 +1,7 @@
 // ----------------------------------------------------
 // 简易令牌桶限流 (按客户端 IP, 仅进程内计数)
 // 桶容量是突发额度, REFILL_PER_MIN 是持续速率:
-// 客户端启动时的更新检测会一次性打出与 Mod 库等量的 /detail 请求,
+// 旧客户端逐项请求 /detail，新客户端每次 /updates 最多查询 100 项。
 // ----------------------------------------------------
 const RATE_LIMIT_BURST = 500;
 const RATE_LIMIT_REFILL_PER_MIN = 50;
@@ -203,6 +203,10 @@ export default {
         status: 429,
         headers: { ...corsHeaders, "Retry-After": "1" },
       });
+    }
+
+    if (path === "/updates") {
+      return handleUpdates(request, url, ctx, corsHeaders);
     }
 
     // 0. 检查缓存 (CF Cache)
@@ -421,24 +425,94 @@ const GETDETAILS_URL =
 
 // 免 key 的详情接口: 实测带不带 key 返回字段一致, 不带可避免消耗 key 的每日调用配额。
 // 需要 children / 多图预览时另走 GetDetails(必须带 key)
-async function fetchPublishedFileDetails(ids) {
+function requestPublishedFileDetails(ids) {
   const formData = new FormData();
   formData.append("itemcount", String(ids.length));
   ids.forEach((id, index) => {
     formData.append(`publishedfileids[${index}]`, id);
   });
 
-  const response = await fetch(PUBLISHED_FILE_DETAILS_URL, {
+  return fetch(PUBLISHED_FILE_DETAILS_URL, {
     method: "POST",
     body: formData,
   });
+}
 
+async function fetchPublishedFileDetails(ids) {
+  const response = await requestPublishedFileDetails(ids);
   if (!response.ok) {
     throw new Error(`GetPublishedFileDetails failed: ${response.status}`);
   }
 
   const data = await response.json();
   return data?.response?.publishedfiledetails || [];
+}
+
+const MAX_UPDATE_IDS = 100;
+const MAX_UPDATE_TIMESTAMP = 253402300799; // 9999-12-31T23:59:59Z
+
+function updateItems(ids, rows) {
+  const expected = new Set(ids);
+  const found = new Map();
+  for (const row of rows) {
+    const id = row?.publishedfileid;
+    if (!expected.has(id)) continue;
+    const item = { publishedfileid: id, result: 0 };
+    if (!found.has(id) && Number.isSafeInteger(row.result) && row.result > 0) {
+      item.result = row.result;
+      if (row.result === 1) {
+        const stamp = typeof row.time_updated === "string" && /^[0-9]+$/.test(row.time_updated)
+          ? Number(row.time_updated) : row.time_updated;
+        if (Number.isSafeInteger(stamp) && stamp > 0 && stamp <= MAX_UPDATE_TIMESTAMP) item.time_updated = stamp;
+      }
+    }
+    // A duplicate makes only its own ID ambiguous.
+    found.set(id, item);
+  }
+  return ids.map(id => found.get(id) ?? { publishedfileid: id, result: 0 });
+}
+
+// The batch cache uses one key per sorted set. A 100-item check needs only one
+// Cache API lookup and one Steam request on a miss, including on the free plan.
+async function handleUpdates(request, url, ctx, headers) {
+  const uncached = { ...headers, "Cache-Control": "no-store" };
+  if (request.method !== "GET") {
+    return Response.json({ error: "Method not allowed" }, { status: 405, headers: { ...uncached, Allow: "GET" } });
+  }
+  const input = (url.searchParams.get("ids") || "").split(",");
+  if (url.search.length > 4096 || [...url.searchParams].length !== 1 || input.length > MAX_UPDATE_IDS ||
+      input.some(id => !/^[1-9][0-9]{0,19}$/.test(id) || (id.length === 20 && id > "18446744073709551615"))) {
+    return Response.json({ error: "Expected 1–100 positive decimal uint64 IDs" }, { status: 400, headers: uncached });
+  }
+  const ids = [...new Set(input)].sort();
+  url.searchParams.set("ids", ids.join(","));
+  const key = new Request(url.toString());
+  const cache = caches.default;
+  const cached = await cache.match(key).catch(() => undefined);
+  if (cached) return cached;
+
+  try {
+    const upstream = await requestPublishedFileDetails(ids);
+    if (!upstream.ok) {
+      const retry = upstream.headers.get("Retry-After");
+      if (retry && upstream.status === 429) uncached["Retry-After"] = retry;
+      return Response.json({ error: "Steam update query failed" }, { status: upstream.status === 429 ? 429 : 502, headers: uncached });
+    }
+    const { response } = await upstream.json();
+    if (response?.result !== 1 || !Array.isArray(response.publishedfiledetails)) {
+      throw new Error("Invalid Steam response");
+    }
+    const rows = response.publishedfiledetails;
+    const items = updateItems(ids, rows);
+    const cacheable = rows.length === ids.length && response.resultcount === rows.length &&
+      items.every(item => item.result === 1 && item.time_updated > 0);
+    const result = Response.json({ items }, { headers: cacheable
+      ? { ...headers, "Cache-Control": "public, max-age=3600, s-maxage=3600" } : uncached });
+    if (cacheable) ctx.waitUntil(cache.put(key, result.clone()));
+    return result;
+  } catch {
+    return Response.json({ error: "Invalid or unavailable Steam update response" }, { status: 502, headers: uncached });
+  }
 }
 
 // 获取完整详情的附加数据: 多图预览 + children(合集的子项 / 普通物品的依赖项)

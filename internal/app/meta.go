@@ -6,8 +6,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+var workshopMetaMu sync.RWMutex
 
 // WorkshopMeta 存储工坊文件的元数据
 type WorkshopMeta struct {
@@ -57,6 +60,12 @@ func SaveWorkshopDetailMeta(filePath string, workshopID string, detail WorkshopI
 }
 
 func writeWorkshopMeta(filePath string, meta WorkshopMeta) error {
+	workshopMetaMu.Lock()
+	defer workshopMetaMu.Unlock()
+	return writeWorkshopMetaFile(filePath, meta)
+}
+
+func writeWorkshopMetaFile(filePath string, meta WorkshopMeta) error {
 	metaPath := GetMetaFilePath(filePath)
 
 	data, err := json.MarshalIndent(meta, "", "  ")
@@ -104,6 +113,12 @@ func workshopTimeUpdatedRFC3339(value interface{}) string {
 
 // LoadWorkshopMeta 读取.meta文件，不存在时返回nil
 func LoadWorkshopMeta(filePath string) (*WorkshopMeta, error) {
+	workshopMetaMu.RLock()
+	defer workshopMetaMu.RUnlock()
+	return readWorkshopMetaFile(filePath)
+}
+
+func readWorkshopMetaFile(filePath string) (*WorkshopMeta, error) {
 	metaPath := GetMetaFilePath(filePath)
 
 	data, err := os.ReadFile(metaPath)
@@ -124,14 +139,19 @@ func LoadWorkshopMeta(filePath string) (*WorkshopMeta, error) {
 
 // UpdateWorkshopMetaTimeUpdated 更新meta文件中的TimeUpdated字段（保留其他字段）
 func UpdateWorkshopMetaTimeUpdated(filePath string, timeUpdated string) error {
-	meta, err := LoadWorkshopMeta(filePath)
-	if meta == nil || err != nil {
+	return editWorkshopMeta(filePath, func(meta *WorkshopMeta) bool {
+		meta.TimeUpdated = timeUpdated
+		return true
+	})
+}
+
+// A fresh download or another check may replace the metadata while Steam is queried.
+func editWorkshopMeta(filePath string, edit func(*WorkshopMeta) bool) error {
+	workshopMetaMu.Lock()
+	defer workshopMetaMu.Unlock()
+	meta, err := readWorkshopMetaFile(filePath)
+	if err != nil || meta == nil || !edit(meta) {
 		return err
 	}
-	meta.TimeUpdated = timeUpdated
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(GetMetaFilePath(filePath), data, 0644)
+	return writeWorkshopMetaFile(filePath, *meta)
 }

@@ -67,6 +67,7 @@ func TestRelayFixedUpstreamsAndResponseCompatibility(t *testing.T) {
 	}{
 		{"list", "GET", "/list?page=0&q=%E5%9C%B0%E5%9B%BE&sort=trend&tags=Map%2CCampaign&filetype=0", "", "l4d2-workshop.laoyutang.cn", "/list", `{"response":{"publishedfiledetails":[{"publishedfileid":"18446744073709551615"}],"total":1}}`},
 		{"detail", "GET", "/detail?id=18446744073709551615&with_previews=TRUE", "", "l4d2-workshop.laoyutang.cn", "/detail", `{"response":{"publishedfiledetails":[{"file_size":"9007199254740993","previews":[]}]}}`},
+		{"updates", "GET", "/updates?ids=123,18446744073709551615", "", "l4d2-workshop.laoyutang.cn", "/updates", `{"items":[{"publishedfileid":"123","result":9}]}`},
 		{"parse", "POST", "/parse", " [9007199254740993,\"18446744073709551615\"] \n", "l4d2-workshop-parse.laoyutang.cn", "/", `[{"result":1,"file_size":"9007199254740993","children":[]}]`},
 		{"parse-root-alias", "POST", "/", "[123]", "l4d2-workshop-parse.laoyutang.cn", "/", `[{"result":0,"file_type":2}]`},
 		{"map", "GET", "/maps/c1m1_hotel", "", "l4d2-maps.laoyutang.cn", "/c1m1_hotel", "\n死亡中心\n"},
@@ -83,6 +84,10 @@ func TestRelayFixedUpstreamsAndResponseCompatibility(t *testing.T) {
 				if r.URL.User != nil || r.URL.Fragment != "" {
 					t.Errorf("unexpected URL identity or fragment: %s", r.URL)
 				}
+				if tt.name == "updates" && r.URL.Query().Get("ids") != "123,18446744073709551615" {
+					t.Errorf("workshop update IDs changed: %v", r.URL.Query())
+				}
+
 				if tt.body != "" {
 					body, err := io.ReadAll(r.Body)
 					if err != nil || string(body) != tt.body {

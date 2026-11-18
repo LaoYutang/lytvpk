@@ -150,3 +150,29 @@ func TestSafeTextUTF8AndByteLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateBatchQueryValidation(t *testing.T) {
+	valid := make([]string, 100)
+	for i := range valid {
+		valid[i] = fmt.Sprint(9007199254740993 + int64(i))
+	}
+	for _, tc := range []struct {
+		query string
+		ok    bool
+	}{
+		{"ids=" + strings.Join(valid, ","), true}, {"ids=1,1,18446744073709551615", true},
+		{"ids=" + strings.Join(append(valid, "1"), ","), false}, {"", false}, {"ids=", false}, {"ids=0", false},
+		{"ids=01", false}, {"ids=12,,3", false}, {"ids=18446744073709551616", false},
+		{"ids=1&ids=2", false}, {"ids=1&q=2", false}, {"ids=%2B5", false},
+	} {
+		r := httptest.NewRequest("GET", "/updates?"+tc.query, nil)
+		dest := selectRoute(r)
+		if dest.name != "updates" || dest.method != "GET" {
+			t.Fatal(dest)
+		}
+		err := validateQuery(r, &dest)
+		if (err == nil) != tc.ok {
+			t.Errorf("query %s: %v", tc.query, err)
+		}
+	}
+}
