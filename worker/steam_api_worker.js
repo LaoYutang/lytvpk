@@ -1,4 +1,4 @@
-// 工坊链接解析接口 (l4d2-workshop-parse)
+// 工坊链接解析接口（Worker 名 l4d2-workshop-to-url，域名 l4d2-workshop-parse.laoyutang.cn）
 // 收到 POST 的工坊 ID 数组, 返回客户端 internal/app/workshop.go 的 WorkshopFileDetails 数组。
 //
 // 数据来源是官方 IPublishedFileService/GetDetails:
@@ -13,8 +13,31 @@ const GETDETAILS_URL =
 // GetDetails 单次请求的 ID 上限没有明确文档, 与 steam_workshop_worker.js 保持一致按 100 分块
 const CHUNK_SIZE = 100;
 
+function withRequestSummary(handle) {
+  return async (request, env, ctx) => {
+    const summary = {
+      event: "steam_request_summary", worker: "l4d2-workshop-to-url", route: "parse",
+      cache: "not_checked", http_status: null,
+      steam_keyed: 0, steam_unkeyed: 0, steam_fetch_errors: 0,
+      steam_endpoints: { get_details: 0 }, steam_http: {},
+    };
+    try {
+      const response = await handle(request, env, ctx, summary);
+      summary.http_status = response.status;
+      return response;
+    } finally {
+      try {
+        if (summary.cache === "hit" || summary.cache === "miss") {
+          summary.cache_hit = Number(summary.cache === "hit");
+        }
+        console.log(summary);
+      } catch { /* 日志写入失败不影响请求。 */ }
+    }
+  };
+}
+
 export default {
-  async fetch(request, env, ctx) {
+  fetch: withRequestSummary(async (request, env, ctx, summary) => {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -57,7 +80,6 @@ export default {
 
     // 缓存逻辑：尝试从 Cache 中获取
     // 使用 payload 内容（排序后）作为唯一 Key
-    const cache = caches.default;
     const sortedPayload = [...payload].sort();
     const cacheUrl = new URL(request.url);
     // 构造一个虚拟的 GET 请求作为 Cache Key
@@ -69,7 +91,10 @@ export default {
       }
     );
 
-    let cachedResponse = await cache.match(cacheKey);
+    summary.cache = "error";
+    const cache = caches.default;
+    const cachedResponse = await cache.match(cacheKey);
+    summary.cache = cachedResponse ? "hit" : "miss";
     if (cachedResponse) {
       return cachedResponse;
     }
@@ -83,7 +108,7 @@ export default {
       const details = [];
       for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
         const chunk = payload.slice(i, i + CHUNK_SIZE);
-        details.push(...(await fetchFileDetails(chunk, env, includeChildren)));
+        details.push(...(await fetchFileDetails(chunk, env, includeChildren, summary)));
       }
 
       const mappedData = details.map(mapDetail);
@@ -106,10 +131,10 @@ export default {
         { status: 502, headers: corsHeaders }
       );
     }
-  },
+  }),
 };
 
-async function fetchFileDetails(ids, env, includeChildren) {
+async function fetchFileDetails(ids, env, includeChildren, summary) {
   const params = new URLSearchParams();
   params.set("key", env.STEAM_API_KEY);
   params.set("includechildren", includeChildren ? "true" : "false");
@@ -117,7 +142,22 @@ async function fetchFileDetails(ids, env, includeChildren) {
     params.set(`publishedfileids[${index}]`, String(id))
   );
 
-  const response = await fetch(`${GETDETAILS_URL}?${params.toString()}`);
+  const url = `${GETDETAILS_URL}?${params.toString()}`;
+  summary.steam_keyed++;
+  summary.steam_endpoints.get_details++;
+  let response;
+  try {
+    response = await fetch(url);
+  } catch (error) {
+    summary.steam_fetch_errors++;
+    throw error;
+  }
+  if (response.status) {
+    const status = `keyed_${response.status}`;
+    summary.steam_http[status] = (summary.steam_http[status] ?? 0) + 1;
+  } else {
+    summary.steam_fetch_errors++;
+  }
   if (!response.ok) {
     throw new Error(`GetDetails failed: ${response.status}`);
   }

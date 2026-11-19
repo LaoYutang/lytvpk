@@ -167,10 +167,73 @@ function sweepIdleBuckets(now) {
   }
 }
 
+function withRequestSummary(handle) {
+  return async (request, env, ctx) => {
+    const summary = {
+      event: "steam_request_summary", worker: "l4d2-workshop", route: "other",
+      cache: "not_checked", http_status: null,
+      steam_keyed: 0, steam_unkeyed: 0, steam_fetch_errors: 0,
+      steam_endpoints: { query_files: 0, get_details: 0, published_file_details: 0, collection_details: 0 },
+      steam_http: {},
+    };
+    const pending = new Set();
+
+    async function fetchSteam(endpoint, input, init) {
+      const sentKey = new URL(input).searchParams.get("key") || init?.body?.get?.("key");
+      const keyed = Boolean(sentKey) && sentKey === env?.STEAM_API_KEY;
+      summary.steam_endpoints[endpoint]++;
+      if (keyed) summary.steam_keyed++;
+      else summary.steam_unkeyed++;
+      let attempt;
+      try {
+        attempt = fetch(input, init);
+        pending.add(attempt);
+        const response = await attempt;
+        if (response.status) {
+          const status = `${keyed ? "keyed" : "unkeyed"}_${response.status}`;
+          summary.steam_http[status] = (summary.steam_http[status] ?? 0) + 1;
+        } else {
+          summary.steam_fetch_errors++;
+        }
+        return response;
+      } catch (error) {
+        summary.steam_fetch_errors++;
+        throw error;
+      } finally {
+        pending.delete(attempt);
+      }
+    }
+
+    function logSummary() {
+      try {
+        if (summary.cache === "hit" || summary.cache === "miss") {
+          summary.cache_hit = Number(summary.cache === "hit");
+        }
+        console.log(summary);
+      } catch { /* 日志写入失败不影响请求。 */ }
+    }
+
+    try {
+      const response = await handle(request, env, ctx, summary, fetchSteam);
+      summary.http_status = response.status;
+      return response;
+    } finally {
+      // 基础详情失败时可先返回。预览 fetch 若仍在途，等它产生状态后再写同一条汇总。
+      if (pending.size) {
+        const logged = Promise.allSettled(pending).then(logSummary);
+        try { ctx.waitUntil(logged); } catch { /* 保留原响应，即使上下文已结束。 */ }
+      } else {
+        logSummary();
+      }
+    }
+  };
+}
+
 export default {
-  async fetch(request, env, ctx) {
+  fetch: withRequestSummary(async (request, env, ctx, summary, fetchSteam) => {
     const url = new URL(request.url);
     const path = url.pathname;
+    if (path === "/list" || path === "/detail" || path === "/updates") summary.route = path;
 
     // 处理 CORS (允许跨域)
     if (request.method === "OPTIONS") {
@@ -206,15 +269,17 @@ export default {
     }
 
     if (path === "/updates") {
-      return handleUpdates(request, url, ctx, corsHeaders);
+      return handleUpdates(request, url, ctx, corsHeaders, summary, fetchSteam);
     }
 
     // 0. 检查缓存 (CF Cache)
     // 独立命名空间隔离旧列表排序缓存，不删除旧缓存或改变详情缓存。
+    summary.cache = "error"; // open 或 match 抛错时保留原有异常传播。
     const cache = path === "/list"
       ? await caches.open("workshop-list-sorting-v2")
       : caches.default;
-    let cachedResponse = await cache.match(request);
+    const cachedResponse = await cache.match(request);
+    summary.cache = cachedResponse ? "hit" : "miss";
     if (cachedResponse) {
       return cachedResponse;
     }
@@ -225,13 +290,13 @@ export default {
       // 1. 列表 & 筛选 & 搜索
       // GET /list?q=xxx&page=1&sort=trend&tags=Weapon,Map
       if (path === "/list") {
-        response = await handleList(url, env, corsHeaders);
+        response = await handleList(url, env, corsHeaders, fetchSteam);
       }
 
       // 2. 详情
       // GET /detail?id=123456
       else if (path === "/detail") {
-        response = await handleDetail(url, env, corsHeaders);
+        response = await handleDetail(url, env, corsHeaders, fetchSteam);
       }
 
       // 404
@@ -265,7 +330,7 @@ export default {
         headers: corsHeaders,
       });
     }
-  },
+  }),
 };
 
 // ----------------------------------------------------
@@ -325,9 +390,9 @@ function buildListUrl(url, env, filetype) {
   return steamApiUrl;
 }
 
-async function fetchListData(url, env, filetype) {
+async function fetchListData(url, env, filetype, fetchSteam) {
   const steamApiUrl = buildListUrl(url, env, filetype);
-  const resp = await fetch(steamApiUrl.toString());
+  const resp = await fetchSteam("query_files", steamApiUrl.toString());
   if (!resp.ok) {
     throw new Error(`QueryFiles failed: ${resp.status}`);
   }
@@ -381,16 +446,16 @@ function mergeListData(itemData, collectionData, limit = WORKSHOP_PAGE_SIZE) {
 // ----------------------------------------------------
 // Handler 1: 列表查询 (IPublishedFileService/QueryFiles)
 // ----------------------------------------------------
-async function handleList(url, env, headers) {
+async function handleList(url, env, headers, fetchSteam) {
   const requestedFileType = url.searchParams.get("filetype");
   if (requestedFileType !== null) {
-    const data = await fetchListData(url, env, requestedFileType);
+    const data = await fetchListData(url, env, requestedFileType, fetchSteam);
     return new Response(JSON.stringify(data), { headers });
   }
 
   const [itemsResult, collectionsResult] = await Promise.allSettled([
-    fetchListData(url, env, "0"),
-    fetchListData(url, env, "1"),
+    fetchListData(url, env, "0", fetchSteam),
+    fetchListData(url, env, "1", fetchSteam),
   ]);
 
   if (
@@ -425,21 +490,21 @@ const GETDETAILS_URL =
 
 // 免 key 的详情接口: 实测带不带 key 返回字段一致, 不带可避免消耗 key 的每日调用配额。
 // 需要 children / 多图预览时另走 GetDetails(必须带 key)
-function requestPublishedFileDetails(ids) {
+function requestPublishedFileDetails(ids, fetchSteam) {
   const formData = new FormData();
   formData.append("itemcount", String(ids.length));
   ids.forEach((id, index) => {
     formData.append(`publishedfileids[${index}]`, id);
   });
 
-  return fetch(PUBLISHED_FILE_DETAILS_URL, {
+  return fetchSteam("published_file_details", PUBLISHED_FILE_DETAILS_URL, {
     method: "POST",
     body: formData,
   });
 }
 
-async function fetchPublishedFileDetails(ids) {
-  const response = await requestPublishedFileDetails(ids);
+async function fetchPublishedFileDetails(ids, fetchSteam) {
+  const response = await requestPublishedFileDetails(ids, fetchSteam);
   if (!response.ok) {
     throw new Error(`GetPublishedFileDetails failed: ${response.status}`);
   }
@@ -474,7 +539,7 @@ function updateItems(ids, rows) {
 
 // The batch cache uses one key per sorted set. A 100-item check needs only one
 // Cache API lookup and one Steam request on a miss, including on the free plan.
-async function handleUpdates(request, url, ctx, headers) {
+async function handleUpdates(request, url, ctx, headers, summary, fetchSteam) {
   const uncached = { ...headers, "Cache-Control": "no-store" };
   if (request.method !== "GET") {
     return Response.json({ error: "Method not allowed" }, { status: 405, headers: { ...uncached, Allow: "GET" } });
@@ -487,12 +552,16 @@ async function handleUpdates(request, url, ctx, headers) {
   const ids = [...new Set(input)].sort();
   url.searchParams.set("ids", ids.join(","));
   const key = new Request(url.toString());
+  summary.cache = "error";
   const cache = caches.default;
-  const cached = await cache.match(key).catch(() => undefined);
+  const cached = await cache.match(key).then(hit => {
+    summary.cache = hit ? "hit" : "miss";
+    return hit;
+  }, () => undefined); // 查询异常仍回源，但不计为 miss。
   if (cached) return cached;
 
   try {
-    const upstream = await requestPublishedFileDetails(ids);
+    const upstream = await requestPublishedFileDetails(ids, fetchSteam);
     if (!upstream.ok) {
       const retry = upstream.headers.get("Retry-After");
       if (retry && upstream.status === 429) uncached["Retry-After"] = retry;
@@ -518,7 +587,7 @@ async function handleUpdates(request, url, ctx, headers) {
 // 获取完整详情的附加数据: 多图预览 + children(合集的子项 / 普通物品的依赖项)
 // 两者来自同一次 GetDetails 调用, 不额外增加调用次数
 // 无 key 或请求失败时返回空结果, 由调用方回退到单张主图
-async function fetchDetailExtras(id, env) {
+async function fetchDetailExtras(id, env, fetchSteam) {
   const empty = { previews: null, childIds: [], fileType: 0 };
   if (!env?.STEAM_API_KEY) {
     return empty;
@@ -531,7 +600,7 @@ async function fetchDetailExtras(id, env) {
   params.set("publishedfileids[0]", String(id));
 
   try {
-    const response = await fetch(`${GETDETAILS_URL}?${params.toString()}`);
+    const response = await fetchSteam("get_details", `${GETDETAILS_URL}?${params.toString()}`);
     if (!response.ok) {
       return empty;
     }
@@ -555,18 +624,17 @@ async function fetchDetailExtras(id, env) {
       childIds,
       fileType: Number(item?.file_type) || 0,
     };
-  } catch (err) {
-    console.warn(`Failed to fetch detail extras: ${err.message}`);
+  } catch {
     return empty;
   }
 }
 
-async function fetchCollectionDetails(id) {
+async function fetchCollectionDetails(id, fetchSteam) {
   const formData = new FormData();
   formData.append("collectioncount", "1");
   formData.append("publishedfileids[0]", id);
 
-  const response = await fetch(COLLECTION_DETAILS_URL, {
+  const response = await fetchSteam("collection_details", COLLECTION_DETAILS_URL, {
     method: "POST",
     body: formData,
   });
@@ -588,16 +656,16 @@ async function fetchCollectionDetails(id) {
   return collection;
 }
 
-async function fetchCollectionChildItems(collection) {
+async function fetchCollectionChildItems(collection, fetchSteam) {
   const childIds = (collection?.children || [])
     .map((child) => String(child.publishedfileid || ""))
     .filter(Boolean);
 
-  return fetchChildItemsByIds(childIds);
+  return fetchChildItemsByIds(childIds, fetchSteam);
 }
 
 // 按 ID 批量取精简详情（合集子项与依赖项共用）
-async function fetchChildItemsByIds(childIds) {
+async function fetchChildItemsByIds(childIds, fetchSteam) {
   if (childIds.length === 0) {
     return [];
   }
@@ -607,7 +675,7 @@ async function fetchChildItemsByIds(childIds) {
     const chunkSize = 100;
     for (let i = 0; i < childIds.length; i += chunkSize) {
       const chunk = childIds.slice(i, i + chunkSize);
-      childDetails.push(...(await fetchPublishedFileDetails(chunk)));
+      childDetails.push(...(await fetchPublishedFileDetails(chunk, fetchSteam)));
     }
 
     const detailsById = new Map(
@@ -628,13 +696,12 @@ async function fetchChildItemsByIds(childIds) {
         favorited: item.favorited,
         tags: item.tags || [],
       }));
-  } catch (err) {
-    console.warn(`Failed to fetch child items: ${err.message}`);
+  } catch {
     return [];
   }
 }
 
-async function handleDetail(url, env, headers) {
+async function handleDetail(url, env, headers, fetchSteam) {
   const id = url.searchParams.get("id");
   if (!id) throw new Error("Missing id parameter");
 
@@ -647,11 +714,11 @@ async function handleDetail(url, env, headers) {
   // 1. 调用旧接口 (ISteamRemoteStorage/GetPublishedFileDetails)
   // 作用: 获取 title, description, 统计数据(订阅/收藏)等
   // 注意: 虽然此接口返回 file_url，但在详情页场景下前端并不使用它(下载走单独流程)
-  const p1 = fetchPublishedFileDetails([id]);
+  const p1 = fetchPublishedFileDetails([id], fetchSteam);
 
   // 2. 获取附加数据：多图预览 + 依赖项（同一次 GetDetails 调用）
   const p2 = withPreviews
-    ? fetchDetailExtras(id, env)
+    ? fetchDetailExtras(id, env, fetchSteam)
     : Promise.resolve({ previews: null, childIds: [], fileType: 0 });
 
   try {
@@ -699,23 +766,23 @@ async function handleDetail(url, env, headers) {
 
     if (isCollection || fileTypeMissing) {
       try {
-        collectionDetails = await fetchCollectionDetails(id);
+        collectionDetails = await fetchCollectionDetails(id, fetchSteam);
         if (collectionDetails) {
           resultOld.file_type = 2;
           isCollection = true;
         }
-      } catch (err) {
-        console.warn(`Failed to confirm collection details: ${err.message}`);
+      } catch {
+        // 确认失败时继续返回已有详情。
       }
     }
 
     if (isCollection) {
       resultOld.child_items = collectionDetails
-        ? await fetchCollectionChildItems(collectionDetails)
+        ? await fetchCollectionChildItems(collectionDetails, fetchSteam)
         : [];
     } else if (extras.fileType !== 2 && extras.childIds.length > 0) {
       // 普通物品的 children 是依赖项(必需物品)，用 ID 批量补详情以便展示名称
-      resultOld.required_items = await fetchChildItemsByIds(extras.childIds);
+      resultOld.required_items = await fetchChildItemsByIds(extras.childIds, fetchSteam);
     }
 
     // 构造最终响应 (保持原有结构)

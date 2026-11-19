@@ -10,6 +10,10 @@ async function rateLimitFixture(t, env = {}) {
   const worker = await import(`data:text/javascript;base64,${Buffer.from(exposedSource).toString("base64")}#fixture-${++fixtureSequence}`);
   let now = 1_700_000_000_000;
   let cacheMatches = 0;
+  let lastSummary;
+  let logCount = 0;
+  const originalLog = console.log;
+  console.log = summary => { lastSummary = summary; logCount++; };
   t.mock.method(Date, "now", () => now);
   t.mock.method(globalThis, "fetch", async () => assert.fail("rate-limit tests must not call Steam"));
   const previousCaches = globalThis.caches;
@@ -31,6 +35,7 @@ async function rateLimitFixture(t, env = {}) {
     },
   };
   t.after(() => {
+    console.log = originalLog;
     if (previousCaches === undefined) delete globalThis.caches;
     else globalThis.caches = previousCaches;
   });
@@ -40,6 +45,8 @@ async function rateLimitFixture(t, env = {}) {
     worker,
     advance(milliseconds) { now += milliseconds; },
     get cacheMatches() { return cacheMatches; },
+    get lastSummary() { return lastSummary; },
+    get logCount() { return logCount; },
     fetch(request, overrideEnv = env) { return worker.default.fetch(request, overrideEnv, ctx); },
     async flush() { await Promise.all(pending); },
   };
@@ -88,6 +95,10 @@ test("ordinary cached list and detail requests share the original 500-request bu
   assert.ok(Number(limited.headers.get("Retry-After")) > 0);
   assert.equal(fixture.cacheMatches, 500, "cached responses must not bypass admission");
   await fixture.flush();
+  assert.equal(fixture.logCount, 501);
+  const { route, http_status, cache, steam_keyed, steam_unkeyed, steam_http } = fixture.lastSummary;
+  assert.deepEqual([route, http_status, cache, steam_keyed, steam_unkeyed, steam_http], ["/detail", 429, "not_checked", 0, 0, {}]);
+  assert.equal(Object.hasOwn(fixture.lastSummary, "cache_hit"), false);
 });
 
 test("ordinary tokens refill at 50 per minute", async (t) => {
@@ -110,6 +121,8 @@ test("OPTIONS bypasses both token consumption and metadata cache lookup", async 
   await expectRequests(fixture, 500, 200);
   const response = await fixture.fetch(clientRequest("203.0.113.7", { method: "OPTIONS" }));
   assert.ok(response.ok);
+  assert.equal(fixture.lastSummary.cache, "not_checked");
+  assert.deepEqual(fixture.lastSummary.steam_http, {});
   await expectRequests(fixture, 1, 429);
   assert.equal(fixture.cacheMatches, 500);
 });
