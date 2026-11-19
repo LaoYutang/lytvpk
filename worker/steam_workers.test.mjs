@@ -7,6 +7,8 @@ const env = { STEAM_API_KEY: "fixture-key" };
 const json = (value) => Response.json(value);
 
 function fixtureRuntime(t, upstream, cache = { match: async () => undefined, put: async () => {} }, legacyCache = cache) {
+  const log = t.mock.method(console, "log", () => {});
+  const warn = t.mock.method(console, "warn", () => {});
   const previousCaches = globalThis.caches;
   globalThis.caches = {
     default: legacyCache,
@@ -19,16 +21,55 @@ function fixtureRuntime(t, upstream, cache = { match: async () => undefined, put
     if (previousCaches === undefined) delete globalThis.caches;
     else globalThis.caches = previousCaches;
   });
-  t.mock.method(globalThis, "fetch", async (input, init) => {
+  const steamFetch = t.mock.method(globalThis, "fetch", async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : input);
     assert.equal(url.origin, "https://api.steampowered.com");
     return upstream(url, init);
   });
+  t.after(() => {
+    let attempts = 0;
+    for (const call of log.mock.calls) {
+      assert.equal(call.arguments.length, 1);
+      const [summary] = call.arguments;
+      assert.equal(summary.event, "steam_request_summary");
+      const isParser = summary.worker === "l4d2-workshop-to-url";
+      if (isParser) assert.equal(summary.route, "parse");
+      else {
+        assert.equal(summary.worker, "l4d2-workshop");
+        assert.ok(["/list", "/detail", "/updates", "other"].includes(summary.route));
+      }
+      assert.ok(["hit", "miss", "error", "not_checked"].includes(summary.cache));
+      const fields = ["event", "worker", "route", "cache", "http_status", "steam_keyed", "steam_unkeyed",
+        "steam_fetch_errors", "steam_endpoints", "steam_http"];
+      if (summary.cache === "hit" || summary.cache === "miss") {
+        fields.push("cache_hit");
+        assert.equal(summary.cache_hit, Number(summary.cache === "hit"));
+      }
+      assert.deepEqual(Object.keys(summary).sort(), fields.sort());
+      assert.deepEqual(Object.keys(summary.steam_endpoints).sort(), isParser ? ["get_details"] :
+        ["collection_details", "get_details", "published_file_details", "query_files"]);
+      for (const status of Object.keys(summary.steam_http)) assert.match(status, /^(keyed|unkeyed)_[1-5][0-9]{2}$/);
+      const sum = counts => Object.values(counts).reduce((total, count) => total + count, 0);
+      const total = summary.steam_keyed + summary.steam_unkeyed;
+      assert.equal(total, sum(summary.steam_endpoints));
+      assert.equal(total, sum(summary.steam_http) + summary.steam_fetch_errors);
+      attempts += total;
+    }
+    assert.equal(attempts, steamFetch.mock.callCount(), "totals must match actual fetch invocations");
+    assert.equal(warn.mock.callCount(), 0, "raw upstream errors must never be logged");
+  });
   const pending = [];
   return {
+    log,
+    get summaries() { return log.mock.calls.map(call => call.arguments[0]); },
     ctx: { waitUntil: (promise) => pending.push(promise) },
     flush: () => Promise.all(pending),
   };
+}
+
+function assertSummary(summary, expected) {
+  assert.ok(summary, "expected a request summary");
+  for (const [field, value] of Object.entries(expected)) assert.deepEqual(summary[field], value, field);
 }
 
 function parserRequest(ids) {
@@ -123,6 +164,9 @@ test("sorting cache keys isolate sort, keyword, page and filetype without leakin
   await get("q=river&sort=recent&page=1&filetype=1");
   assert.equal(calls, 5);
   assert.equal(entries.size, 5);
+  assert.deepEqual(runtime.summaries.map(s => [s.cache, s.steam_keyed]), [
+    ["miss", 1], ["miss", 1], ["hit", 0], ["miss", 1], ["miss", 1], ["miss", 1],
+  ]);
 });
 
 test("browser requests 50 items or collections per page and preserves query filters", async (t) => {
@@ -191,6 +235,9 @@ test("browser preserves short and empty final pages and does not cache failed re
   await runtime.flush();
   assert.deepEqual(calls, [1, 2, 2, 3]);
   assert.deepEqual(writes, [["1", 200], ["2", 200], ["3", 200]]);
+  assert.deepEqual(runtime.summaries.map(s => [s.http_status, s.steam_keyed, s.steam_http]), [
+    [200, 1, { keyed_200: 1 }], [500, 1, { keyed_503: 1 }], [200, 1, { keyed_200: 1 }], [200, 1, { keyed_200: 1 }],
+  ]);
 });
 
 test("browser mixed lists use the 50-result limit with both sources and either fallback", async (t) => {
@@ -215,6 +262,12 @@ test("browser mixed lists use the 50-result limit with both sources and either f
       assert.equal(data.publishedfiledetails[0].publishedfileid, failedType === "0" ? "collection-51" : "item-51");
       assert.equal(data.publishedfiledetails[49].publishedfileid, failedType === null ? "collection-75" : failedType === "0" ? "collection-100" : "item-100");
       await runtime.flush();
+      assert.equal(runtime.summaries.length, 1);
+      assertSummary(runtime.summaries[0], {
+        route: "/list", http_status: 200, cache: "miss", steam_keyed: 2, steam_unkeyed: 0,
+        steam_http: failedType === null ? { keyed_200: 2 } : { keyed_200: 1, keyed_503: 1 },
+      });
+      assert.equal(runtime.summaries[0].steam_endpoints.query_files, 2);
     });
   }
 });
@@ -306,6 +359,7 @@ test("parser rejects missing configuration without calling Steam", async (t) => 
   const response = await parser.fetch(parserRequest(["100"]), {}, runtime.ctx);
   assert.equal(response.status, 503);
   await runtime.flush();
+  assertSummary(runtime.summaries[0], { route: "parse", http_status: 503, cache: "not_checked", steam_keyed: 0 });
 });
 
 test("parser distinguishes collections from downloadable mods with dependencies", async (t) => {
@@ -348,6 +402,8 @@ test("parser chunks 101 IDs without recursively expanding dependencies", async (
   assert.deepEqual(sizes, [100, 1]);
   assert.deepEqual((await response.json()).map((item) => item.publishedfileid), ids);
   await runtime.flush();
+  assert.equal(runtime.summaries.length, 1);
+  assertSummary(runtime.summaries[0], { steam_keyed: 2, steam_unkeyed: 0, steam_endpoints: { get_details: 2 }, steam_http: { keyed_200: 2 } });
 });
 
 test("browser uses official collection and dependency endpoints and preserves child order", async (t) => {
@@ -387,11 +443,18 @@ test("browser uses official collection and dependency endpoints and preserves ch
       assert.equal(item.preview_url, "https://images.invalid/full.jpg");
       assert.equal(paths.includes("/ISteamRemoteStorage/GetCollectionDetails/v1/"), collection);
       await runtime.flush();
+      assert.equal(runtime.summaries.length, 1);
+      assertSummary(runtime.summaries[0], {
+        route: "/detail", cache: "miss", http_status: 200, steam_keyed: 1,
+        steam_unkeyed: collection ? 3 : 2, steam_http: { keyed_200: 1, unkeyed_200: collection ? 3 : 2 },
+        steam_endpoints: { get_details: 1, published_file_details: 2, collection_details: collection ? 1 : 0, query_files: 0 },
+      });
     });
   }
 });
 
 test("100 update IDs use one Steam call and share a cache key across orderings", async (t) => {
+  const anonymousEnv = { get STEAM_API_KEY() { throw new Error("updates must not read the Steam key"); } };
   const ids = Array.from({ length: 99 }, (_, i) => String(i + 1)).concat("18446744073709551615");
   const stored = new Map();
   const cache = {
@@ -411,7 +474,7 @@ test("100 update IDs use one Steam call and share a cache key across orderings",
     })) } });
   }, cache);
   for (const group of [ids, [...ids].reverse()]) {
-    const res = await browser.fetch(new Request("https://worker.invalid/updates?ids=" + group.join(",")), {}, runtime.ctx);
+    const res = await browser.fetch(new Request("https://worker.invalid/updates?ids=" + group.join(",")), anonymousEnv, runtime.ctx);
     assert.equal(res.status, 200);
     assert.match(res.headers.get("cache-control"), /s-maxage=3600/);
     const { items } = await res.json();
@@ -420,6 +483,9 @@ test("100 update IDs use one Steam call and share a cache key across orderings",
   }
   assert.equal(calls, 1);
   assert.equal(stored.size, 1);
+  assert.deepEqual(runtime.summaries.map(s => [s.route, s.cache, s.steam_keyed, s.steam_unkeyed, s.steam_http]), [
+    ["/updates", "miss", 0, 1, { unkeyed_200: 1 }], ["/updates", "hit", 0, 0, {}],
+  ]);
 });
 
 test("update batches isolate unavailable, missing, duplicate and malformed rows and do not cache them", async (t) => {
@@ -471,6 +537,12 @@ test("updates reject bad batches before Steam and preserve retryable upstream fa
   assert.equal(limited.headers.get("Retry-After"), "7");
   assert.equal((await browser.fetch(new Request(endpoint), {}, runtime.ctx)).status, 502);
   await runtime.flush();
+  assert.equal(runtime.summaries.length, 12);
+  for (const s of runtime.summaries.slice(0, -2)) {
+    assertSummary(s, { cache: "not_checked", steam_keyed: 0, steam_unkeyed: 0, steam_http: {} });
+  }
+  assertSummary(runtime.summaries.at(-2), { cache: "miss", http_status: 429, steam_unkeyed: 1, steam_http: { unkeyed_429: 1 } });
+  assertSummary(runtime.summaries.at(-1), { cache: "miss", http_status: 502, steam_unkeyed: 1, steam_http: { unkeyed_200: 1 } });
 });
 
 test("legacy detail clients still receive the Steam result 9 envelope", async (t) => {
@@ -487,4 +559,205 @@ test("legacy detail clients still receive the Steam result 9 envelope", async (t
   assert.deepEqual(await r.json(), { response: { result: 1, resultcount: 1, publishedfiledetails: [row] } });
   assert.deepEqual(calls, ["GetPublishedFileDetails", "GetCollectionDetails"]);
   await runtime.flush();
+});
+
+test("early returns and unknown paths keep bounded labels and reflect where validation happens", async (t) => {
+  const runtime = fixtureRuntime(t, () => assert.fail("unexpected Steam call"));
+  const base = "https://worker.invalid";
+  const opaqueURL = base + "/private-path-sentinel?q=private-query-sentinel";
+  for (const [worker, request, route, status, cache] of [
+    [browser, new Request(opaqueURL), "other", 404, "miss"],
+    [browser, new Request(base + "/detail"), "/detail", 500, "miss"],
+    [browser, new Request(base + "/list", { method: "OPTIONS" }), "/list", 200, "not_checked"],
+    [parser, new Request(opaqueURL, { method: "OPTIONS" }), "parse", 200, "not_checked"],
+    [parser, new Request(opaqueURL), "parse", 405, "not_checked"],
+    [parser, new Request(opaqueURL, { method: "POST", body: "invalid JSON" }), "parse", 400, "not_checked"],
+    [parser, parserRequest([]), "parse", 400, "not_checked"],
+  ]) {
+    assert.equal((await worker.fetch(request, env, runtime.ctx)).status, status);
+    assertSummary(runtime.summaries.at(-1), { route, http_status: status, cache, steam_keyed: 0, steam_unkeyed: 0 });
+  }
+  assert.equal(runtime.summaries.length, 7);
+  assert.doesNotMatch(JSON.stringify(runtime.summaries), /sentinel|worker\.invalid|fixture-key/);
+});
+
+test("HTTP 409 from a cached response has zero attempts; Steam 409 is counted with its actual client status", async (t) => {
+  let hit = true;
+  const conflict = () => new Response(null, { status: 409 });
+  const runtime = fixtureRuntime(t, conflict, { match: async () => hit ? conflict() : undefined });
+  const updates = () => new Request("https://worker.invalid/updates?ids=123");
+  for (const [worker, makeRequest] of [[browser, updates], [parser, () => parserRequest(["123"])]]) {
+    hit = true;
+    assert.equal((await worker.fetch(makeRequest(), env, runtime.ctx)).status, 409);
+    assertSummary(runtime.summaries.at(-1), { cache: "hit", http_status: 409, steam_keyed: 0, steam_unkeyed: 0, steam_http: {} });
+    hit = false;
+    assert.equal((await worker.fetch(makeRequest(), env, runtime.ctx)).status, 502);
+    assertSummary(runtime.summaries.at(-1), { cache: "miss", http_status: 502, steam_keyed: Number(worker === parser),
+      steam_unkeyed: Number(worker === browser), steam_http: worker === browser ? { unkeyed_409: 1 } : { keyed_409: 1 } });
+  }
+  assert.equal(runtime.summaries.length, 4);
+});
+
+test("cache errors preserve the original exception or the updates fallback", async (t) => {
+  const failure = new Error("cache-error-sentinel");
+  const fail = async () => { throw failure; };
+  const runtime = fixtureRuntime(t, () => json({ response: { result: 1, resultcount: 1, publishedfiledetails: [
+    { result: 1, publishedfileid: "123", time_updated: 1700000000 },
+  ] } }), { match: fail, put: async () => {} });
+  t.mock.method(caches, "open", fail);
+  const base = "https://worker.invalid";
+  for (const [worker, request] of [[browser, new Request(base + "/list")], [browser, new Request(base + "/detail?id=123")],
+    [parser, parserRequest(["123"])]]) {
+    await assert.rejects(worker.fetch(request, env, runtime.ctx), error => error === failure);
+    assertSummary(runtime.summaries.at(-1), { cache: "error", http_status: null, steam_keyed: 0, steam_unkeyed: 0 });
+  }
+  const result = await browser.fetch(new Request(base + "/updates?ids=123"), env, runtime.ctx);
+  assert.equal(result.status, 200);
+  assert.equal((await result.json()).items[0].time_updated, 1700000000);
+  await runtime.flush();
+  assertSummary(runtime.summaries.at(-1), { route: "/updates", cache: "error", http_status: 200,
+    steam_keyed: 0, steam_unkeyed: 1, steam_http: { unkeyed_200: 1 } });
+  assert.equal(runtime.summaries.length, 4);
+  assert.doesNotMatch(JSON.stringify(runtime.summaries), /cache-error-sentinel/);
+});
+
+test("a Fetch error response counts one attempt without inventing an HTTP status", async (t) => {
+  const runtime = fixtureRuntime(t, () => Response.error());
+  assert.equal((await browser.fetch(new Request("https://worker.invalid/updates?ids=123"), env, runtime.ctx)).status, 502);
+  assert.equal((await parser.fetch(parserRequest(["123"]), env, runtime.ctx)).status, 502);
+  assert.deepEqual(runtime.summaries.map(s => [s.steam_keyed, s.steam_unkeyed, s.steam_fetch_errors, s.steam_http]),
+    [[0, 1, 1, {}], [1, 0, 1, {}]]);
+});
+
+test("a delayed preview is attributed to its own request after an early error response", async (t) => {
+  const preview = Promise.withResolvers();
+  const secretID = "9955227733";
+  const ip = "192.0.2.71";
+  const runtime = fixtureRuntime(t, (url, init) => {
+    if (url.pathname.includes("/GetDetails/")) return preview.promise;
+    const id = init.body.get("publishedfileids[0]");
+    if (id === secretID) return new Response(null, { status: 503 });
+    return json({ response: { publishedfiledetails: [{ publishedfileid: id, file_type: 0 }] } });
+  });
+  const first = await browser.fetch(new Request(`https://worker.invalid/detail?id=${secretID}&with_previews=1`,
+    { headers: { "CF-Connecting-IP": ip } }), env, runtime.ctx);
+  assert.equal(first.status, 500);
+  assert.equal(runtime.summaries.length, 0);
+  const second = await browser.fetch(new Request("https://worker.invalid/detail?id=123"), env, runtime.ctx);
+  assert.equal(second.status, 200);
+  assert.equal(runtime.summaries.length, 1);
+  assertSummary(runtime.summaries[0], { http_status: 200, steam_keyed: 0, steam_unkeyed: 1, steam_http: { unkeyed_200: 1 } });
+  preview.reject(new Error(`upstream-sentinel: https://api.steampowered.com/x?key=${env.STEAM_API_KEY}&id=${secretID}`));
+  await runtime.flush();
+  assert.equal(runtime.summaries.length, 2);
+  assertSummary(runtime.summaries[1], { route: "/detail", http_status: 500, steam_keyed: 1, steam_unkeyed: 1,
+    steam_http: { unkeyed_503: 1 }, steam_fetch_errors: 1 });
+  const serialized = JSON.stringify(runtime.summaries);
+  for (const value of [env.STEAM_API_KEY, secretID, ip, "upstream-sentinel", "https://"]) assert.ok(!serialized.includes(value));
+});
+
+test("a throttled keyed preview keeps the basic detail and reports both Steam statuses", async (t) => {
+  const runtime = fixtureRuntime(t, url => url.pathname.includes("/GetDetails/")
+    ? new Response(null, { status: 429 })
+    : json(listData([{ publishedfileid: "123", file_type: 0, preview_url: "fixture-cover" }])));
+  const response = await browser.fetch(new Request("https://worker.invalid/detail?id=123&with_previews=1"), env, runtime.ctx);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).response.publishedfiledetails[0].previews[0].preview_url, "fixture-cover");
+  await runtime.flush();
+  assert.equal(runtime.summaries.length, 1);
+  assertSummary(runtime.summaries[0], { steam_keyed: 1, steam_unkeyed: 1, http_status: 200,
+    steam_http: { keyed_429: 1, unkeyed_200: 1 } });
+});
+
+test("failed collection probes and child chunks preserve detail fallback without logging raw errors", async (t) => {
+  const children = Array.from({ length: 101 }, (_, index) => ({ publishedfileid: String(1001 + index) }));
+  const runtime = fixtureRuntime(t, (url, init) => {
+    const id = init?.body?.get("publishedfileids[0]");
+    if (url.pathname.includes("/GetDetails/")) return json(listData([{ children }]));
+    if (url.pathname.includes("/GetCollectionDetails/") || id === "1101") {
+      throw new Error(`failure-sentinel ${url}?key=${env.STEAM_API_KEY}&id=${id}`);
+    }
+    if (id === "123") return json(listData([{ publishedfileid: id }])); // Missing type triggers a collection probe.
+    assert.equal(init.body.get("itemcount"), "100");
+    return json(listData([]));
+  });
+  const response = await browser.fetch(new Request("https://worker.invalid/detail?id=123&with_previews=1"), env, runtime.ctx);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).response.publishedfiledetails[0].required_items, []);
+  await runtime.flush();
+  assert.equal(runtime.summaries.length, 1);
+  assertSummary(runtime.summaries[0], { steam_keyed: 1, steam_unkeyed: 4, steam_fetch_errors: 2,
+    steam_http: { keyed_200: 1, unkeyed_200: 2 },
+    steam_endpoints: { query_files: 0, get_details: 1, published_file_details: 3, collection_details: 1 },
+  });
+  assert.doesNotMatch(JSON.stringify(runtime.summaries), /failure-sentinel|fixture-key|https:\/\//);
+});
+
+test("parse stops counting at a failed chunk and counts a concurrent retry and subsequent cache hit separately", async (t) => {
+  const failure = Promise.withResolvers();
+  const secondChunk = Promise.withResolvers();
+  let calls = 0;
+  const cached = new Map();
+  const runtime = fixtureRuntime(t, () => {
+    if (++calls === 2) {
+      secondChunk.resolve();
+      return failure.promise;
+    }
+    return json({ response: { publishedfiledetails: [] } });
+  }, {
+    match: async key => cached.get(key.url)?.clone(),
+    put: async (key, value) => cached.set(key.url, value.clone()),
+  });
+  const ids = Array.from({ length: 201 }, (_, i) => String(i + 1));
+  const first = parser.fetch(parserRequest(ids), env, runtime.ctx);
+  await secondChunk.promise;
+  assert.equal((await parser.fetch(parserRequest(ids), env, runtime.ctx)).status, 200);
+  failure.reject(new Error("parse-fetch-sentinel"));
+  assert.equal((await first).status, 502);
+  await runtime.flush();
+  assert.equal((await parser.fetch(parserRequest(ids.reverse()), env, runtime.ctx)).status, 200);
+  assert.deepEqual(runtime.summaries.map(s => [s.cache, s.http_status, s.steam_keyed, s.steam_fetch_errors, s.steam_http]), [
+    ["miss", 200, 3, 0, { keyed_200: 3 }], ["miss", 502, 2, 1, { keyed_200: 1 }], ["hit", 200, 0, 0, {}],
+  ]);
+  assert.equal(calls, 5);
+});
+
+test("an unconfigured list or preview never charges a configured key in the summary", async (t) => {
+  const runtime = fixtureRuntime(t, (url) => {
+    if (url.pathname.includes("/QueryFiles/")) {
+      assert.equal(url.searchParams.get("key"), "undefined"); // Existing wire behavior without a binding.
+      return new Response(null, { status: 403 });
+    }
+    assert.equal(url.pathname, "/ISteamRemoteStorage/GetPublishedFileDetails/v1/");
+    return json({ response: { publishedfiledetails: [{ publishedfileid: "123", file_type: 0 }] } });
+  });
+  const base = "https://worker.invalid";
+  assert.equal((await browser.fetch(new Request(base + "/list?filetype=0"), {}, runtime.ctx)).status, 500);
+  assert.equal((await browser.fetch(new Request(base + "/detail?id=123&with_previews=1"), {}, runtime.ctx)).status, 200);
+  assert.deepEqual(runtime.summaries.map(s => [s.steam_keyed, s.steam_unkeyed, s.steam_http]), [
+    [0, 1, { unkeyed_403: 1 }], [0, 1, { unkeyed_200: 1 }],
+  ]);
+  await runtime.flush();
+});
+
+test("a throwing log sink preserves both Workers' responses and cache exceptions", async (t) => {
+  const failure = new Error("original cache failure");
+  let broken = false;
+  const runtime = fixtureRuntime(t, () => assert.fail("unexpected Steam call"), {
+    match: async () => {
+      if (broken) throw failure;
+      return new Response("cached body", { headers: { "X-Fixture": "cached" } });
+    },
+  });
+  runtime.log.mock.mockImplementation(() => { throw new Error("unavailable log sink"); });
+  for (const [worker, makeRequest] of [[browser, () => new Request("https://worker.invalid/list")], [parser, () => parserRequest(["1"])]]) {
+    broken = false;
+    const response = await worker.fetch(makeRequest(), env, runtime.ctx);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("X-Fixture"), "cached");
+    assert.equal(await response.text(), "cached body");
+    broken = true;
+    await assert.rejects(worker.fetch(makeRequest(), env, runtime.ctx), error => error === failure);
+  }
+  assert.equal(runtime.summaries.length, 4);
 });
