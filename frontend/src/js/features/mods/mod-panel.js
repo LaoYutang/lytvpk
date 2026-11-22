@@ -1,3 +1,5 @@
+import { bindFileActionData, createTextElement } from "../../core/utils.js";
+
 let selectedPath = "";
 let findFileByPath = () => null;
 
@@ -58,56 +60,68 @@ export function renderModInfoPanel(file) {
     return;
   }
 
-  const title = escapeHtml(file.title || file.name);
-  const name = escapeHtml(file.name || "");
-  const path = escapeHtml(file.path || "");
-  const workshopId = escapeHtml(file.workshopId || "");
-  const tags = renderTags(file.primaryTag, file.secondaryTags);
   const hidden = file.name?.startsWith("_");
   const firstAction = file.location === "workshop"
-    ? `<button class="panel-action move-btn primary" data-file-path="${path}" data-action="move">转移</button>`
-    : `<button class="panel-action toggle-btn primary" data-file-path="${path}" data-action="toggle">${file.enabled ? "禁用" : "启用"}</button>`;
+    ? `<button class="panel-action move-btn primary" data-file-path data-action="move">转移</button>`
+    : `<button class="panel-action toggle-btn primary" data-file-path data-action="toggle">${file.enabled ? "禁用" : "启用"}</button>`;
 
   panel.innerHTML = `
     <div class="mod-info-card">
       <div class="mod-info-header">
-        <div class="mod-file-icon">${getLocationGlyph(file.location)}</div>
+        <div class="mod-file-icon"></div>
         <div class="mod-info-title-wrap">
-          <h3 title="${title}">${title}</h3>
+          <h3></h3>
           <span class="mod-info-status ${file.enabled ? "enabled" : "disabled"}">${file.enabled ? "已启用" : "已禁用"}</span>
         </div>
       </div>
 
       <div class="mod-info-section">
         <h4>基本信息</h4>
-        ${infoRow("文件名", name)}
-        ${infoRow("大小", formatFileSize(file.size))}
-        ${infoRow("位置", escapeHtml(getLocationName(file.location)))}
-        ${infoRow("最后修改", escapeHtml(file.lastModified || "N/A"))}
-        ${workshopId ? infoRow("工坊 ID", workshopId) : ""}
-        ${infoRow("路径", path, "path")}
       </div>
 
       <div class="mod-info-section">
         <h4>标签</h4>
-        <div class="mod-info-tags">${tags || '<span class="tag muted">未设置</span>'}</div>
+        <div class="mod-info-tags"></div>
       </div>
 
       <div class="mod-info-section">
         <h4>快捷操作</h4>
         <div class="mod-panel-actions">
           ${firstAction}
-          ${file.workshopId ? `<button class="panel-action workshop-btn" data-file-path="${path}" data-workshop-id="${workshopId}">查看工坊</button>` : ""}
-          <button class="panel-action open-location-btn" data-file-path="${path}" data-action="open-location">打开目录</button>
-          <button class="panel-action set-tags-btn" data-file-path="${path}" data-action="set-tags">设置标签</button>
-          <button class="panel-action rename-btn" data-file-path="${path}" data-action="rename">重命名</button>
-          <button class="panel-action load-order-btn" data-file-path="${path}" data-action="load-order">加载顺序</button>
-          <button class="panel-action hide-btn" data-file-path="${path}" data-action="hide">${hidden ? "取消隐藏" : "隐藏文件"}</button>
-          <button class="panel-action delete-btn danger" data-file-path="${path}" data-action="delete">删除文件</button>
+          ${file.workshopId ? `<button class="panel-action workshop-btn" data-file-path data-workshop-id>查看工坊</button>` : ""}
+          <button class="panel-action open-location-btn" data-file-path data-action="open-location">打开目录</button>
+          <button class="panel-action set-tags-btn" data-file-path data-action="set-tags">设置标签</button>
+          <button class="panel-action rename-btn" data-file-path data-action="rename">重命名</button>
+          <button class="panel-action load-order-btn" data-file-path data-action="load-order">加载顺序</button>
+          <button class="panel-action hide-btn" data-file-path data-action="hide">${hidden ? "取消隐藏" : "隐藏文件"}</button>
+          <button class="panel-action delete-btn danger" data-file-path data-action="delete">删除文件</button>
         </div>
       </div>
     </div>
   `;
+
+  const title = panel.querySelector(".mod-info-title-wrap h3");
+  title.textContent = file.title || file.name || "";
+  title.title = title.textContent;
+  panel.querySelector(".mod-file-icon").textContent = getLocationGlyph(file.location);
+
+  const info = panel.querySelector(".mod-info-section");
+  info.append(
+    infoRow("文件名", file.name || ""),
+    infoRow("大小", formatFileSize(file.size)),
+    infoRow("位置", getLocationName(file.location)),
+    infoRow("最后修改", file.lastModified || "N/A")
+  );
+  if (file.workshopId) info.appendChild(infoRow("工坊 ID", file.workshopId));
+  info.appendChild(infoRow("路径", file.path || "", "path"));
+
+  const tags = panel.querySelector(".mod-info-tags");
+  if (file.primaryTag) tags.appendChild(createTextElement("span", "tag primary-tag", file.primaryTag));
+  for (const tag of file.secondaryTags || []) {
+    tags.appendChild(createTextElement("span", "tag secondary-tag", tag));
+  }
+  if (!tags.childElementCount) tags.appendChild(createTextElement("span", "tag muted", "未设置"));
+  bindFileActionData(panel, file);
 }
 
 function syncSelectedRow() {
@@ -117,21 +131,12 @@ function syncSelectedRow() {
 }
 
 function infoRow(label, value, variant = "") {
-  return `
-    <div class="mod-info-row ${variant}">
-      <span>${label}</span>
-      <strong title="${value}">${value}</strong>
-    </div>
-  `;
-}
-
-function renderTags(primaryTag, secondaryTags = []) {
-  const tags = [];
-  if (primaryTag) tags.push(`<span class="tag primary-tag">${escapeHtml(primaryTag)}</span>`);
-  secondaryTags?.forEach((tag) => {
-    tags.push(`<span class="tag secondary-tag">${escapeHtml(tag)}</span>`);
-  });
-  return tags.join("");
+  const row = document.createElement("div");
+  row.className = variant ? `mod-info-row ${variant}` : "mod-info-row";
+  const strong = createTextElement("strong", "", value);
+  strong.title = value;
+  row.append(createTextElement("span", "", label), " ", strong);
+  return row;
 }
 
 function formatFileSize(bytes) {
@@ -158,10 +163,4 @@ function getLocationGlyph(location) {
     disabled: "−",
   };
   return glyphs[location] || "•";
-}
-
-function escapeHtml(value) {
-  const div = document.createElement("div");
-  div.textContent = value == null ? "" : String(value);
-  return div.innerHTML;
 }

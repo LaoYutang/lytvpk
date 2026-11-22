@@ -8,7 +8,7 @@ import {
 } from "../state.js";
 import { showError, showNotification, showSuccess } from "../../core/toast.js";
 import { showConfirmModal } from "../modals/confirm.js";
-import { renderFileList, iconSvg, getLocationSvg } from "./render.js";
+import { renderFileList, iconSvg, createLocationBadge } from "./render.js";
 import { refreshFilesKeepFilter } from "./filters.js";
 import {
   ToggleVPKFile,
@@ -431,32 +431,21 @@ function updateSingleFileDisplay(file) {
 
   const locationEl = item.querySelector(".file-location");
   if (locationEl) {
-    const locationNames = { root: "根目录", workshop: "创意工坊", disabled: "已禁用" };
-    locationEl.innerHTML = `
-      <span class="location-state-tag location-${file.location}">
-        ${getLocationSvg(file.location)}
-        <span>${locationNames[file.location] || file.location}</span>
-      </span>
-    `;
+    locationEl.replaceChildren(createLocationBadge(file.location));
   }
 
   const actionBtn = item.querySelector(".toggle-btn, .move-btn");
   if (actionBtn) {
-    if (file.location === "workshop") {
-      actionBtn.outerHTML = `
-        <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move">
-          <span class="btn-icon">${iconSvg("package")}</span>
-          <span class="btn-text">转移</span>
-        </button>
-      `;
-    } else {
-      actionBtn.outerHTML = `
-        <button class="btn-small action-btn toggle-btn ${file.enabled ? "toggle-disable" : "toggle-enable"}"
-                data-file-path="${file.path}" data-action="toggle">
-          <span class="btn-icon">${file.enabled ? iconSvg("x") : iconSvg("check")}</span>
-          <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
-        </button>
-      `;
+    const move = file.location === "workshop";
+    const actionClass = move ? "move-btn" : `toggle-btn ${file.enabled ? "toggle-disable" : "toggle-enable"}`;
+    const icon = move ? "package" : file.enabled ? "x" : "check";
+    actionBtn.className = `btn-small action-btn ${actionClass}`;
+    actionBtn.dataset.filePath = file.path;
+    actionBtn.dataset.action = move ? "move" : "toggle";
+    actionBtn.querySelector(".btn-icon").replaceChildren(document.createRange().createContextualFragment(iconSvg(icon)));
+    actionBtn.querySelector(".btn-text").textContent = move ? "转移" : file.enabled ? "禁用" : "启用";
+    if (actionBtn.hasAttribute("title")) {
+      actionBtn.title = move ? "转移" : file.enabled ? "点击禁用" : "点击启用";
     }
   }
 }

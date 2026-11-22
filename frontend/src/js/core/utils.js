@@ -10,7 +10,7 @@ export function getLocationDisplayName(tag) {
 export function getActionButton(file) {
   if (file.location === "workshop") {
     return `
-      <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move">
+      <button class="btn-small action-btn move-btn" data-file-path data-action="move">
         <span class="btn-icon">
           <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path>
@@ -25,7 +25,7 @@ export function getActionButton(file) {
     return `
       <button class="btn-small action-btn toggle-btn ${
         file.enabled ? "toggle-disable" : "toggle-enable"
-      }" data-file-path="${file.path}" data-action="toggle">
+      }" data-file-path data-action="toggle">
         <span class="btn-icon">
           <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 2v10"></path>
@@ -48,33 +48,20 @@ export function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-export function formatTags(primaryTag, secondaryTags = []) {
-  const tags = [];
+export function createTextElement(tagName, className, text) {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  element.textContent = text;
+  return element;
+}
 
-  if (primaryTag) {
-    tags.push(
-      `<span class="tag primary-tag" title="${escapeHtml(primaryTag)}">${escapeHtml(primaryTag)}</span>`
-    );
+export function bindFileActionData(container, file) {
+  for (const button of container.querySelectorAll("[data-file-path]")) {
+    button.dataset.filePath = file.path;
   }
-
-  if (secondaryTags && secondaryTags.length > 0) {
-    secondaryTags.slice(0, 2).forEach((tag) => {
-      tags.push(
-        `<span class="tag secondary-tag" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`
-      );
-    });
-
-    if (secondaryTags.length > 2) {
-      tags.push(
-        `<span class="tag more-tags" title="${secondaryTags
-          .slice(2)
-          .map(escapeHtml)
-          .join(", ")}">+${secondaryTags.length - 2}</span>`
-      );
-    }
+  for (const button of container.querySelectorAll("[data-workshop-id]")) {
+    button.dataset.workshopId = file.workshopId;
   }
-
-  return tags.join("");
 }
 
 export function escapeHtml(text) {

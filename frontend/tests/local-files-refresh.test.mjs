@@ -28,7 +28,6 @@ async function setup() {
     showNotification() {}, updateStatusBar() {}, showFileListLoading() {},
     hideFileListLoading: () => calls.hides++,
     renderFileList: () => calls.renders++,
-    getLocationDisplayName: (value) => value, escapeHtml: (value) => value,
     applySort: (value) => value, refreshSortData: async () => {},
     saveSortPreference() {}, updateSortButtonUI() {}, resetBoxSelection() {},
   };
@@ -42,7 +41,6 @@ async function setup() {
     "../state.js": ["updateStatusBar", "showFileListLoading", "hideFileListLoading"],
     "../../core/toast.js": ["showError", "showNotification"],
     "./render.js": ["renderFileList"],
-    "../../core/utils.js": ["getLocationDisplayName", "escapeHtml"],
     "./sorting.js": ["applySort", "refreshSortData", "saveSortPreference", "updateSortButtonUI"],
     "./box-selection.js": ["resetBoxSelection"],
     "../../../../wailsjs/go/app/App": [
@@ -173,7 +171,7 @@ test("partially failed batch deletion refreshes installation state and retains o
     "../state.js": ["toggleFileSelection", "updateStatusBar", "showLoadingScreen", "showMainScreen", "updateLoadingMessage"],
     "../../core/toast.js": ["showError", "showNotification", "showSuccess"],
     "../modals/confirm.js": ["showConfirmModal"],
-    "./render.js": ["renderFileList", "iconSvg", "getLocationSvg"],
+    "./render.js": ["renderFileList", "iconSvg", "createLocationBadge"],
     "./filters.js": ["refreshFilesKeepFilter"],
     "../../../../wailsjs/go/app/App": ["ToggleVPKFile", "ExportVPKFilesToZip", "MoveVpkFiles", "DeleteVPKFiles", "SelectDirectory", "GetVPKFiles", "ToggleVPKVisibility"],
     "../../../../wailsjs/runtime/runtime": ["EventsOn"],
