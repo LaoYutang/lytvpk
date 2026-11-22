@@ -1,7 +1,7 @@
 import { appState, updateStatusBar, showFileListLoading, hideFileListLoading } from "../state.js";
 import { showError, showNotification } from "../../core/toast.js";
 import { renderFileList } from "./render.js";
-import { getLocationDisplayName, escapeHtml } from "../../core/utils.js";
+import { createTextElement, getLocationDisplayName } from "../../core/utils.js";
 import { applySort, refreshSortData, saveSortPreference, updateSortButtonUI } from "./sorting.js";
 import { resetBoxSelection } from "./box-selection.js";
 import { GetPrimaryTags, GetSecondaryTags, SearchVPKFiles, ScanVPKFiles, GetVPKFiles, GetRootDirectory, SetRootDirectory, ValidateDirectory } from "../../../../wailsjs/go/app/App";
@@ -392,7 +392,7 @@ async function renderSecondaryTagDropdown(secondaryGroup, primaryTag) {
 
     // 渲染选项的函数
     const renderOptions = (filterText = "") => {
-      optionsContainer.innerHTML = "";
+      optionsContainer.replaceChildren();
       const filteredTags = filterText
         ? secondaryTags.filter((tag) => tag.toLowerCase().includes(filterText.toLowerCase()))
         : secondaryTags;
@@ -400,11 +400,12 @@ async function renderSecondaryTagDropdown(secondaryGroup, primaryTag) {
       filteredTags.forEach((tag) => {
         const label = document.createElement("label");
         label.className = "multi-select-option";
-        label.innerHTML = `
-          <input type="checkbox" value="${escapeHtml(tag)}" ${appState.selectedSecondaryTags.includes(tag) ? "checked" : ""}>
-          <span>${escapeHtml(tag)}</span>
-        `;
-        label.querySelector("input").addEventListener("change", (event) => {
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = tag;
+        input.checked = appState.selectedSecondaryTags.includes(tag);
+        label.append(input, createTextElement("span", "", tag));
+        input.addEventListener("change", (event) => {
           if (event.target.checked) {
             if (!appState.selectedSecondaryTags.includes(tag)) {
               appState.selectedSecondaryTags.push(tag);

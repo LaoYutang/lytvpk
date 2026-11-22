@@ -1,5 +1,5 @@
 import { appState } from "../state.js";
-import { formatFileSize, getLocationDisplayName } from "../../core/utils.js";
+import { createTextElement, formatFileSize, getLocationDisplayName } from "../../core/utils.js";
 import { showError } from "../../core/toast.js";
 import { GetVPKPreviewImage, ParseWorkshopID } from "../../../../wailsjs/go/app/App";
 import { handleProtocolWorkshop } from "../workshop/workshop-browser.js";
@@ -60,19 +60,16 @@ export function showFileDetail(filePath) {
   }
 
   const tagsContainer = document.getElementById("detail-tags");
-  const primaryTagHtml = file.primaryTag
-    ? `<span class="tag primary-tag">${file.primaryTag}</span>`
-    : "";
-  tagsContainer.innerHTML = primaryTagHtml;
+  tagsContainer.replaceChildren();
+  if (file.primaryTag) {
+    tagsContainer.appendChild(createTextElement("span", "tag primary-tag", file.primaryTag));
+  }
 
   const detailTagsContainer = document.getElementById("detail-detail-tags");
-  const secondaryTagsHtml =
-    file.secondaryTags && file.secondaryTags.length > 0
-      ? file.secondaryTags
-          .map((tag) => `<span class="tag secondary-tag">${tag}</span>`)
-          .join("")
-      : "";
-  detailTagsContainer.innerHTML = secondaryTagsHtml;
+  detailTagsContainer.replaceChildren();
+  for (const tag of file.secondaryTags || []) {
+    detailTagsContainer.appendChild(createTextElement("span", "tag secondary-tag", tag));
+  }
 
   const vpkInfoSection = document.getElementById("vpk-info-section");
   document.getElementById("detail-vpk-title").textContent = file.title || "无标题";
@@ -137,26 +134,22 @@ export function showFileDetail(filePath) {
     campaignElement.textContent = file.campaign || "未知战役";
 
     const chaptersListElement = document.getElementById("detail-chapters-list");
-    if (file.chapters && Object.keys(file.chapters).length > 0) {
-      let chaptersHtml = "";
-      Object.entries(file.chapters).forEach(([chapterCode, chapterInfo]) => {
-        const chapterName = chapterInfo.title || chapterCode;
-        const modes = chapterInfo.modes || [];
-        chaptersHtml += `
-          <div class="chapter-item">
-            <div class="chapter-header">
-              <div class="chapter-name">${chapterName}</div>
-              <div class="chapter-code">${chapterCode}</div>
-            </div>
-            <div class="chapter-modes">${
-              modes.length > 0 ? modes.join(" | ") : "未知模式"
-            }</div>
-          </div>
-        `;
-      });
-      chaptersListElement.innerHTML = chaptersHtml;
-    } else {
-      chaptersListElement.innerHTML = '<div class="no-chapters">无章节信息</div>';
+    chaptersListElement.replaceChildren();
+    for (const [code, chapter] of Object.entries(file.chapters || {})) {
+      const item = document.createElement("div");
+      item.className = "chapter-item";
+      const header = document.createElement("div");
+      header.className = "chapter-header";
+      header.append(
+        createTextElement("div", "chapter-name", chapter.title || code),
+        createTextElement("div", "chapter-code", code)
+      );
+      const modes = chapter.modes?.length ? chapter.modes.join(" | ") : "未知模式";
+      item.append(header, createTextElement("div", "chapter-modes", modes));
+      chaptersListElement.appendChild(item);
+    }
+    if (!chaptersListElement.childElementCount) {
+      chaptersListElement.appendChild(createTextElement("div", "no-chapters", "无章节信息"));
     }
   } else {
     mapInfoSection.classList.add("hidden");

@@ -3,8 +3,8 @@ import {
   formatFileSize,
   getLocationDisplayName,
   getActionButton,
-  formatTags,
-  escapeHtml,
+  bindFileActionData,
+  createTextElement,
 } from "../../core/utils.js";
 import { showFileDetail } from "../modals/detail.js";
 import { GetVPKPreviewImage } from "../../../../wailsjs/go/app/App";
@@ -19,7 +19,7 @@ export function renderFileList() {
   const listHeader = document.querySelector(".file-list-header");
   const statusBar = document.querySelector(".status-bar");
 
-  container.innerHTML = "";
+  container.replaceChildren();
 
   if (appState.displayMode === "card") {
     container.classList.add("file-list-grid");
@@ -42,6 +42,105 @@ export function renderFileList() {
   }
 }
 
+function appendFileTags(container, file, cardView) {
+  const badgeClass = cardView ? "card-badge" : "tag";
+  function appendBadge(className, text, title = text) {
+    const badge = createTextElement("span", `${badgeClass} ${className}`, text);
+    badge.title = title;
+    container.appendChild(badge);
+  }
+
+  if (file.primaryTag) {
+    appendBadge(cardView ? "tag-badge" : "primary-tag", file.primaryTag);
+  }
+  const tags = file.secondaryTags || [];
+  for (const tag of tags.slice(0, 2)) {
+    let className = cardView ? "secondary-tag-badge" : "secondary-tag";
+    if (cardView && tag.length > 16) className += " is-long";
+    appendBadge(className, tag);
+  }
+  if (tags.length > 2) {
+    appendBadge(cardView ? "more-tag-badge" : "more-tags", `+${tags.length - 2}`, tags.slice(2).join(", "));
+  }
+}
+
+export function createLocationBadge(location) {
+  const badge = document.createElement("span");
+  badge.className = `location-state-tag location-${location || "unknown"}`;
+  badge.append(
+    document.createRange().createContextualFragment(getLocationSvg(location)),
+    createTextElement("span", "", getLocationDisplayName(location))
+  );
+  return badge;
+}
+
+function getMoreActionsHtml(file) {
+  const isHidden = file.name.startsWith("_");
+  const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
+  const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
+
+  return `
+    <div class="more-actions-dropdown">
+      <button class="btn-small action-btn more-btn" title="更多操作">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+        </svg>
+      </button>
+      <div class="dropdown-content hidden">
+        <button class="dropdown-item detail-btn" data-file-path>
+          <span class="btn-icon">${iconSvg("info")}</span> 详情
+        </button>
+        ${file.workshopId ? `
+        <button class="dropdown-item workshop-btn" data-file-path data-workshop-id>
+          <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
+        </button>
+        <button class="dropdown-item share-workshop-btn" data-file-path data-action="share-workshop">
+          <span class="btn-icon">${iconSvg("share")}</span> 分享物品
+        </button>
+        ` : ""}
+        <button class="dropdown-item set-tags-btn" data-file-path data-action="set-tags">
+          <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
+        </button>
+        ${hasPanelServers() ? `
+        <button class="dropdown-item upload-server-btn" data-file-path data-action="upload-server">
+          <span class="btn-icon">${iconSvg("upload")}</span>
+          <span class="menu-item-text">上传服务器</span>
+          <span class="menu-item-arrow">${iconSvg("chevronRight")}</span>
+        </button>
+        ` : ""}
+        <button class="dropdown-item rename-btn" data-file-path data-action="rename">
+          <span class="btn-icon">${iconSvg("edit")}</span> 重命名
+        </button>
+        <button class="dropdown-item load-order-btn" data-file-path data-action="load-order">
+          <span class="btn-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="10" y1="6" x2="21" y2="6"></line>
+              <line x1="10" y1="12" x2="21" y2="12"></line>
+              <line x1="10" y1="18" x2="21" y2="18"></line>
+              <path d="M4 6h1v4"></path>
+              <path d="M4 10h2"></path>
+              <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+            </svg>
+          </span> 加载顺序
+        </button>
+        <button class="dropdown-item unpack-btn" data-file-path data-action="unpack">
+          <span class="btn-icon">${iconSvg("package")}</span> 解包
+        </button>
+        <button class="dropdown-item open-location-btn" data-file-path data-action="open-location">
+          <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
+        </button>
+        <button class="dropdown-item hide-btn" data-file-path data-action="hide">
+          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
+        </button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item delete-btn" data-file-path data-action="delete">
+          <span class="btn-icon">${iconSvg("trash")}</span> 删除
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 export function createFileItem(file) {
   const item = document.createElement("div");
   item.className = "file-item";
@@ -56,98 +155,34 @@ export function createFileItem(file) {
   });
 
   const displayTitle = file.title || file.name;
-  const isHidden = file.name.startsWith("_");
-  const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
-  const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
-  const locationBadgeClass = `location-${file.location || "unknown"}`;
-
-  const moreActionsHtml = `
-    <div class="more-actions-dropdown">
-      <button class="btn-small action-btn more-btn" title="更多操作">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-        </svg>
-      </button>
-      <div class="dropdown-content hidden">
-        <button class="dropdown-item detail-btn" data-file-path="${file.path}">
-          <span class="btn-icon">${iconSvg("info")}</span> 详情
-        </button>
-        ${file.workshopId ? `
-        <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
-          <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
-        </button>
-        <button class="dropdown-item share-workshop-btn" data-file-path="${file.path}" data-action="share-workshop">
-          <span class="btn-icon">${iconSvg("share")}</span> 分享物品
-        </button>
-        ` : ""}
-        <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
-          <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
-        </button>
-        ${hasPanelServers() ? `
-        <button class="dropdown-item upload-server-btn" data-file-path="${file.path}" data-action="upload-server">
-          <span class="btn-icon">${iconSvg("upload")}</span>
-          <span class="menu-item-text">上传服务器</span>
-          <span class="menu-item-arrow">${iconSvg("chevronRight")}</span>
-        </button>
-        ` : ""}
-        <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
-          <span class="btn-icon">${iconSvg("edit")}</span> 重命名
-        </button>
-        <button class="dropdown-item load-order-btn" data-file-path="${file.path}" data-action="load-order">
-          <span class="btn-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="10" y1="6" x2="21" y2="6"></line>
-              <line x1="10" y1="12" x2="21" y2="12"></line>
-              <line x1="10" y1="18" x2="21" y2="18"></line>
-              <path d="M4 6h1v4"></path>
-              <path d="M4 10h2"></path>
-              <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
-            </svg>
-          </span> 加载顺序
-        </button>
-        <button class="dropdown-item unpack-btn" data-file-path="${file.path}" data-action="unpack">
-          <span class="btn-icon">${iconSvg("package")}</span> 解包
-        </button>
-        <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
-          <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
-        </button>
-        <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
-          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
-        </button>
-        <div class="dropdown-divider"></div>
-        <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
-          <span class="btn-icon">${iconSvg("trash")}</span> 删除
-        </button>
-      </div>
-    </div>
-  `;
 
   item.innerHTML = `
     <div class="file-checkbox-container"></div>
     <div class="file-name">
-      <div class="file-title">${escapeHtml(displayTitle)}</div>
-      <div class="file-filename"><span class="file-filename-text">${escapeHtml(file.name)}</span></div>
+      <div class="file-title"></div>
+      <div class="file-filename"><span class="file-filename-text"></span></div>
     </div>
-    <div class="file-size">${formatFileSize(file.size)}</div>
-    <div class="file-location">
-      <span class="location-state-tag ${locationBadgeClass}">
-        ${getLocationSvg(file.location)}
-        <span>${getLocationDisplayName(file.location)}</span>
-      </span>
-    </div>
-    <div class="file-tags">${formatTags(file.primaryTag, file.secondaryTags)}</div>
+    <div class="file-size"></div>
+    <div class="file-location"></div>
+    <div class="file-tags"></div>
     <div class="file-actions">
-      <button class="btn-small action-btn detail-btn" data-file-path="${file.path}">
+      <button class="btn-small action-btn detail-btn" data-file-path>
         <span class="btn-icon">${iconSvg("info")}</span>
         <span class="btn-text">详情</span>
       </button>
       ${getActionButton(file)}
-      ${moreActionsHtml}
+      ${getMoreActionsHtml(file)}
     </div>
   `;
 
   item.querySelector(".file-checkbox-container").appendChild(checkbox);
   item.querySelector(".file-name").title = file.path;
+  item.querySelector(".file-title").textContent = displayTitle;
+  item.querySelector(".file-filename-text").textContent = file.name;
+  item.querySelector(".file-size").textContent = formatFileSize(file.size);
+  item.querySelector(".file-location").appendChild(createLocationBadge(file.location));
+  appendFileTags(item.querySelector(".file-tags"), file, false);
+  bindFileActionData(item, file);
   if (file.hasUpdate) {
     const update = document.createElement("button");
     update.type = "button";
@@ -204,13 +239,10 @@ export function createFileCard(file) {
   }
 
   const displayTitle = file.title || file.name;
-  const isHidden = file.name.startsWith("_");
-  const hideBtnText = isHidden ? "取消隐藏" : "隐藏";
-  const hideBtnIcon = isHidden ? iconSvg("eye") : iconSvg("eyeOff");
   const hasUpdate = file.hasUpdate;
 
   const updateBtnHtml = hasUpdate
-    ? `<button class="btn-small action-btn update-btn" data-workshop-id="${file.workshopId}" title="点击更新此Mod">
+    ? `<button class="btn-small action-btn update-btn" data-workshop-id title="点击更新此Mod">
         <span class="btn-icon">
           <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -222,38 +254,12 @@ export function createFileCard(file) {
       </button>`
     : "";
 
-  let previewSrc = "";
-  let showPlaceholder = true;
-
-  if (file.previewImage) {
-    previewSrc = file.previewImage;
-    showPlaceholder = false;
-  }
-
-  let secondaryTagsHtml = "";
-  if (file.secondaryTags && file.secondaryTags.length > 0) {
-    const displayTags = file.secondaryTags.slice(0, 2);
-    const hasMore = file.secondaryTags.length > 2;
-
-    secondaryTagsHtml = displayTags
-      .map((tag) => {
-        const longTagClass = tag.length > 16 ? " is-long" : "";
-        return `<span class="card-badge secondary-tag-badge${longTagClass}" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
-      })
-      .join("");
-
-    if (hasMore) {
-      secondaryTagsHtml += `<span class="card-badge more-tag-badge" title="${file.secondaryTags
-        .slice(2)
-        .map(escapeHtml)
-        .join(", ")}">+${file.secondaryTags.length - 2}</span>`;
-    }
-  }
+  const showPlaceholder = !file.previewImage;
 
   let actionBtn = "";
   if (file.location === "workshop") {
     actionBtn = `
-      <button class="btn-small action-btn move-btn" data-file-path="${file.path}" data-action="move" title="转移">
+      <button class="btn-small action-btn move-btn" data-file-path data-action="move" title="转移">
         <span class="btn-icon">${iconSvg("package")}</span>
         <span class="btn-text">转移</span>
       </button>
@@ -261,74 +267,13 @@ export function createFileCard(file) {
   } else {
     actionBtn = `
       <button class="btn-small action-btn toggle-btn ${file.enabled ? "toggle-disable" : "toggle-enable"}"
-              data-file-path="${file.path}" data-action="toggle"
+              data-file-path data-action="toggle"
               title="${file.enabled ? "点击禁用" : "点击启用"}">
         <span class="btn-icon">${iconSvg("power")}</span>
         <span class="btn-text">${file.enabled ? "禁用" : "启用"}</span>
       </button>
     `;
   }
-
-  const moreActionsHtml = `
-    <div class="more-actions-dropdown">
-      <button class="btn-small action-btn more-btn" title="更多操作">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-        </svg>
-      </button>
-      <div class="dropdown-content hidden">
-        <button class="dropdown-item detail-btn" data-file-path="${file.path}">
-          <span class="btn-icon">${iconSvg("info")}</span> 详情
-        </button>
-        ${file.workshopId ? `
-        <button class="dropdown-item workshop-btn" data-file-path="${file.path}" data-workshop-id="${file.workshopId}">
-          <span class="btn-icon">${iconSvg("external")}</span> 跳转工坊
-        </button>
-        <button class="dropdown-item share-workshop-btn" data-file-path="${file.path}" data-action="share-workshop">
-          <span class="btn-icon">${iconSvg("share")}</span> 分享物品
-        </button>
-        ` : ""}
-        <button class="dropdown-item set-tags-btn" data-file-path="${file.path}" data-action="set-tags">
-          <span class="btn-icon">${iconSvg("tag")}</span> 设置标签
-        </button>
-        ${hasPanelServers() ? `
-        <button class="dropdown-item upload-server-btn" data-file-path="${file.path}" data-action="upload-server">
-          <span class="btn-icon">${iconSvg("upload")}</span>
-          <span class="menu-item-text">上传服务器</span>
-          <span class="menu-item-arrow">${iconSvg("chevronRight")}</span>
-        </button>
-        ` : ""}
-        <button class="dropdown-item rename-btn" data-file-path="${file.path}" data-action="rename">
-          <span class="btn-icon">${iconSvg("edit")}</span> 重命名
-        </button>
-        <button class="dropdown-item load-order-btn" data-file-path="${file.path}" data-action="load-order">
-          <span class="btn-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="10" y1="6" x2="21" y2="6"></line>
-              <line x1="10" y1="12" x2="21" y2="12"></line>
-              <line x1="10" y1="18" x2="21" y2="18"></line>
-              <path d="M4 6h1v4"></path>
-              <path d="M4 10h2"></path>
-              <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
-            </svg>
-          </span> 加载顺序
-        </button>
-        <button class="dropdown-item unpack-btn" data-file-path="${file.path}" data-action="unpack">
-          <span class="btn-icon">${iconSvg("package")}</span> 解包
-        </button>
-        <button class="dropdown-item open-location-btn" data-file-path="${file.path}" data-action="open-location">
-          <span class="btn-icon">${iconSvg("folderOpen")}</span> 打开位置
-        </button>
-        <button class="dropdown-item hide-btn" data-file-path="${file.path}" data-action="hide">
-          <span class="btn-icon">${hideBtnIcon}</span> ${hideBtnText}
-        </button>
-        <div class="dropdown-divider"></div>
-        <button class="dropdown-item delete-btn" data-file-path="${file.path}" data-action="delete">
-          <span class="btn-icon">${iconSvg("trash")}</span> 删除
-        </button>
-      </div>
-    </div>
-  `;
 
   card.innerHTML = `
     <div class="card-preview-container">
@@ -339,30 +284,34 @@ export function createFileCard(file) {
           <polyline points="21 15 16 10 5 21"></polyline>
         </svg>
       </div>
-      <img class="card-preview-img ${showPlaceholder ? "hidden" : ""}" src="${previewSrc}" alt="${displayTitle}" loading="lazy" />
+      <img class="card-preview-img ${showPlaceholder ? "hidden" : ""}" alt="" loading="lazy" />
       <div class="card-checkbox-container"></div>
       <div class="card-badges">
-        <span class="card-badge location-badge">${getLocationDisplayName(file.location)}</span>
-        ${
-          file.primaryTag
-            ? `<span class="card-badge tag-badge" title="${escapeHtml(file.primaryTag)}">${escapeHtml(file.primaryTag)}</span>`
-            : ""
-        }
-        ${secondaryTagsHtml}
+        <span class="card-badge location-badge"></span>
       </div>
     </div>
     <div class="card-content">
-      <div class="card-title" title="${displayTitle}">${displayTitle}</div>
-      <div class="card-filename" title="${file.name}">${file.name}</div>
+      <div class="card-title"></div>
+      <div class="card-filename"></div>
       <div class="card-actions">
         <div class="card-actions-left">
           ${actionBtn}
           ${updateBtnHtml}
         </div>
-        ${moreActionsHtml}
+        ${getMoreActionsHtml(file)}
       </div>
     </div>
   `;
+
+  const title = card.querySelector(".card-title");
+  title.textContent = displayTitle;
+  title.title = displayTitle;
+  const filename = card.querySelector(".card-filename");
+  filename.textContent = file.name;
+  filename.title = file.name;
+  card.querySelector(".location-badge").textContent = getLocationDisplayName(file.location);
+  appendFileTags(card.querySelector(".card-badges"), file, true);
+  bindFileActionData(card, file);
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -378,6 +327,8 @@ export function createFileCard(file) {
   });
 
   const img = card.querySelector(".card-preview-img");
+  img.alt = displayTitle;
+  if (file.previewImage) img.src = file.previewImage;
   const placeholder = card.querySelector(".card-preview-placeholder");
 
   if (!file.previewImage) {
