@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+const workshopFixture = `{"response":{"total":1,"publishedfiledetails":[{"publishedfileid":"123","title":"Fixture"}]}}`
+
 type relayRoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f relayRoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
@@ -37,7 +39,7 @@ func newTestRelay(t *testing.T, configure func(*Config), trip relayRoundTripFunc
 		t.Fatal(err)
 	}
 	if trip == nil {
-		trip = func(*http.Request) (*http.Response, error) { return relayResponse(200, `{"ok":true}`), nil }
+		trip = func(*http.Request) (*http.Response, error) { return relayResponse(200, workshopFixture), nil }
 	}
 	s.client.Transport = trip
 	return s
@@ -65,11 +67,11 @@ func TestRelayFixedUpstreamsAndResponseCompatibility(t *testing.T) {
 	tests := []struct {
 		name, method, target, body, host, path, response string
 	}{
-		{"list", "GET", "/list?page=0&q=%E5%9C%B0%E5%9B%BE&sort=trend&tags=Map%2CCampaign&filetype=0", "", "l4d2-workshop.laoyutang.cn", "/list", `{"response":{"publishedfiledetails":[{"publishedfileid":"18446744073709551615"}],"total":1}}`},
-		{"detail", "GET", "/detail?id=18446744073709551615&with_previews=TRUE", "", "l4d2-workshop.laoyutang.cn", "/detail", `{"response":{"publishedfiledetails":[{"file_size":"9007199254740993","previews":[]}]}}`},
-		{"updates", "GET", "/updates?ids=123,18446744073709551615", "", "l4d2-workshop.laoyutang.cn", "/updates", `{"items":[{"publishedfileid":"123","result":9}]}`},
-		{"parse", "POST", "/parse", " [9007199254740993,\"18446744073709551615\"] \n", "l4d2-workshop-parse.laoyutang.cn", "/", `[{"result":1,"file_size":"9007199254740993","children":[]}]`},
-		{"parse-root-alias", "POST", "/", "[123]", "l4d2-workshop-parse.laoyutang.cn", "/", `[{"result":0,"file_type":2}]`},
+		{"list", "GET", "/list?page=0&q=%E5%9C%B0%E5%9B%BE&sort=trend&tags=Map%2CCampaign&filetype=0", "", "l4d2-workshop-api.laoyutang.cn", "/v1/list", `{"response":{"publishedfiledetails":[{"publishedfileid":"18446744073709551615"}],"total":1}}`},
+		{"detail", "GET", "/detail?id=18446744073709551615&with_previews=TRUE", "", "l4d2-workshop-api.laoyutang.cn", "/v1/detail", `{"response":{"publishedfiledetails":[{"publishedfileid":"18446744073709551615","file_size":"9007199254740993","previews":[]}]}}`},
+		{"updates", "GET", "/updates?ids=123,18446744073709551615", "", "l4d2-workshop-api.laoyutang.cn", "/v1/updates", `{"items":[{"publishedfileid":"123","result":9}]}`},
+		{"parse", "POST", "/parse", " [9007199254740993,\"18446744073709551615\"] \n", "l4d2-workshop-api.laoyutang.cn", "/v1/parse", `[{"publishedfileid":"9007199254740993","result":1,"file_size":"9007199254740993","children":[]}]`},
+		{"parse-root-alias", "POST", "/", "[123]", "l4d2-workshop-api.laoyutang.cn", "/v1/parse", `[{"publishedfileid":"123","result":0,"file_type":2}]`},
 		{"map", "GET", "/maps/c1m1_hotel", "", "l4d2-maps.laoyutang.cn", "/c1m1_hotel", "\n死亡中心\n"},
 		{"ips", "GET", "/ips?domain=cdn.steamusercontent.com&format=entries", "", "lytvpk-get-ips.laoyutang.cn", "/", `[{"ip":"23.59.72.59","category":"内置"}]`},
 	}
@@ -115,7 +117,7 @@ func TestRelayFixedUpstreamsAndResponseCompatibility(t *testing.T) {
 }
 
 func TestRelayPreservesUpstreamErrorsAndDoesNotFollowRedirects(t *testing.T) {
-	for _, status := range []int{204, 304, 400, 403, 404, 429, 500, 502, 503, 307} {
+	for _, status := range []int{204, 304, 307, 400, 403, 404, 429, 500, 501, 502, 503, 504} {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			calls := 0
 			body := "original upstream response"
@@ -130,11 +132,65 @@ func TestRelayPreservesUpstreamErrorsAndDoesNotFollowRedirects(t *testing.T) {
 				return r, nil
 			})
 			w := serveRelay(s, relayRequest("GET", "/detail?id=123", "", ""))
-			if w.Code != status || w.Body.String() != body || calls != 1 {
+			wantCalls := 1
+			if status == 500 || status == 502 || status == 503 || status == 504 {
+				wantCalls = 2
+			}
+			if w.Code != status || w.Body.String() != body || calls != wantCalls {
 				t.Fatalf("got %d body=%q calls=%d", w.Code, w.Body.String(), calls)
 			}
 			if w.Header().Get("Retry-After") != "Wed, 21 Oct 2030 07:28:00 GMT" {
 				t.Error("Retry-After was changed")
+			}
+		})
+	}
+}
+
+func TestRelayPreservesLimitOnUnreadable429(t *testing.T) {
+	calls := 0
+	s := newTestRelay(t, nil, func(*http.Request) (*http.Response, error) {
+		calls++
+		r := relayResponse(http.StatusTooManyRequests, "")
+		r.Body = relayErrorBody{}
+		r.Header.Set("Retry-After", "17")
+		r.Header.Set("Content-Encoding", "gzip")
+		r.Header.Set("Content-Length", "200")
+		return r, nil
+	})
+	w := serveRelay(s, relayRequest("GET", "/list", "", ""))
+	if calls != 1 || w.Code != http.StatusTooManyRequests || w.Header().Get("Retry-After") != "17" {
+		t.Fatalf("unexpected throttling response: calls=%d status=%d headers=%v", calls, w.Code, w.Header())
+	}
+	if !json.Valid(w.Body.Bytes()) || w.Header().Get("Content-Encoding") != "" || w.Header().Get("Content-Length") != "" {
+		t.Fatalf("local error body disagrees with response headers: %q %v", w.Body.String(), w.Header())
+	}
+}
+
+func TestRelayWorkshopLog(t *testing.T) {
+	for _, tc := range []struct {
+		name, want  string
+		firstStatus int
+		firstBody   string
+	}{
+		{"success", "upstream=bridge fallback=none status=200", 200, workshopFixture},
+		{"limited", "upstream=bridge fallback=none status=429", 429, "user-specific body"},
+		{"unavailable", "upstream=worker fallback=http_503 status=200", 503, "upstream error detail"},
+		{"invalid", "upstream=worker fallback=invalid_response status=200", 200, "not JSON"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestRelay(t, nil, func(r *http.Request) (*http.Response, error) {
+				if r.URL.Host == "l4d2-workshop-api.laoyutang.cn" {
+					return relayResponse(tc.firstStatus, tc.firstBody), nil
+				}
+				return relayResponse(200, workshopFixture), nil
+			})
+			var log bytes.Buffer
+			s.logger.SetOutput(&log)
+			r := relayRequest("GET", "/list?q=private-search", "", "")
+			r.Header.Set("Authorization", "private-value")
+			serveRelay(s, r)
+			if want := "lytvpk-relay: route=list " + tc.want + "\n"; log.String() != want {
+				t.Fatalf("expected a single bounded log line %q, got %q", want, log.String())
 			}
 		})
 	}
@@ -235,7 +291,7 @@ func TestRelayDropsSensitiveAndHopByHopHeaders(t *testing.T) {
 		if r.UserAgent() != "lytvpk-relay/1" || r.Header.Get("If-None-Match") != `"cached"` || r.Header.Get("Accept-Language") != "zh-CN" {
 			t.Errorf("missing safe headers: %v", r.Header)
 		}
-		resp := relayResponse(200, "okay")
+		resp := relayResponse(200, workshopFixture)
 		resp.Header.Set("Connection", "X-Internal")
 		resp.Header.Set("X-Internal", "secret")
 		resp.Header.Set("Keep-Alive", "timeout=5")
@@ -402,7 +458,7 @@ func TestRelayConcurrentLimitsReleaseOnCompletionAndCancel(t *testing.T) {
 						return nil, r.Context().Err()
 					}
 				}
-				return relayResponse(200, "okay"), nil
+				return relayResponse(200, workshopFixture), nil
 			})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -555,9 +611,9 @@ func TestRelayHealthOptionsAndPrivateStats(t *testing.T) {
 func TestRelayRealHTTPClientBoundsSlowHeadersAndBody(t *testing.T) {
 	for _, slowBody := range []bool{false, true} {
 		t.Run(fmt.Sprint("slow-body=", slowBody), func(t *testing.T) {
-			finished := make(chan struct{})
+			finished := make(chan struct{}, 2)
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer close(finished)
+				defer func() { finished <- struct{}{} }()
 				if slowBody {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(200)
@@ -703,7 +759,7 @@ func TestRelayQueuedRequestsResumeAndQueueCapacityIsBounded(t *testing.T) {
 						return nil, r.Context().Err()
 					}
 				}
-				return relayResponse(200, "okay"), nil
+				return relayResponse(200, workshopFixture), nil
 			})
 			var workers sync.WaitGroup
 			results := make(chan int, 2)
@@ -767,7 +823,7 @@ func TestRelayQueueTimeoutAndCancellationReleasePendingSlots(t *testing.T) {
 				case <-r.Context().Done():
 					return nil, r.Context().Err()
 				}
-				return relayResponse(200, "okay"), nil
+				return relayResponse(200, workshopFixture), nil
 			})
 			var workers sync.WaitGroup
 			workers.Go(func() { serveRelay(s, relayRequest("GET", "/list", "", "198.51.100.1:1")) })
@@ -808,6 +864,7 @@ func TestRelayQueueTimeoutAndCancellationReleasePendingSlots(t *testing.T) {
 func FuzzRelayDestinationsStayFixed(f *testing.F) {
 	f.Add("/list", "page=0&q=map&sort=trend", "")
 	f.Add("/detail", "id=9007199254740993&with_previews=1", "")
+	f.Add("/updates", "ids=123", "")
 	f.Add("/parse", "", `[123,"18446744073709551615"]`)
 	f.Add("/maps/c1m1_hotel", "", "")
 	f.Add("/ips", "domain=cdn.steamusercontent.com&format=entries", "")
@@ -821,8 +878,12 @@ func FuzzRelayDestinationsStayFixed(f *testing.F) {
 				t.Fatalf("unsafe destination URL: %s", r.URL)
 			}
 			switch r.URL.Host {
+			case "l4d2-workshop-api.laoyutang.cn":
+				if !oneOf(r.URL.Path, "/v1/list", "/v1/detail", "/v1/updates", "/v1/parse") {
+					t.Fatalf("unexpected Bridge path: %s", r.URL)
+				}
 			case "l4d2-workshop.laoyutang.cn":
-				if r.URL.Path != "/list" && r.URL.Path != "/detail" {
+				if !oneOf(r.URL.Path, "/list", "/detail", "/updates") {
 					t.Fatalf("unsafe workshop path: %s", r.URL)
 				}
 			case "l4d2-workshop-parse.laoyutang.cn", "lytvpk-get-ips.laoyutang.cn":
@@ -843,7 +904,8 @@ func FuzzRelayDestinationsStayFixed(f *testing.F) {
 					t.Fatalf("accepted parser request was changed: %q, %v", got, err)
 				}
 			}
-			return relayResponse(200, "okay"), nil
+			// Exercise both fixed destinations for accepted workshop requests.
+			return relayResponse(503, ""), nil
 		})
 		r := relayRequest("GET", "/", body, "")
 		r.URL = &url.URL{Path: path, RawQuery: query}

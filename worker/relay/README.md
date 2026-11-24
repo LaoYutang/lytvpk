@@ -1,6 +1,6 @@
 # LytVPK 备用 API 转发服务
 
-独立的 Go 服务，为固定 Worker API 提供有界转发、限流和统计。源码、测试、依赖及本地构建产物均位于 `worker/relay`，使用独立 Go module，不依赖外层管理器模块，也不会更改现有 Worker 或客户端线路。
+独立的 Go 服务，为工坊、地图名和优选 IP 提供有界转发、限流和统计。源码、测试、依赖及本地构建产物均位于 `worker/relay`，使用独立 Go module，不依赖外层管理器模块，也不会更改现有 Worker 或客户端线路。
 
 ```text
 worker/relay/
@@ -15,19 +15,19 @@ worker/relay/
 
 ## 接口
 
-| 本地接口 | 固定上游 |
-| --- | --- |
-| `GET /list` | `https://l4d2-workshop.laoyutang.cn/list` |
-| `GET /detail` | `https://l4d2-workshop.laoyutang.cn/detail` |
-| `GET /updates?ids=ID,ID`（每批 1–100 个正整数工坊 ID） | `https://l4d2-workshop.laoyutang.cn/updates` |
-| `POST /parse`，兼容 `POST /` | `https://l4d2-workshop-parse.laoyutang.cn/` |
-| `GET /maps/{mapCode}` | `https://l4d2-maps.laoyutang.cn/{mapCode}` |
-| `GET /ips` | `https://lytvpk-get-ips.laoyutang.cn/` |
-| `GET /healthz` | 本地进程健康检查 |
+| 本地接口 | 首选上游 | 回退上游 |
+| --- | --- | --- |
+| `GET /list` | `https://l4d2-workshop-api.laoyutang.cn/v1/list` | `https://l4d2-workshop.laoyutang.cn/list` |
+| `GET /detail` | `https://l4d2-workshop-api.laoyutang.cn/v1/detail` | `https://l4d2-workshop.laoyutang.cn/detail` |
+| `GET /updates?ids=ID,ID`（每批 1–100 个正整数工坊 ID） | `https://l4d2-workshop-api.laoyutang.cn/v1/updates` | `https://l4d2-workshop.laoyutang.cn/updates` |
+| `POST /parse`，兼容 `POST /` | `https://l4d2-workshop-api.laoyutang.cn/v1/parse` | `https://l4d2-workshop-parse.laoyutang.cn/` |
+| `GET /maps/{mapCode}` | `https://l4d2-maps.laoyutang.cn/{mapCode}` | — |
+| `GET /ips` | `https://lytvpk-get-ips.laoyutang.cn/` | — |
+| `GET /healthz` | 本地进程健康检查 | — |
 
-浏览和详情保持 Worker 的参数及 JSON 响应形状；解析接受非空 JSON ID 数组，兼容整数和数字字符串，返回上游原始数组。地图名返回上游文本。`/ips` 只允许 `domain=cdn.steamusercontent.com`；`format` 可用 `entries` 或省略。所有上游由程序固定，不提供任意 URL 代理或上游地址配置。
+工坊请求先访问 Bridge。遇到网络故障、Bridge 超时、HTTP 500、502、503、504 或无法作为成功结果读取的响应时，Relay 在剩余预算内访问一次对应的旧 Worker。合法空页、条目缺失和明确的 HTTP 4xx（含 400、429）直接返回。HTTP 重定向由调用方处理。Relay 保留所选上游的有效响应正文及 `Retry-After` 等响应头。
 
-上游正常完成且响应在大小限制内时，保留其 HTTP 状态、响应正文及 `Retry-After` 等响应头。连接失败、超时和响应过大由服务返回相应错误；服务不自动重试上游请求。客户端取消会取消排队或进行中的上游请求。输入、请求体和响应体都有上限，逐用户及全局令牌桶、并发上限和有界等待队列共同控制开销。
+工坊上游请求只携带允许的内容协商与缓存请求头，使用 `Accept-Encoding: identity` 获取可按大小上限校验的 JSON。解析接受非空 JSON ID 数组，兼容整数和数字字符串。回退时复用已校验的请求体原始字节。地图名返回上游文本。`/ips` 只允许 `domain=cdn.steamusercontent.com`，`format` 可用 `entries` 或省略。客户端取消会终止排队或当前上游请求。输入、请求体和响应体都有上限，逐用户及全局令牌桶、并发上限和有界等待队列共同控制开销。
 
 ## 构建与验证
 
@@ -61,7 +61,7 @@ curl --fail http://127.0.0.1:18080/healthz
 curl --fail http://127.0.0.1:18081/stats
 ```
 
-`-version` 显示构建版本，`-help` 显示全部选项。测试使用受控上游，不需要生产 Steam API key。现网端到端验证另外依赖 DNS、目标 Worker 可达性及其配额。
+`-version` 显示构建版本，`-help` 显示全部选项。测试使用受控上游，不需要生产 Steam API key。现网端到端验证另外依赖 DNS 及目标上游的可达性和配额。
 
 ## 配置
 
@@ -96,7 +96,7 @@ curl --fail http://127.0.0.1:18081/stats
 
 普通接口每个请求扣一份调用额度；解析每 100 个 ID 扣一份，不足 100 个也按一份计，逐用户与全局桶都采用该成本。调用速率超额仍会直接被拒绝。新调用方应尊重 `Retry-After`，分批更新和重试；不应同时为全部条目无限建立请求。较大的合集解析请求可能达到 1000 ID 上限，超过时需要调用方分批。
 
-总预算从 Go 完成请求头解析、进入 `ServeHTTP` 时开始；读取请求头另有不超过 5 秒的限制。请求体读取、等待队列、实际上游调用和响应写出共享 `RELAY_REQUEST_TIMEOUT`，默认和最大值均为 10 秒；可以缩短该值。`RELAY_QUEUE_TIMEOUT` 和 `RELAY_UPSTREAM_TIMEOUT` 分别进一步限制等待和上游阶段，不能延长剩余总预算。例如排队耗时 4 秒后，上游和响应写出只能使用剩余约 6 秒。
+总预算从 Go 完成请求头解析、进入 `ServeHTTP` 时开始；读取请求头另有不超过 5 秒的限制。请求体读取、等待队列、实际上游调用和响应写出共享 `RELAY_REQUEST_TIMEOUT`，默认和最大值均为 10 秒；可以缩短该值。`RELAY_QUEUE_TIMEOUT` 和 `RELAY_UPSTREAM_TIMEOUT` 分别进一步限制等待和上游阶段，不能延长剩余总预算。两次工坊上游调用共享一个预算。Bridge 最多使用 3 秒，且最多使用上游阶段剩余时间的一半，给 Worker 至少留出另一半。
 
 程序在总预算内预留 `min(100ms, RequestTimeout/10)` 发送 HTTP 504，处理阶段会提前结束。若响应头已经发送，客户端所见状态无法再改成 504，超时会关闭或截断响应，并按 504 统计。已有客户端的自身超时仍会取消尚未完成的请求。
 
@@ -108,9 +108,11 @@ Worker 仍会对转发流量应用自己的配额和限流。本服务不会通�
 
 ## 统计与管理
 
-管理监听器提供 `GET /healthz` 和 `GET /stats`，不要将其反代到公网。统计只描述经过该服务的请求，无法覆盖客户端直接访问 Worker 的流量。
+管理监听器提供 `GET /healthz` 和 `GET /stats`，不要将其反代到公网。统计只描述经过该服务的请求，无法覆盖客户端直接访问 Bridge 或 Worker 的流量。
 
-`total_requests` 包含业务入口收到的预检、无效路径和被拒请求，不包含健康检查及管理接口访问。`forwarded_requests` 是向固定 Worker 发起的 HTTP 请求数，包含最终失败的尝试，不代表 Worker 内部访问 Steam 的次数。`upstream_failures` 包含上游 5xx、网络错误、超时及不可用响应；客户端主动取消单独计为 499，不计入上游故障。
+`total_requests` 包含业务入口收到的预检、无效路径和被拒请求，不包含健康检查及管理接口访问。`forwarded_requests` 按已转发的入站请求计数，Bridge 回退 Worker 仍计一次。`upstream_failures` 按最终结果计数，包含上游 5xx、网络错误、超时及不可用响应。客户端主动取消单独计为 499。
+
+每个转发的工坊请求向标准错误写一条 `lytvpk-relay:` 日志，字段为路由名 `route`、最终上游 `upstream`、回退原因 `fallback` 和 HTTP 状态 `status`。例如 `route=list upstream=worker fallback=http_503 status=200` 表示 Bridge 返回 503，随后 Worker 成功响应。
 
 `anonymous_users` 按 UTC 当天的 IP 身份近似计算，`cumulative_anonymous_users` 提供跨日去重的累计地址估计，两者都不能视为登录用户数；同一 NAT 下的人可能合并，同一人更换 IP 也可能重复。统计内存有界，不记录原始 IP 或请求内容。累计调用数、当天计数与匿名估计、最多 30 天的每日历史可通过 SQLite 跨进程恢复。
 
