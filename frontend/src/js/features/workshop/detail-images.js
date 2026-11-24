@@ -3,6 +3,13 @@ import { escapeHtml } from "./utils.js";
 let workshopPreviewImages = [];
 let workshopPreviewIndex = 0;
 let previewExitAnimations = null;
+let previewWheelGesture = null;
+
+const WHEEL_STEP_PX = 16;
+const WHEEL_REPEAT_DISTANCE_PX = 48;
+const WHEEL_IDLE_MS = 90;
+const WHEEL_NOTCH_GAP_MS = 50;
+const WHEEL_REPEAT_MS = 200;
 
 export function getWorkshopPreviewImages(detail) {
   let images = detail.previews || [];
@@ -85,6 +92,47 @@ function changeFullImage(step) {
   setFullImageAt(workshopPreviewIndex + step);
 }
 
+function handlePreviewWheel(event) {
+  const modal = event.currentTarget;
+  if (event.ctrlKey || modal.style.display !== "flex") return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (previewExitAnimations || workshopPreviewImages.length <= 1) return;
+
+  const { deltaMode, deltaX, deltaY, timeStamp } = event;
+  if (!deltaY || Math.abs(deltaY) <= Math.abs(deltaX)) return;
+  let distance = Math.abs(deltaY);
+  if (deltaMode === WheelEvent.DOM_DELTA_LINE) distance *= WHEEL_STEP_PX;
+  if (deltaMode === WheelEvent.DOM_DELTA_PAGE) distance *= modal.clientHeight;
+
+  const direction = Math.sign(deltaY);
+  const gap = timeStamp - (previewWheelGesture?.lastEvent ?? -Infinity);
+  if (gap >= WHEEL_IDLE_MS || direction !== previewWheelGesture?.direction) {
+    previewWheelGesture = { direction, recent: [], distance: 0, lastTurn: -Infinity };
+  }
+  const gesture = previewWheelGesture;
+  gesture.lastEvent = timeStamp;
+
+  // Compare nearby samples so a fading tail stops and a new steady pace can resume.
+  const fading = gesture.recent.some((sample) => distance < sample);
+  gesture.recent.push(distance);
+  if (gesture.recent.length > 3) gesture.recent.shift();
+  const hasTurned = Number.isFinite(gesture.lastTurn);
+  if (hasTurned && fading) return;
+  const separateNotch = gap >= WHEEL_NOTCH_GAP_MS && distance >= WHEEL_STEP_PX;
+  const repeating = hasTurned && !separateNotch;
+  if (repeating && timeStamp - gesture.lastTurn < WHEEL_REPEAT_MS) return;
+
+  // Several rounded 1px events can linger at the end of a trackpad gesture.
+  gesture.distance += distance;
+  const threshold = repeating ? WHEEL_REPEAT_DISTANCE_PX : WHEEL_STEP_PX;
+  if (gesture.distance < threshold) return;
+
+  changeFullImage(direction);
+  gesture.distance = 0;
+  gesture.lastTurn = timeStamp;
+}
+
 function scrollThumbnailsAfterEdgeClick(element) {
   const container = element?.closest(".detail-thumbnails");
   if (!container) return;
@@ -147,6 +195,7 @@ window.openFullImage = function (src) {
   const modal = document.getElementById("image-preview-modal");
   if (modal) {
     clearPreviewExitAnimations();
+    previewWheelGesture = null;
     if (!workshopPreviewImages.includes(src)) {
       workshopPreviewImages = [src].filter(Boolean);
     }
@@ -164,6 +213,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextBtn = document.getElementById("image-modal-next");
 
   if (modal && closeButton) {
+    modal.addEventListener("wheel", handlePreviewWheel, { passive: false });
+
     prevBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       changeFullImage(-1);
