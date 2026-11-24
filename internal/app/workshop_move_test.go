@@ -58,10 +58,11 @@ func addWorkshopMoveTestFile(t *testing.T, app *App, filePath string, location s
 
 func resetWorkshopDetailTestClient(t *testing.T, serverURL string) {
 	t.Helper()
-	WorkshopWorkerURL = serverURL
+	previous := primaryWorkshopBaseURL
+	primaryWorkshopBaseURL = serverURL
 	clearWorkshopDetailTestCache()
 	t.Cleanup(func() {
-		WorkshopWorkerURL = "https://l4d2-workshop.laoyutang.cn"
+		primaryWorkshopBaseURL = previous
 		clearWorkshopDetailTestCache()
 	})
 }

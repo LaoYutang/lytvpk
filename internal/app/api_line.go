@@ -102,8 +102,8 @@ func (a *App) captureAPIOperation() apiOperation {
 	line := a.apiLineLocked()
 	endpoints := network.EndpointsForAPILine(line)
 	if line == network.APILinePrimary {
-		// Existing tests replace this public-Worker base with a local fixture.
-		endpoints.WorkshopBaseURL = WorkshopWorkerURL
+		// Existing tests replace the primary workshop base with a local fixture.
+		endpoints.WorkshopBaseURL = primaryWorkshopBaseURL
 	}
 	ctx := a.ctx
 	if ctx == nil {
