@@ -128,6 +128,7 @@ window.openFullImage = function (src) {
 
 document.addEventListener("DOMContentLoaded", () => {
   const modal = document.getElementById("image-preview-modal");
+  const fullImage = document.getElementById("full-image");
   const span = document.getElementsByClassName("image-modal-close")[0];
   const prevBtn = document.getElementById("image-modal-prev");
   const nextBtn = document.getElementById("image-modal-next");
@@ -153,7 +154,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     modal.onclick = function (event) {
-      if (event.target === modal) {
+      if (event.target === modal || event.target === fullImage) {
+        event.stopPropagation();
         closeFullImageModal();
       }
     };
