@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -11,12 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime"
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,6 +26,7 @@ import (
 type Server struct {
 	config Config
 	client *http.Client
+	logger *log.Logger
 	users  *limiter
 	global *limiter
 	stats  *stats
@@ -47,6 +48,7 @@ func New(config Config) (*Server, error) {
 	// Caller-owned slices cannot change the trust boundary after startup.
 	config.TrustedProxies = append([]netip.Prefix(nil), config.TrustedProxies...)
 	s := &Server{
+		logger: log.New(os.Stderr, "lytvpk-relay: ", 0),
 		config: config, users: newLimiter(config.PerClientRatePerMinute, config.PerClientBurst, config.MaxClients, config.ClientIdleTTL),
 		global: newLimiter(config.GlobalRatePerMinute, config.GlobalBurst, 1, 24*time.Hour),
 		stats:  newPersistentStats(config.StatsFile), now: time.Now, byClient: make(map[string]int),
@@ -82,11 +84,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	dest := selectRoute(r)
 	status, forwarded, upstreamFailure, key, statsKey := 500, false, false, "", ""
+	var workshopUpstream, fallback string
 	defer func() {
 		if responseWriter.writeError != nil && requestDeadlineExceeded(r.Context()) {
 			status = http.StatusGatewayTimeout
 		} else if !requestDeadlineExceeded(r.Context()) && errors.Is(r.Context().Err(), context.Canceled) {
 			status = 499
+			upstreamFailure = false
+		}
+		if workshopUpstream != "" {
+			s.logger.Printf("route=%s upstream=%s fallback=%s status=%d", dest.name, workshopUpstream, fallback, status)
 		}
 		s.stats.record(dest.name, status, forwarded, upstreamFailure, statsKey, s.now())
 	}()
@@ -214,71 +221,36 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusGatewayTimeout, "request deadline exceeded")
 		return
 	}
-	target := url.URL{Scheme: "https", Host: dest.upstream, Path: dest.path, RawQuery: dest.query.Encode()}
 	ctx, cancel := context.WithTimeout(r.Context(), s.config.UpstreamTimeout)
 	defer cancel()
-	out, err := http.NewRequestWithContext(ctx, dest.method, target.String(), bytes.NewReader(body))
-	if err != nil {
-		fail(http.StatusInternalServerError, "could not construct upstream request")
-		return
-	}
-	hopHeaders := hopByHopHeaders(r.Header)
-	for _, name := range []string{"Accept", "Accept-Language", "Accept-Encoding", "If-None-Match", "If-Modified-Since", "Cache-Control"} {
-		if hopHeaders[http.CanonicalHeaderKey(name)] {
-			continue
-		}
-		for _, value := range r.Header.Values(name) {
-			out.Header.Add(name, value)
-		}
-	}
-	out.Header.Set("User-Agent", "lytvpk-relay/1")
-	if dest.method == http.MethodPost {
-		out.Header.Set("Content-Type", "application/json")
-	}
 	forwarded = true
-	response, err := s.client.Do(out)
-	if err != nil {
-		if !requestDeadlineExceeded(r.Context()) && errors.Is(r.Context().Err(), context.Canceled) {
-			fail(499, "client request canceled")
-			return
-		}
-		upstreamFailure = true
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			fail(http.StatusGatewayTimeout, "upstream request timed out")
-		} else {
-			fail(http.StatusBadGateway, "upstream request failed")
-		}
-		return
-	}
-	defer response.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(response.Body, s.config.MaxResponseBytes+1))
-	if err != nil || int64(len(responseBody)) > s.config.MaxResponseBytes {
-		if !requestDeadlineExceeded(r.Context()) && errors.Is(r.Context().Err(), context.Canceled) {
-			fail(499, "client request canceled")
-			return
-		}
-		upstreamFailure = true
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			fail(http.StatusGatewayTimeout, "upstream response timed out")
-		} else {
-			fail(http.StatusBadGateway, "upstream response unreadable or too large")
-		}
-		return
-	}
+	var response upstreamReply
+	response, workshopUpstream, fallback = s.forward(ctx, r, dest, body)
 	if requestDeadlineExceeded(r.Context()) || r.Context().Err() != nil {
+		upstreamFailure = requestDeadlineExceeded(r.Context())
 		fail(http.StatusGatewayTimeout, "request deadline exceeded")
 		return
 	}
-	copyResponseHeaders(w.Header(), response.Header)
+	if workshopUpstream != "" && requestDeadlineExceeded(ctx) {
+		upstreamFailure = true
+		fail(http.StatusGatewayTimeout, "upstream request timed out")
+		return
+	}
+	copyResponseHeaders(w.Header(), response.header)
+	if response.problem != "" {
+		upstreamFailure = response.status >= 500
+		fail(response.status, response.problem)
+		return
+	}
 	// Ensure Retry-After is readable from browser clients even if upstream sets CORS.
 	exposed := w.Header().Get("Access-Control-Expose-Headers")
 	if !strings.Contains(strings.ToLower(exposed), "retry-after") {
 		w.Header().Set("Access-Control-Expose-Headers", strings.Trim(exposed+", Retry-After", ", "))
 	}
-	status = response.StatusCode
+	status = response.status
 	upstreamFailure = status >= 500
 	w.WriteHeader(status)
-	_, _ = w.Write(responseBody)
+	_, _ = w.Write(response.body)
 	responseWriter.flush()
 }
 

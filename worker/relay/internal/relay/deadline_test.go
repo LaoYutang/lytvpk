@@ -173,9 +173,9 @@ func TestRequestDeadlineBoundsRealSlowUpstreamHeadersAndBody(t *testing.T) {
 	for _, slowBody := range []bool{false, true} {
 		t.Run(fmt.Sprint("slow-body=", slowBody), func(t *testing.T) {
 			const budget = 120 * time.Millisecond
-			upstreamFinished := make(chan struct{})
+			upstreamFinished := make(chan struct{}, 2)
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer close(upstreamFinished)
+				defer func() { upstreamFinished <- struct{}{} }()
 				if slowBody {
 					w.WriteHeader(200)
 					_, _ = io.WriteString(w, "[")
@@ -227,8 +227,9 @@ func (l deadlineSmallWriteListener) Accept() (net.Conn, error) {
 }
 
 func TestRequestDeadlineInterruptsNativeSlowDownstreamWrite(t *testing.T) {
-	const budget = 150 * time.Millisecond
-	payload := strings.Repeat("x", 1<<20)
+	const budget = 500 * time.Millisecond
+	// Leave time to validate the JSON, then block the write on the small TCP buffers.
+	payload := `{"response":{"total":1,"publishedfiledetails":[{"publishedfileid":"123","title":"` + strings.Repeat("x", 256<<10) + `"}]}}`
 	s := newTestRelay(t, func(c *Config) {
 		c.RequestTimeout = budget
 		c.UpstreamTimeout = time.Second
