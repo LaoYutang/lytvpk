@@ -1423,6 +1423,16 @@ html.dark-mode .workshop-type-toggle-btn.active {
   opacity: 1;
 }
 
+.thumbnail-item:focus-visible {
+  outline: 2px solid var(--primary-light);
+  outline-offset: -4px;
+  opacity: 1;
+}
+
+html.dark-mode .thumbnail-item:not(.active) {
+  background-clip: padding-box;
+}
+
 .thumbnail-item.skeleton-anim {
   background: var(--gray-100);
   background: linear-gradient(

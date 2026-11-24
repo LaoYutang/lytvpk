@@ -1,3 +1,5 @@
+import { escapeHtml } from "./utils.js";
+
 let workshopPreviewImages = [];
 let workshopPreviewIndex = 0;
 
@@ -99,12 +101,10 @@ window.switchPreview = function (url, element) {
   if (mainImg) {
     mainImg.src = url;
   }
-  document
-    .querySelectorAll(".thumbnail-item")
-    .forEach((el) => el.classList.remove("active"));
-  if (element) {
-    element.classList.add("active");
-  }
+  document.querySelectorAll(".thumbnail-item").forEach((el) => {
+    el.classList.toggle("active", el === element);
+    el.setAttribute("aria-pressed", String(el === element));
+  });
 
   const index = workshopPreviewImages.indexOf(url);
   if (index >= 0) {
@@ -170,12 +170,13 @@ export function renderThumbnails(detail) {
         ${images
           .map(
             (img, index) => `
-            <div class="thumbnail-item skeleton-anim ${
+            <button type="button" class="thumbnail-item skeleton-anim ${
               index === 0 ? "active" : ""
-            }" onclick="window.switchPreview('${img}', this)">
-                <img src="${img}" loading="lazy" style="opacity: 0; transition: opacity 0.3s;"
+            }" aria-label="查看第 ${index + 1} 张预览图" aria-pressed="${index === 0}"
+               onclick="window.switchPreview(this.firstElementChild.getAttribute('src'), this)">
+                <img src="${escapeHtml(img)}" alt="" loading="lazy" style="opacity: 0; transition: opacity 0.3s;"
                 onload="this.style.opacity='1'; this.parentElement.classList.remove('skeleton-anim')">
-            </div>
+            </button>
         `
           )
           .join("")}
