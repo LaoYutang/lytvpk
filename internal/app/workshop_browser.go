@@ -17,8 +17,7 @@ import (
 // WorkshopBrowserService 处理创意工坊浏览相关的逻辑
 // 这些方法直接挂载在 *App 上，供前端调用
 
-// 定义 Cloudflare Worker 的地址
-var WorkshopWorkerURL = network.EndpointsForAPILine(network.APILinePrimary).WorkshopBaseURL
+var primaryWorkshopBaseURL = network.EndpointsForAPILine(network.APILinePrimary).WorkshopBaseURL
 
 // WorkshopQueryOptions 前端传来的搜索参数
 type WorkshopQueryOptions struct {
@@ -184,7 +183,6 @@ func (a *App) fetchWorkshopListWithOperation(operation apiOperation, opts Worksh
 	// Log request for debugging
 	fmt.Printf("[Workshop] Fetching List: Page=%d, Q=%s, Sort=%s, FileType=%s\n", opts.Page, opts.SearchText, opts.Sort, opts.FileType)
 
-	// 发起请求到 Cloudflare Worker (Path: /list)
 	resp, err := req.Get(operation.endpoints.WorkshopBaseURL + "/list")
 
 	if err != nil {

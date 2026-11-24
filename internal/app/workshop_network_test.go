@@ -202,7 +202,7 @@ func TestWorkshopDNSAllAPIEntrypointsAndCacheRetention(t *testing.T) {
 	fixture := workshopRoundTripFunc(func(request *http.Request) (*http.Response, error) {
 		calls = append(calls, request.Method+" "+request.URL.Host+request.URL.Path)
 		body := `{"response":{"publishedfiledetails":[{"publishedfileid":"975313579","title":"Fixture"}],"total":1}}`
-		if request.URL.Host == "l4d2-workshop-parse.laoyutang.cn" {
+		if request.URL.Path == "/v1/parse" {
 			body = `[{"publishedfileid":"975313579","title":"Fixture"}]`
 		}
 		return workshopJSONResponse(request, body), nil
@@ -219,7 +219,7 @@ func TestWorkshopDNSAllAPIEntrypointsAndCacheRetention(t *testing.T) {
 	if _, err := app.fetchWorkshopDetails(`["975313579"]`); err != nil {
 		t.Fatal(err)
 	}
-	if fmt.Sprint(calls) != "[GET l4d2-workshop.laoyutang.cn/list GET l4d2-workshop.laoyutang.cn/detail POST l4d2-workshop-parse.laoyutang.cn]" {
+	if fmt.Sprint(calls) != "[GET l4d2-workshop-api.laoyutang.cn/v1/list GET l4d2-workshop-api.laoyutang.cn/v1/detail POST l4d2-workshop-api.laoyutang.cn/v1/parse]" {
 		t.Fatalf("unexpected API calls: %v", calls)
 	}
 	if err := app.SetWorkshopDNSConfig(WorkshopDNSConfig{Mode: "alidns"}); err != nil {

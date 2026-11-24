@@ -37,11 +37,11 @@ func TestNormalizeAPILine(t *testing.T) {
 
 func TestAPILineEndpointsAndTimeouts(t *testing.T) {
 	primary := EndpointsForAPILine(APILinePrimary)
-	if primary.WorkshopBaseURL != "https://l4d2-workshop.laoyutang.cn" ||
-		primary.ParseURL != "https://l4d2-workshop-parse.laoyutang.cn" ||
+	if primary.WorkshopBaseURL != "https://l4d2-workshop-api.laoyutang.cn/v1" ||
+		primary.ParseURL != "https://l4d2-workshop-api.laoyutang.cn/v1/parse" ||
 		primary.MapBaseURL != "https://l4d2-maps.laoyutang.cn/" ||
 		primary.IPPoolURL != "https://lytvpk-get-ips.laoyutang.cn/" {
-		t.Fatalf("primary endpoints changed existing destinations: %+v", primary)
+		t.Fatalf("unexpected primary endpoints: %+v", primary)
 	}
 	backup := EndpointsForAPILine(APILineBackup)
 	for _, test := range []struct {

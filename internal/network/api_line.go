@@ -17,7 +17,8 @@ const (
 	APILinePrimary APILine = "primary"
 	APILineBackup  APILine = "backup"
 
-	backupAPIBaseURL = "https://lytvpk-backup.laoyutang.cn"
+	bridgeWorkshopBaseURL = "https://l4d2-workshop-api.laoyutang.cn/v1"
+	backupAPIBaseURL      = "https://lytvpk-backup.laoyutang.cn"
 )
 
 // APIEndpoints contains only the fixed public metadata API destinations.
@@ -61,8 +62,8 @@ func EndpointsForAPILine(line APILine) APIEndpoints {
 		}
 	}
 	return APIEndpoints{
-		WorkshopBaseURL: "https://l4d2-workshop.laoyutang.cn",
-		ParseURL:        "https://l4d2-workshop-parse.laoyutang.cn",
+		WorkshopBaseURL: bridgeWorkshopBaseURL,
+		ParseURL:        bridgeWorkshopBaseURL + "/parse",
 		MapBaseURL:      "https://l4d2-maps.laoyutang.cn/",
 		IPPoolURL:       "https://lytvpk-get-ips.laoyutang.cn/",
 	}

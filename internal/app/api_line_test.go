@@ -57,6 +57,70 @@ func TestAPILineDefaultsMigrationAndRestart(t *testing.T) {
 	}
 }
 
+func TestAPILineProfileCompatibility(t *testing.T) {
+	preserveAPILineForTest(t)
+	for _, tc := range []struct {
+		name   string
+		stored string
+		want   network.APILine
+	}{
+		{"fresh", "", network.APILinePrimary},
+		{"missing-line", "", network.APILinePrimary},
+		{"empty-line", "", network.APILinePrimary},
+		{"previous-primary", "primary", network.APILinePrimary},
+		{"previous-relay", "backup", network.APILineBackup},
+		{"preview-bridge", "bridge", network.APILinePrimary},
+		{"preview-worker", "worker", network.APILinePrimary},
+		{"unknown", "unknown", network.APILinePrimary},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			profile := newConfigTestApp(t)
+			switch tc.name {
+			case "fresh":
+			case "missing-line":
+				if err := os.WriteFile(profile.configPath, []byte(`{"migrationVersion":6,"theme":"dark"}`), 0600); err != nil {
+					t.Fatal(err)
+				}
+			default:
+				writeConfigFixture(t, profile.configPath, ConfigFile{MigrationVersion: 6, APILine: tc.stored, Theme: "dark"})
+			}
+			reopen := func(want network.APILine) *App {
+				t.Helper()
+				app := newConfigTestApp(t)
+				app.configDir, app.configPath = profile.configDir, profile.configPath
+				app.loadConfig()
+				op := app.captureAPIOperation()
+				if app.GetAPILine() != string(want) || op.line != want || op.endpoints != network.EndpointsForAPILine(want) || network.GlobalIPSelector.GetAPILine() != want {
+					t.Fatalf("profile selected %q with endpoints %+v; want %q", op.line, op.endpoints, want)
+				}
+				return app
+			}
+			reopen(tc.want)
+			app := reopen(tc.want)
+			if err := app.SaveAppConfig(app.GetAppConfig()); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(profile.configPath)
+			var saved ConfigFile
+			if err != nil || json.Unmarshal(data, &saved) != nil || saved.APILine != string(tc.want) {
+				t.Fatalf("unexpected saved profile: %s, err=%v", data, err)
+			}
+			if tc.name != "fresh" && saved.Theme != "dark" {
+				t.Fatalf("profile lost its saved theme: %q", saved.Theme)
+			}
+			app = reopen(tc.want)
+			other := network.APILineBackup
+			if tc.want == network.APILineBackup {
+				other = network.APILinePrimary
+			}
+			if err := app.SetAPILine(string(other)); err != nil {
+				t.Fatal(err)
+			}
+			reopen(other)
+		})
+	}
+}
+
 func TestAPILinePersistsBeforePublishingAndRejectsInvalidValues(t *testing.T) {
 	preserveAPILineForTest(t)
 	app := newConfigTestApp(t)
@@ -68,7 +132,7 @@ func TestAPILinePersistsBeforePublishingAndRejectsInvalidValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, value := range []string{"auto", "https://example.invalid", "primary,backup"} {
+	for _, value := range []string{"auto", "bridge", "worker", "https://example.invalid", "primary,backup"} {
 		if err := app.SetAPILine(value); err == nil {
 			t.Fatalf("accepted invalid line %q", value)
 		}
@@ -104,7 +168,7 @@ func TestAPILineSnapshotRetainsClientsAndNetworkPolicies(t *testing.T) {
 	base := &http.Client{Timeout: 2 * time.Second, Transport: &http.Transport{Proxy: nil}}
 	app.restyClient = resty.NewWithClient(base)
 	primary := app.captureAPIOperation()
-	if primary.line != network.APILinePrimary || primary.ctx != ctx || primary.endpoints.WorkshopBaseURL != WorkshopWorkerURL || primary.clients.parser.Timeout != 30*time.Second || primary.clients.browser.GetClient().Timeout != 30*time.Second || primary.mapClient.Timeout != 2*time.Second {
+	if primary.line != network.APILinePrimary || primary.ctx != ctx || primary.endpoints.WorkshopBaseURL != primaryWorkshopBaseURL || primary.clients.parser.Timeout != 30*time.Second || primary.clients.browser.GetClient().Timeout != 30*time.Second || primary.mapClient.Timeout != 2*time.Second {
 		t.Fatalf("unexpected primary snapshot: %+v", primary)
 	}
 	if primary.clients.browser.RetryCount != 0 || primary.clients.transport.Proxy != nil || primary.clients.parser.Transport != primary.clients.transport || primary.clients.browser.GetClient().Transport != primary.clients.transport {

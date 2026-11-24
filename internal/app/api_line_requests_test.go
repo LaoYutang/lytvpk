@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-resty/resty/v2"
+
 	"vpk-manager/internal/network"
 )
 
@@ -75,6 +77,75 @@ func TestWorkshopSortRequestsAndCacheKeys(t *testing.T) {
 				if _, err := app.fetchWorkshopListWithOperation(operation, opts); err != nil || calls != before+1 {
 					t.Fatalf("page/keyword/type cache collision: calls=%d error=%v", calls, err)
 				}
+			}
+		})
+	}
+}
+
+func TestWorkshopAPILineRequestDestinations(t *testing.T) {
+	for _, tc := range []struct {
+		line         network.APILine
+		workshopBase string
+		parseURL     string
+		mapBase      string
+	}{
+		{network.APILinePrimary, "https://l4d2-workshop-api.laoyutang.cn/v1", "https://l4d2-workshop-api.laoyutang.cn/v1/parse", "https://l4d2-maps.laoyutang.cn"},
+		{network.APILineBackup, "https://lytvpk-backup.laoyutang.cn", "https://lytvpk-backup.laoyutang.cn/parse", "https://lytvpk-backup.laoyutang.cn/maps"},
+	} {
+		t.Run(string(tc.line), func(t *testing.T) {
+			app, _ := newAPIRequestTestOperation(t, tc.line)
+			op := app.captureAPIOperation()
+			var calls []string
+			responses := []string{
+				`{"response":{"publishedfiledetails":[],"total":0}}`,
+				`{"response":{"publishedfiledetails":[{"publishedfileid":"17","title":"Detail"}]}}`,
+				`{"items":[{"publishedfileid":"17","result":1,"time_updated":1700000000}]}`,
+				`[{"publishedfileid":"17","result":1}]`,
+				"死亡中心",
+				`{"error":"invalid request"}`,
+			}
+			setAPIRequestTestTransport(op, func(request *http.Request) (*http.Response, error) {
+				destination := request.URL.Scheme + "://" + request.URL.Host + request.URL.EscapedPath()
+				calls = append(calls, request.Method+" "+destination)
+				if len(calls) > len(responses) {
+					t.Fatalf("unexpected request %s", calls[len(calls)-1])
+				}
+				response := workshopJSONResponse(request, responses[len(calls)-1])
+				if len(calls) == len(responses) {
+					response.StatusCode = http.StatusBadRequest
+				}
+				return response, nil
+			})
+			app.restyClient = resty.NewWithClient(op.mapClient)
+			list, err := app.FetchWorkshopList(WorkshopQueryOptions{Page: 2})
+			if err != nil || list.Total != 0 || list.Items == nil || len(list.Items) != 0 {
+				t.Fatalf("valid empty list: %+v, err=%v", list, err)
+			}
+			if detail, err := app.FetchWorkshopDetail("17"); err != nil || detail.Title != "Detail" {
+				t.Fatalf("detail: %+v, err=%v", detail, err)
+			}
+			if updates, err := fetchWorkshopUpdates(op, []string{"17"}); err != nil || updates["17"].updated.Unix() != 1700000000 {
+				t.Fatalf("updates: %+v, err=%v", updates, err)
+			}
+			if details, err := app.fetchWorkshopDetails(`[17]`); err != nil || len(details) != 1 || details[0].PublishedFileId != "17" {
+				t.Fatalf("parse: %+v, err=%v", details, err)
+			}
+			if name := app.GetMapName("c1m1_hotel"); name != "死亡中心" {
+				t.Fatalf("map name: %q", name)
+			}
+			if _, err := app.FetchWorkshopList(WorkshopQueryOptions{Page: 3}); err == nil || !strings.Contains(err.Error(), "HTTP 400") {
+				t.Fatalf("bad request: %v", err)
+			}
+			want := []string{
+				"GET " + tc.workshopBase + "/list",
+				"GET " + tc.workshopBase + "/detail",
+				"GET " + tc.workshopBase + "/updates",
+				"POST " + tc.parseURL,
+				"GET " + tc.mapBase + "/c1m1_hotel",
+				"GET " + tc.workshopBase + "/list",
+			}
+			if !reflect.DeepEqual(calls, want) {
+				t.Fatalf("request destinations: got %v, want %v", calls, want)
 			}
 		})
 	}
@@ -253,7 +324,7 @@ func TestAPILineRequestsSeparateCacheAcrossLineAndGeneration(t *testing.T) {
 	readBoth(old, "old primary")
 	readBoth(current, "current backup")
 	readBoth(old, "old primary")
-	if oldCalls < 2 || currentCalls != 2 {
+	if oldCalls != 4 || currentCalls != 2 {
 		t.Fatalf("unexpected cache requests: old=%d current=%d", oldCalls, currentCalls)
 	}
 	if err := app.SetAPILine(string(network.APILinePrimary)); err != nil {
@@ -266,6 +337,8 @@ func TestAPILineRequestsSeparateCacheAcrossLineAndGeneration(t *testing.T) {
 	if newest.cachePrefix() == old.cachePrefix() || newest.generation <= old.generation {
 		t.Fatal("returning to the primary reused an earlier cache generation")
 	}
+	readBoth(newest, "new primary")
+	readBoth(old, "old primary")
 	readBoth(newest, "new primary")
 	if newestCalls != 2 {
 		t.Fatalf("returning to primary reused stale cache: calls=%d", newestCalls)
