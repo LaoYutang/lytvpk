@@ -1385,6 +1385,10 @@ html.dark-mode .workshop-type-toggle-btn.active {
   box-shadow: var(--shadow-lg);
 }
 
+html:not(.dark-mode) .main-preview-container:not(.skeleton-anim) {
+  background: var(--bg-surface);
+}
+
 /* Ensure skeleton animation overrides background when active */
 .main-preview-container.skeleton-anim {
   background: var(--gray-100);
