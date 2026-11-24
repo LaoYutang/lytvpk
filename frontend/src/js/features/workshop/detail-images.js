@@ -2,6 +2,7 @@ import { escapeHtml } from "./utils.js";
 
 let workshopPreviewImages = [];
 let workshopPreviewIndex = 0;
+let previewExitAnimations = null;
 
 export function getWorkshopPreviewImages(detail) {
   let images = detail.previews || [];
@@ -44,15 +45,43 @@ function setFullImageAt(index) {
   updateImageModalControls();
 }
 
-function closeFullImageModal() {
+function clearPreviewExitAnimations() {
+  previewExitAnimations?.forEach((animation) => animation.cancel());
+  previewExitAnimations = null;
+}
+
+async function closeFullImageModal() {
   const modal = document.getElementById("image-preview-modal");
-  if (modal) {
-    modal.style.display = "none";
+  if (!modal || modal.style.display !== "flex" || previewExitAnimations) return;
+
+  const image = document.getElementById("full-image");
+  if (
+    image &&
+    modal.animate &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    // A quick close can interrupt the opening zoom before it reaches full size.
+    const { transform, opacity } = getComputedStyle(image);
+    const timing = { duration: 180, easing: "ease-in", fill: "both" };
+    const animations = [
+      image.animate(
+        [{ transform, opacity }, { transform: "scale(0.8)", opacity: 0 }],
+        timing
+      ),
+      modal.animate([{ opacity: 1 }, { opacity: 0 }], timing),
+    ];
+    previewExitAnimations = animations;
+    await Promise.allSettled(animations.map((animation) => animation.finished));
+    if (previewExitAnimations !== animations) return;
+    clearPreviewExitAnimations();
   }
+
+  modal.style.display = "none";
+  image?.removeAttribute("src");
 }
 
 function changeFullImage(step) {
-  if (workshopPreviewImages.length <= 1) return;
+  if (previewExitAnimations || workshopPreviewImages.length <= 1) return;
   setFullImageAt(workshopPreviewIndex + step);
 }
 
@@ -117,6 +146,7 @@ window.switchPreview = function (url, element) {
 window.openFullImage = function (src) {
   const modal = document.getElementById("image-preview-modal");
   if (modal) {
+    clearPreviewExitAnimations();
     if (!workshopPreviewImages.includes(src)) {
       workshopPreviewImages = [src].filter(Boolean);
     }
@@ -129,13 +159,11 @@ window.openFullImage = function (src) {
 document.addEventListener("DOMContentLoaded", () => {
   const modal = document.getElementById("image-preview-modal");
   const fullImage = document.getElementById("full-image");
-  const span = document.getElementsByClassName("image-modal-close")[0];
+  const closeButton = modal?.querySelector(".image-modal-close");
   const prevBtn = document.getElementById("image-modal-prev");
   const nextBtn = document.getElementById("image-modal-next");
 
-  if (modal && span) {
-    span.onclick = closeFullImageModal;
-
+  if (modal && closeButton) {
     prevBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       changeFullImage(-1);
@@ -146,16 +174,23 @@ document.addEventListener("DOMContentLoaded", () => {
       changeFullImage(1);
     });
 
-    document.addEventListener("keydown", (event) => {
-      if (modal.style.display !== "flex") return;
-      if (event.key === "Escape") closeFullImageModal();
-      if (event.key === "ArrowLeft") changeFullImage(-1);
-      if (event.key === "ArrowRight") changeFullImage(1);
-    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (modal.style.display !== "flex") return;
+        if (!["Escape", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key === "Escape") closeFullImageModal();
+        if (event.key === "ArrowLeft") changeFullImage(-1);
+        if (event.key === "ArrowRight") changeFullImage(1);
+      },
+      true
+    );
 
     modal.onclick = function (event) {
-      if (event.target === modal || event.target === fullImage) {
-        event.stopPropagation();
+      event.stopPropagation();
+      if ([modal, fullImage, closeButton].includes(event.target)) {
         closeFullImageModal();
       }
     };
