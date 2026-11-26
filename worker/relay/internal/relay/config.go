@@ -34,7 +34,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		PerClientRatePerMinute: 50, PerClientBurst: 500,
+		PerClientRatePerMinute: 50, PerClientBurst: 100,
 		GlobalRatePerMinute: 600, GlobalBurst: 1000,
 		MaxClients: 20000, ClientIdleTTL: 10 * time.Minute,
 		MaxConcurrent: 32, MaxConcurrentPerClient: 16,
