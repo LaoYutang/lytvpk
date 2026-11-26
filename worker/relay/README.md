@@ -74,7 +74,7 @@ curl --fail http://127.0.0.1:18081/stats
 | `-trusted-proxies` | `RELAY_TRUSTED_PROXIES` | 空 |
 | `-real-ip-header` | `RELAY_REAL_IP_HEADER` | `X-Real-IP` |
 | `-client-rate` | `RELAY_CLIENT_RATE` | 50 次/分钟 |
-| `-client-burst` | `RELAY_CLIENT_BURST` | 500 |
+| `-client-burst` | `RELAY_CLIENT_BURST` | 100 |
 | `-global-rate` | `RELAY_GLOBAL_RATE` | 600 次/分钟 |
 | `-global-burst` | `RELAY_GLOBAL_BURST` | 1000 |
 | `-max-clients` | `RELAY_MAX_CLIENTS` | 20000 |
@@ -92,7 +92,7 @@ curl --fail http://127.0.0.1:18081/stats
 | `-max-response-bytes` | `RELAY_MAX_RESPONSE_BYTES` | 8388608 |
 | `-max-parse-ids` | `RELAY_MAX_PARSE_IDS` | 1000 |
 
-客户端 Mod 库更新会突发请求大量详情，现有客户端不会对 HTTP 429 自动重试。因此逐用户默认突发额度与现有 Worker 的 500 保持一致；暂时超出活动并发额度的请求由有界队列吸收，默认最多全局 1024 个、单用户 500 个等待请求，最长等待 5 秒。队列满或等待超时返回 HTTP 429。将两个队列容量同时设为 0 可关闭排队；管理员可按实际用户容量调整并发、等待容量和时限。
+客户端 Mod 库更新会突发请求大量详情，现有客户端不会对 HTTP 429 自动重试。每个客户端 IP 默认可突发消耗 100 份额度，每分钟补充 50 份。暂时超出活动并发额度的请求由有界队列吸收，默认最多全局 1024 个、单用户 500 个等待请求，最长等待 5 秒。队列满或等待超时返回 HTTP 429。将两个队列容量同时设为 0 可关闭排队；管理员可按实际用户容量调整并发、等待容量和时限。
 
 普通接口每个请求扣一份调用额度；解析每 100 个 ID 扣一份，不足 100 个也按一份计，逐用户与全局桶都采用该成本。调用速率超额仍会直接被拒绝。新调用方应尊重 `Retry-After`，分批更新和重试；不应同时为全部条目无限建立请求。较大的合集解析请求可能达到 1000 ID 上限，超过时需要调用方分批。
 

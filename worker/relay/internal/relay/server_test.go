@@ -532,17 +532,25 @@ func TestRelayDoesNotCountClientCancellationAsUpstreamFailure(t *testing.T) {
 	}
 }
 
-func TestRelayDefaultLimitAllowsExistingLargeLibraryBurst(t *testing.T) {
+func TestRelayDefaultClientBurst(t *testing.T) {
 	s := newTestRelay(t, nil, nil)
-	s.now = func() time.Time { return time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC) }
-	for i := range 500 {
+	now := time.Date(2026, 11, 8, 0, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return now }
+	for i := range 100 {
 		w := serveRelay(s, relayRequest("GET", fmt.Sprintf("/detail?id=%d", i+1), "", ""))
 		if w.Code != 200 {
-			t.Fatalf("existing Worker-compatible burst failed at %d: %d %s", i+1, w.Code, w.Body.String())
+			t.Fatalf("default burst failed at %d: %d %s", i+1, w.Code, w.Body.String())
 		}
 	}
-	if w := serveRelay(s, relayRequest("GET", "/detail?id=501", "", "")); w.Code != 429 {
+	if w := serveRelay(s, relayRequest("GET", "/detail?id=101", "", "")); w.Code != 429 {
 		t.Fatalf("burst limit missing: %d %s", w.Code, w.Body.String())
+	}
+	if w := serveRelay(s, relayRequest("GET", "/detail?id=101", "", "198.51.100.21:4321")); w.Code != 200 {
+		t.Fatalf("another client was limited: %d", w.Code)
+	}
+	now = now.Add(1200 * time.Millisecond)
+	if w := serveRelay(s, relayRequest("GET", "/detail?id=101", "", "")); w.Code != 200 {
+		t.Fatalf("client token did not refill: %d", w.Code)
 	}
 }
 
