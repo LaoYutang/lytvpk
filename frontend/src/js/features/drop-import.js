@@ -113,12 +113,8 @@ async function planDroppedItems(paths, { folders, addonsDir }) {
       showError(`${folderName}：未找到 VPK 文件，根目录也没有可识别的 Mod 资源目录`, 7000);
       continue;
     }
-    if (folder.hasResources && !folder.vpkPaths.length) {
-      if (addonsDir) {
-        items.push({ path, folderAction: "pack" });
-      } else {
-        showError(`${folderName}：请先设置游戏 addons 目录`, 7000);
-      }
+    if (!addonsDir && !folder.vpkPaths.length) {
+      showError(`${folderName}：请先设置游戏 addons 目录`, 7000);
       continue;
     }
     const folderAction = await chooseDroppedFolderAction(folder, addonsDir);
