@@ -1,15 +1,21 @@
 let EventsOn;
 let showError;
 let CheckConflicts;
+let showFileDetail;
+let refreshFilesKeepFilter;
 let toggleFile;
 let moveFileToAddons;
 let conflictProgressRegistered = false;
 let isConflictChecking = false;
 let isConflictModalVisible = false;
 let conflictCheckRunId = 0;
+let detailRequestId = 0;
 
 export function configureConflicts(deps) {
-  ({ EventsOn, showError, CheckConflicts, toggleFile, moveFileToAddons } = deps);
+  ({
+    EventsOn, showError, CheckConflicts, showFileDetail,
+    refreshFilesKeepFilter, toggleFile, moveFileToAddons,
+  } = deps);
   registerConflictProgressEvents();
 }
 
@@ -32,6 +38,12 @@ export function showConflictModal() {
   // 自动开始检测
   startConflictCheck();
 }
+
+document.addEventListener("app:page-change", (event) => {
+  if (isConflictModalVisible && event.detail.page !== "diagnostics") {
+    hideConflictModal();
+  }
+});
 
 export function hideConflictModal() {
   isConflictModalVisible = false;
@@ -258,16 +270,27 @@ function createConflictGroupElement(group) {
       details.classList.toggle("expanded");
     });
 
-    // 添加禁用/转移按钮点击处理
+    // 每个按钮使用当前冲突项的完整路径。
     groupEl.querySelectorAll(".btn-conflict-action").forEach((btn) => {
+      const path = btn.dataset.path;
+      const detailButton = document.createElement("button");
+      detailButton.type = "button";
+      detailButton.className = "btn btn-small btn-secondary btn-conflict-detail";
+      detailButton.textContent = "详情";
+      detailButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openConflictFileDetail(path, detailButton);
+      });
+      btn.before(detailButton);
+
       btn.addEventListener("click", async (e) => {
         e.stopPropagation(); // 阻止触发 header click
 
-        const path = btn.dataset.path;
         const location = btn.dataset.location;
 
         try {
           btn.disabled = true;
+          detailButton.disabled = true;
           btn.innerHTML = '<span>处理中...</span>';
 
           if (location === "workshop") {
@@ -286,11 +309,24 @@ function createConflictGroupElement(group) {
           const isWorkshop = location === "workshop";
           btn.innerHTML = `<span>${isWorkshop ? "转移" : "禁用"}</span>`;
           btn.disabled = false;
+          detailButton.disabled = false;
         }
       });
     });
 
   return groupEl;
+}
+
+async function openConflictFileDetail(path, button) {
+  const requestId = ++detailRequestId;
+  if (showFileDetail(path, button)) return;
+
+  // 冲突检测直接读取磁盘，可能发现 MOD 管理上次刷新后才加入的文件。
+  await refreshFilesKeepFilter();
+  if (requestId !== detailRequestId || !button.isConnected || button.disabled) return;
+  if (!showFileDetail(path, button)) {
+    showError("找不到此 MOD 的详情，文件可能已被移动或删除。");
+  }
 }
 
 function loadConflictDetails(details, group) {

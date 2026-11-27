@@ -1,31 +1,21 @@
 import { appState } from "../state.js";
 import { createTextElement, formatFileSize, getLocationDisplayName } from "../../core/utils.js";
-import { showError } from "../../core/toast.js";
 import { GetVPKPreviewImage, ParseWorkshopID } from "../../../../wailsjs/go/app/App";
 import { handleProtocolWorkshop } from "../workshop/workshop-browser.js";
 
 let currentDetailFile = null;
+let detailOpener = null;
 
-export function showFileDetail(filePath) {
-  console.log("=== showFileDetail 开始执行 ===");
-  console.log("文件路径:", filePath);
-  console.log("appState.vpkFiles 长度:", appState.vpkFiles.length);
-
-  const file = appState.vpkFiles.find((f) => f.path === filePath);
-  if (!file) {
-    console.error("未找到文件:", filePath);
-    console.log("可用文件列表:", appState.vpkFiles.map((f) => f.path));
-    return;
-  }
-
-  console.log("找到文件:", file.name);
-  currentDetailFile = file;
+export function showFileDetail(filePath, opener = null) {
+  const file =
+    appState.vpkFiles.find((f) => f.path === filePath) ??
+    appState.allVpkFiles.find((f) => f.path === filePath);
+  if (!file) return false;
 
   const modal = document.getElementById("file-detail-modal");
-  if (!modal) {
-    console.error("模态框元素不存在!");
-    return;
-  }
+  if (!modal) return false;
+  currentDetailFile = file;
+  detailOpener = opener;
 
   document.getElementById("detail-file-name").textContent = file.name;
   document.getElementById("detail-name").textContent = file.name;
@@ -46,6 +36,7 @@ export function showFileDetail(filePath) {
   } else {
     GetVPKPreviewImage(file.path)
       .then((imgData) => {
+        if (currentDetailFile !== file) return;
         if (imgData) {
           previewImage.src = imgData;
           previewImage.style.display = "block";
@@ -54,6 +45,7 @@ export function showFileDetail(filePath) {
         }
       })
       .catch((err) => {
+        if (currentDetailFile !== file) return;
         console.error("加载预览图失败:", err);
         previewSection.classList.add("hidden");
       });
@@ -114,7 +106,7 @@ export function showFileDetail(filePath) {
       }
     }
 
-    if (workshopId) {
+    if (currentDetailFile === file && workshopId) {
       urlItem.style.display = "grid";
       urlLink.textContent = `工坊 #${workshopId}`;
       urlLink.href = "javascript:void(0)";
@@ -156,6 +148,12 @@ export function showFileDetail(filePath) {
   }
 
   modal.classList.remove("hidden");
+  if (opener) {
+    document.getElementById("conflict-modal").inert = true;
+    modal.setAttribute("aria-modal", "true");
+    document.addEventListener("keydown", handleConflictDetailKeydown, true);
+    document.getElementById("close-modal-header-btn").focus({ preventScroll: true });
+  }
 
   setTimeout(() => {
     const modalContent = modal.querySelector(".modal-content");
@@ -163,11 +161,43 @@ export function showFileDetail(filePath) {
     if (modalContent) modalContent.scrollTop = 0;
     if (modalBody) modalBody.scrollTop = 0;
   }, 0);
+  return true;
+}
 
-  console.log("=== showFileDetail 执行完成 ===");
+function handleConflictDetailKeydown(event) {
+  if (event.key !== "Escape" && event.key !== "Tab") return;
+  const modal = document.getElementById("file-detail-modal");
+  // 退出确认等提示可能临时盖在详情上，此时由最上层处理按键。
+  const topElement = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+  if (!modal.contains(topElement)) return;
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) closeModal();
+    return;
+  }
+
+  const controls = Array.from(modal.querySelectorAll("button:enabled, a[href]"))
+    .filter((element) => element.getClientRects().length > 0);
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  const active = document.activeElement;
+  if (!modal.contains(active) || active === (event.shiftKey ? first : last)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus({ preventScroll: true });
+  }
 }
 
 export function closeModal() {
-  document.getElementById("file-detail-modal").classList.add("hidden");
+  const modal = document.getElementById("file-detail-modal");
+  modal.classList.add("hidden");
   currentDetailFile = null;
+  if (detailOpener) {
+    document.removeEventListener("keydown", handleConflictDetailKeydown, true);
+    modal.removeAttribute("aria-modal");
+    document.getElementById("conflict-modal").inert = false;
+    detailOpener.focus({ preventScroll: true });
+    detailOpener = null;
+  }
 }

@@ -328,6 +328,8 @@ configureUpdates({
 });
 
 configureConflicts({
+  showFileDetail,
+  refreshFilesKeepFilter,
   EventsOn,
   showError,
   CheckConflicts,
