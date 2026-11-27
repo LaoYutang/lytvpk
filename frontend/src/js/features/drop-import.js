@@ -1,25 +1,55 @@
 import { showError, showNotification } from "../core/toast.js";
+import { escapeHtml } from "../core/utils.js";
 import { openMDMPReportFromPath } from "./diagnostics/mdmp-report.js";
+import { chooseDroppedFolderAction } from "./drop-folder-dialog.js";
 
 let HandleFileDrop;
+let HandlePlannedFileDrop;
+let InspectDroppedFolders;
 let EventsOn;
 let progressUnsubscribe = null;
 let importRunning = false;
+let inspectionRunning = false;
 
 export function configureDropImport(deps = {}) {
   HandleFileDrop = deps.HandleFileDrop;
+  HandlePlannedFileDrop = deps.HandlePlannedFileDrop;
+  InspectDroppedFolders = deps.InspectDroppedFolders;
   EventsOn = deps.EventsOn;
   if (!progressUnsubscribe && typeof EventsOn === "function") {
     progressUnsubscribe = EventsOn("drop_import_progress", renderDropImportProgress);
   }
 }
 
-export async function handleDropImportPaths(paths = [], { source = "drop" } = {}) {
+export async function inspectDroppedFolders(paths) {
+  if (inspectionRunning) {
+    showNotification("正在检查上一次拖入的文件", "info");
+    return null;
+  }
+  inspectionRunning = true;
+  const notice = window.setTimeout(() => showNotification("正在扫描拖入的文件夹…", "info"), 400);
+  try {
+    const result = await InspectDroppedFolders(normalizePaths(paths));
+    return {
+      addonsDir: result.addonsDir,
+      folders: new Map(result.folders.map((folder) => [folder.path, folder])),
+    };
+  } catch (error) {
+    showError(`检查拖入内容失败：${escapeHtml(formatError(error))}`);
+    return null;
+  } finally {
+    window.clearTimeout(notice);
+    inspectionRunning = false;
+  }
+}
+
+export async function handleDropImportPaths(paths = [], { source = "drop", inspection } = {}) {
   const normalizedPaths = normalizePaths(paths);
   if (normalizedPaths.length === 0) return null;
 
-  const dumpPaths = normalizedPaths.filter(isDumpPath);
-  const importPaths = normalizedPaths.filter((path) => !isDumpPath(path));
+  const isDumpFile = (path) => !inspection?.folders.has(path) && isDumpPath(path);
+  const dumpPaths = normalizedPaths.filter(isDumpFile);
+  const importPaths = normalizedPaths.filter((path) => !isDumpFile(path));
 
   if (dumpPaths.length > 0) {
     openFirstDump(dumpPaths);
@@ -46,28 +76,55 @@ export async function handleDropImportPaths(paths = [], { source = "drop" } = {}
   }
 
   importRunning = true;
-  showDropImportPanel(source === "select" ? "正在导入选中的文件" : "正在处理拖入的文件");
-  renderDropImportProgress({
-    current: 0,
-    total: importPaths.length,
-    percent: 0,
-    phase: "preparing",
-    name: "",
-    message: "准备处理...",
-  });
-
   try {
-    const result = await HandleFileDrop(importPaths);
+    const items = inspection ? await planDroppedItems(importPaths, inspection) : importPaths.map((path) => ({ path }));
+    if (!items.length) return null;
+
+    showDropImportPanel(source === "select" ? "正在导入选中的文件" : "正在处理拖入的文件");
+    const result = items.some((item) => item.folderAction)
+      ? await HandlePlannedFileDrop(items, inspection.addonsDir)
+      : await HandleFileDrop(items.map((item) => item.path));
     renderDropImportResult(result || {});
     showImportSummary(result || {});
     return result;
   } catch (error) {
     renderDropImportError("处理文件失败: " + formatError(error));
-    showError("处理文件失败: " + formatError(error));
+    showError("处理文件失败: " + escapeHtml(formatError(error)));
     return null;
   } finally {
     importRunning = false;
   }
+}
+
+async function planDroppedItems(paths, { folders, addonsDir }) {
+  const items = [];
+  for (const path of paths) {
+    const folder = folders.get(path);
+    if (!folder) {
+      items.push({ path });
+      continue;
+    }
+    const folderName = escapeHtml(basename(path));
+    if (folder.error) {
+      showError(`${folderName}：${escapeHtml(folder.error)}`, 7000);
+      continue;
+    }
+    if (!folder.hasResources && !folder.vpkPaths.length) {
+      showError(`${folderName}：未找到 VPK 文件，根目录也没有可识别的 Mod 资源目录`, 7000);
+      continue;
+    }
+    if (folder.hasResources && !folder.vpkPaths.length) {
+      if (addonsDir) {
+        items.push({ path, folderAction: "pack" });
+      } else {
+        showError(`${folderName}：请先设置游戏 addons 目录`, 7000);
+      }
+      continue;
+    }
+    const folderAction = await chooseDroppedFolderAction(folder, addonsDir);
+    if (folderAction) items.push({ path, folderAction, vpkPaths: folder.vpkPaths });
+  }
+  return items;
 }
 
 function openFirstDump(dumpPaths) {
@@ -129,15 +186,16 @@ function renderDropImportResult(result = {}) {
   const failed = Number(result.failed || 0);
   const succeeded = Number(result.succeeded || 0);
   const total = Number(result.total || 0);
+  const skipped = Number(result.skipped || 0);
 
   panel.classList.toggle("is-error", failed > 0 && succeeded === 0);
   panel.classList.remove("is-running");
   panel.classList.add("is-complete");
   panel.querySelector(".drop-import-title").textContent = failed > 0 ? "导入完成，有失败" : "导入完成";
   panel.querySelector(".drop-import-phase").textContent = failed > 0 ? "完成" : "完成";
-  panel.querySelector(".drop-import-summary").textContent = `成功 ${succeeded} / ${total}，失败 ${failed}`;
-  panel.querySelector(".drop-import-file").textContent = failed > 0 ? "查看处理结果" : "全部处理完成";
-  setDropImportCurrent(panel, failed > 0 ? "部分项目未处理成功" : "全部处理完成");
+  panel.querySelector(".drop-import-summary").textContent = `成功 ${succeeded} / ${total}，失败 ${failed}${skipped ? `，跳过 ${skipped}` : ""}`;
+  panel.querySelector(".drop-import-file").textContent = failed || skipped ? "查看处理结果" : "全部处理完成";
+  setDropImportCurrent(panel, failed ? "部分项目未处理成功" : skipped ? "已跳过同名文件" : "全部处理完成");
   panel.querySelector(".drop-import-active-list").replaceChildren();
   panel.querySelector(".drop-import-progress-fill").style.width = "100%";
   panel.querySelector(".drop-import-progress-meta").textContent = "100%";
@@ -167,7 +225,7 @@ function renderDropImportError(message) {
 
 function createResultRow(item = {}) {
   const row = document.createElement("div");
-  row.className = `drop-import-result ${item.success ? "is-success" : "is-failed"}`;
+  row.className = `drop-import-result ${item.success ? "is-success" : item.skipped ? "is-skipped" : "is-failed"}`;
 
   const body = document.createElement("div");
   body.className = "drop-import-result-body";
@@ -184,7 +242,7 @@ function createResultRow(item = {}) {
   if (!item.success) {
     const status = document.createElement("span");
     status.className = "drop-import-result-status";
-    status.textContent = "失败";
+    status.textContent = item.skipped ? "跳过" : "失败";
     row.appendChild(status);
   }
   return row;
@@ -200,10 +258,13 @@ function setDropImportCurrent(panel, text, hidden = false) {
 function showImportSummary(result = {}) {
   const failed = Number(result.failed || 0);
   const succeeded = Number(result.succeeded || 0);
+  const skipped = Number(result.skipped || 0);
   if (failed > 0 && succeeded === 0) {
     showError(`导入失败：${failed} 个项目未处理成功`);
   } else if (failed > 0) {
-    showNotification(`导入完成：成功 ${succeeded} 个，失败 ${failed} 个`, "info");
+    showNotification(`导入完成：成功 ${succeeded} 个，失败 ${failed} 个${skipped ? `，跳过 ${skipped} 个` : ""}`, "info");
+  } else if (skipped > 0) {
+    showNotification(`导入完成：成功 ${succeeded} 个，跳过 ${skipped} 个同名文件`, "info");
   } else {
     showNotification(`导入完成：成功 ${succeeded} 个`, "success");
   }

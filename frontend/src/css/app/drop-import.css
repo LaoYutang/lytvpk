@@ -16,6 +16,52 @@
   color: #0f172a;
 }
 
+.drop-folder-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.24);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.drop-folder-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.drop-folder-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+}
+
+.drop-folder-dialog p {
+  margin: 8px 0;
+  color: var(--text-secondary);
+}
+
+.drop-folder-files {
+  max-height: min(32vh, 240px);
+  margin: 10px 0;
+  padding: 10px 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-card);
+}
+
+.drop-folder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 .drop-import-header {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;
@@ -237,6 +283,18 @@
 .drop-import-result.is-failed .drop-import-result-status {
   background: #fee2e2;
   color: #dc2626;
+}
+
+.drop-import-result.is-skipped::before {
+  content: "–";
+}
+
+.drop-import-result.is-skipped::before,
+.drop-import-result.is-skipped .drop-import-result-status,
+html.dark-mode .drop-import-result.is-skipped::before,
+html.dark-mode .drop-import-result.is-skipped .drop-import-result-status {
+  background: var(--bg-card);
+  color: var(--text-secondary);
 }
 
 .drop-import-panel.is-error .drop-import-progress-meta,

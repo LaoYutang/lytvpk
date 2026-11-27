@@ -29,6 +29,7 @@ import {
 import {
   configureDropImport,
   handleDropImportPaths,
+  inspectDroppedFolders,
 } from "./drop-import.js";
 import {
   configureModelStatsScan,
@@ -173,6 +174,8 @@ import {
 
 import {
   HandleFileDrop,
+  HandlePlannedFileDrop,
+  InspectDroppedFolders,
   FetchServerInfo,
   FetchPlayerList,
   ConnectToServer,
@@ -345,6 +348,8 @@ configureModelStatsScan({
 configureDropImport({
   EventsOn,
   HandleFileDrop,
+  HandlePlannedFileDrop,
+  InspectDroppedFolders,
 });
 
 configureSettings({
@@ -524,6 +529,13 @@ function getDataTransferTypes(event) {
 }
 
 function getDroppedFiles(event) {
+  const items = Array.from(event.dataTransfer?.items || []);
+  if (items.length > 0) {
+    return items
+      .filter((item) => item.kind === "file" && !item.webkitGetAsEntry?.()?.isDirectory)
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+  }
   return Array.from(event.dataTransfer?.files || []);
 }
 
@@ -1214,13 +1226,16 @@ function setupWailsEvents() {
   });
 
   OnFileDrop(async (x, y, paths) => {
-    const droppedPaths = Array.from(paths || []).filter(Boolean);
+    const droppedPaths = Array.from(paths || [], (path) => String(path || "").trim()).filter(Boolean);
     if (droppedPaths.length === 0) return;
 
     clearSprayFileDropFallback();
 
-    const sprayPaths = droppedPaths.filter(isSprayImportPath);
-    const otherPaths = droppedPaths.filter((path) => !isSprayImportPath(path));
+    const inspection = await inspectDroppedFolders(droppedPaths);
+    if (!inspection) return;
+    const isSprayFile = (path) => !inspection.folders.has(path) && isSprayImportPath(path);
+    const sprayPaths = droppedPaths.filter(isSprayFile);
+    const otherPaths = droppedPaths.filter((path) => !isSprayFile(path));
     if (
       sprayPaths.length > 0 &&
       !consumeRecentDomSprayFallbackForPaths(sprayPaths)
@@ -1228,7 +1243,7 @@ function setupWailsEvents() {
       await importSprayPaths(sprayPaths, { refreshFilesKeepFilter });
     }
     if (otherPaths.length > 0) {
-      handleDropImportPaths(otherPaths, { source: "drop" });
+      await handleDropImportPaths(otherPaths, { source: "drop", inspection });
     }
   }, false);
 

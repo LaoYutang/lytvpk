@@ -22,8 +22,7 @@ func TestInstallVPKFileReportsProgress(t *testing.T) {
 	}
 
 	var progress []int
-	app := &App{rootDir: outputDir}
-	outputPath, err := app.installVPKFile(sourcePath, func(percent int, message string) {
+	outputPath, err := installVPKFile(sourcePath, outputDir, func(percent int, message string) {
 		progress = append(progress, percent)
 	})
 	if err != nil {

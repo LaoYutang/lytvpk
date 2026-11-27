@@ -334,6 +334,10 @@ export function HandleFileDrop(arg1) {
   return window['go']['app']['App']['HandleFileDrop'](arg1);
 }
 
+export function HandlePlannedFileDrop(arg1, arg2) {
+  return window['go']['app']['App']['HandlePlannedFileDrop'](arg1, arg2);
+}
+
 export function HandleProtocolURL(arg1) {
   return window['go']['app']['App']['HandleProtocolURL'](arg1);
 }
@@ -352,6 +356,10 @@ export function HasWorkshopTranslateCustomAPIKey() {
 
 export function HotReloadPanelMaps(arg1) {
   return window['go']['app']['App']['HotReloadPanelMaps'](arg1);
+}
+
+export function InspectDroppedFolders(arg1) {
+  return window['go']['app']['App']['InspectDroppedFolders'](arg1);
 }
 
 export function InstallSprayVPK(arg1) {
