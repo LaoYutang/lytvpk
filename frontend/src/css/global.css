@@ -6,6 +6,20 @@
     url("../assets/fonts/nunito-v16-latin-regular.woff2") format("woff2");
 }
 
+/* 详情开关时立即切换遮罩和层级，保留冲突弹窗自身的显隐过渡。 */
+#conflict-modal {
+  transition-property: opacity, visibility;
+}
+
+/* 详情复用标准模态遮罩；底层仅保留冲突面板，避免背景重复变暗和模糊。 */
+#conflict-modal[inert] {
+  /* 普通弹窗在 titlebar.css 中为 9999。底层应立即让出一级。 */
+  z-index: 9998 !important;
+  background-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* 冲突检测弹窗样式 */
 .modal-content.conflict-modal-content {
   max-width: 1000px;
@@ -285,6 +299,7 @@
   max-width: 15ch;
 }
 
+.btn-conflict-detail,
 .btn-conflict-action {
   min-height: 1.5rem;
   padding: 0 var(--spacing-2);
