@@ -116,7 +116,7 @@ function bindDetail(t, { title, description, translate, isCurrent = () => true }
   return { detail, button, heading, originalTitle, originals, results, calls, notices };
 }
 
-test("both fields follow the detail toggle while originals stay unchanged", async (t) => {
+test("description originals stay visible in bilingual and original-only modes", async (t) => {
   const fixture = bindDetail(t, {
     title: "Playable Coach - AK-47 [VScript]",
     description: "[b]Original paragraph[/b]",
@@ -128,6 +128,8 @@ test("both fields follow the detail toggle while originals stay unchanged", asyn
     },
   });
   assert.deepEqual(fixture.calls, []);
+  assert.equal(isHidden(fixture.originals[0]), false);
+  assert.equal(isHidden(fixture.results[0]), true);
   await fixture.button.click();
   assert.deepEqual([...fixture.calls].sort(), ["Original paragraph", "Playable"]);
   assert.equal(fixture.heading.textContent, "可玩 Coach - AK-47 [VScript]");
@@ -135,17 +137,20 @@ test("both fields follow the detail toggle while originals stay unchanged", asyn
   assert.equal(isHidden(fixture.originalTitle), false);
   assert.equal(fixture.results[0].textContent, "原始段落");
   assert.equal(isHidden(fixture.results[0]), false);
+  assert.equal(isHidden(fixture.originals[0]), false);
   assert.match(fixture.button.textContent, /查看原文/);
 
   await fixture.button.click();
   assert.equal(fixture.heading.textContent, "Playable Coach - AK-47 [VScript]");
   assert.equal(isHidden(fixture.originalTitle), true);
   assert.equal(isHidden(fixture.results[0]), true);
+  assert.equal(isHidden(fixture.originals[0]), false);
   assert.equal(fixture.originals[0].textContent, "[b]Original paragraph[/b]");
   assert.match(fixture.button.textContent, /查看译文/);
   await fixture.button.click();
   assert.equal(fixture.heading.textContent, "可玩 Coach - AK-47 [VScript]");
   assert.equal(isHidden(fixture.results[0]), false);
+  assert.equal(isHidden(fixture.originals[0]), false);
   assert.equal(fixture.calls.length, 2);
   assert.equal(fixture.detail.title, "Playable Coach - AK-47 [VScript]");
   assert.equal(fixture.detail.description, "[b]Original paragraph[/b]");
@@ -177,7 +182,27 @@ test("a failed title translation leaves the original title and keeps successful 
   assert.equal(isHidden(fixture.originalTitle), true);
   assert.equal(fixture.results[0].textContent, "成功段落");
   assert.equal(isHidden(fixture.results[0]), false);
+  assert.equal(isHidden(fixture.originals[0]), false);
   assert.match(fixture.button.textContent, /查看原文/);
+});
+
+test("a failed paragraph keeps its original alongside the bilingual successful paragraph", async (t) => {
+  const fixture = bindDetail(t, {
+    title: "原文标题",
+    description: "First paragraph\n\nBroken paragraph",
+    translate(text) {
+      if (text === "Broken paragraph") throw new Error("fixture failure");
+      return "第一段译文";
+    },
+  });
+  await fixture.button.click();
+  assert.deepEqual(fixture.originals.map((node) => node.textContent), ["First paragraph", "Broken paragraph"]);
+  assert.deepEqual(fixture.originals.map(isHidden), [false, false]);
+  assert.deepEqual(fixture.results.map((node) => node.textContent), ["第一段译文", "这一段翻译失败"]);
+  assert.deepEqual(fixture.results.map(isHidden), [false, false]);
+  await fixture.button.click();
+  assert.deepEqual(fixture.originals.map(isHidden), [false, false]);
+  assert.deepEqual(fixture.results.map(isHidden), [true, true]);
 });
 
 test("a stale detail cannot publish a delayed failed or successful translation", async (t) => {
