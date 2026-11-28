@@ -1133,6 +1133,19 @@ html.dark-mode .workshop-type-toggle-btn.active {
   line-height: 1.25;
   margin: 0;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-title-text {
+  min-width: 0;
+}
+
+.detail-title-original {
+  margin-top: 5px;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .detail-title-row {
@@ -1509,10 +1522,15 @@ html.dark-mode .thumbnail-item:not(.active) {
   font-size: 0.92rem;
   line-height: 1.65;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .detail-paragraph-translation.hidden {
   display: none;
+}
+
+.detail-description-original.hidden + .detail-paragraph-translation {
+  margin-top: 0;
 }
 
 .detail-paragraph-translation.is-loading {

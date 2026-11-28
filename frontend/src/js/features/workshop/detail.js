@@ -4,6 +4,11 @@ import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "..
 import { createWorkshopRequestError } from "./request-error.js";
 import { getWorkshopDetailScrollTop, restoreWorkshopDetailScroll } from "./detail-scroll.js";
 import {
+  bindWorkshopDetailTranslation,
+  splitDescriptionParagraphs,
+  stripDescriptionFormattingTags,
+} from "./detail-translation.js";
+import {
   getWorkshopPreviewImages,
   renderThumbnails,
   setWorkshopPreviewImages,
@@ -26,7 +31,6 @@ import {
   renderWorkshopLoading,
 } from "./utils.js";
 
-const descriptionTranslationCache = new Map();
 let detailRequestSequence = 0;
 let detailViewSequence = 0;
 
@@ -326,6 +330,10 @@ function renderRequiredItems(detail) {
   });
 }
 
+function renderDetailTitle(detail) {
+  return `<div class="detail-title-text"><h1 class="detail-title-large">${escapeHtml(detail.title)}</h1></div>`;
+}
+
 function renderItemDetail(detail, parentDetail) {
   return `
     <div class="detail-container">
@@ -334,7 +342,7 @@ function renderItemDetail(detail, parentDetail) {
           <div class="detail-top-section">
               ${renderDetailPreview(detail)}
               <div class="detail-info-wrapper">
-                  <h1 class="detail-title-large">${escapeHtml(detail.title)}</h1>
+                  ${renderDetailTitle(detail)}
                   ${renderItemStats(detail)}
                   ${renderDetailTags(detail)}
                   ${renderDetailDownloadButton("下载并安装")}
@@ -357,7 +365,7 @@ function renderCollectionDetail(detail, parentDetail) {
               <div class="detail-info-wrapper">
                   <div class="detail-title-row">
                     <span class="detail-type-badge">合集</span>
-                    <h1 class="detail-title-large">${escapeHtml(detail.title)}</h1>
+                    ${renderDetailTitle(detail)}
                   </div>
                   ${renderCollectionStats(detail)}
                   ${renderDetailTags(detail, '<span class="tag-badge collection-detail-tag">合集</span>')}
@@ -373,15 +381,16 @@ function renderCollectionDetail(detail, parentDetail) {
 
 function renderDescriptionBox(detail, title) {
   const hasDescription = Boolean(String(detail.description || "").trim());
+  const canTranslate = hasDescription || Boolean(String(detail.title || "").trim());
   return `
     <div class="detail-description-box" data-description-box>
         <div class="detail-description-header">
           <h3>${escapeHtml(title)}</h3>
           ${
-            hasDescription
+            canTranslate
               ? `<button class="btn btn-outline btn-small detail-translate-btn" type="button" data-translate-description-btn>
                   ${TRANSLATE_ICON_SVG}
-                  <span>翻译描述</span>
+                  <span>翻译</span>
                 </button>`
               : ""
           }
@@ -408,14 +417,6 @@ function formatDescriptionParagraphs(text) {
         </div>`
     )
     .join("");
-}
-
-function splitDescriptionParagraphs(text) {
-  return String(text || "")
-    .replace(/\r\n/g, "\n")
-    .split(/\n[ \t]*\n+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function returnToParentDetail(options) {
@@ -446,7 +447,7 @@ function renderWorkshopDetail(detail, options = {}) {
     ? renderCollectionDetail(detail, parentDetail)
     : renderItemDetail(detail, parentDetail);
   appendInstalledBadge(detailView.querySelector(".detail-tags-row"), detail);
-  bindDescriptionTranslation(detailView, detail);
+  bindWorkshopDetailTranslation(detailView, detail, () => sequence === detailRequestSequence);
 
   document
     .getElementById("back-to-list-btn")
@@ -682,184 +683,12 @@ function formatDescription(text) {
     return `<ol type="a" class="bbcode-list">${listItems}</ol>`;
   });
 
-  html = html.replace(/\[\/?[a-zA-Z]+(?:=[^\]]*)?\]/g, "");
+  html = stripDescriptionFormattingTags(html);
   html = html.replace(/\n/g, "<br>");
   html = html.replace(/(<br>){3,}/g, "<br><br>");
   html = html.replace(/^(<br>)+|(<br>)+$/g, "");
 
   return html;
-}
-
-function bindDescriptionTranslation(detailView, detail) {
-  const button = detailView.querySelector("[data-translate-description-btn]");
-  const paragraphElements = Array.from(
-    detailView.querySelectorAll("[data-description-paragraph-index]")
-  );
-  if (!button || paragraphElements.length === 0 || !detail.description) return;
-
-  button.addEventListener("click", async () => {
-    const rawDescription = detail.description || "";
-    const paragraphs = splitDescriptionParagraphs(rawDescription);
-    const segments = paragraphs
-      .map((paragraph, index) => ({
-        index,
-        text: descriptionToPlainText(paragraph),
-        resultEl: detailView.querySelector(
-          `[data-description-paragraph-translation="${index}"]`
-        ),
-      }))
-      .filter((segment) => segment.text && segment.resultEl);
-
-    if (segments.length === 0) {
-      workshopDeps.showNotification?.("没有可翻译的描述内容", "info");
-      return;
-    }
-
-    const provider = (await workshopDeps.GetWorkshopTranslateProvider?.()) || "microsoft";
-    setTranslateButtonLoading(button, true);
-    let translatedCount = 0;
-    let failedError = null;
-
-    try {
-      for (const segment of segments) {
-        const cacheKey = [
-          getWorkshopItemId(detail),
-          provider,
-          segment.text,
-        ].join("::");
-        const cached = descriptionTranslationCache.get(cacheKey);
-        if (cached) {
-          if (showParagraphTranslation(segment.resultEl, cached.text, segment.text)) {
-            translatedCount += 1;
-          }
-          continue;
-        }
-
-        setParagraphTranslationLoading(segment.resultEl);
-        try {
-          const result = await workshopDeps.TranslateWorkshopDescription(segment.text);
-          descriptionTranslationCache.set(cacheKey, result);
-          if (showParagraphTranslation(segment.resultEl, result.text, segment.text)) {
-            translatedCount += 1;
-          }
-        } catch (err) {
-          failedError = err;
-          showParagraphTranslationError(segment.resultEl);
-          break;
-        }
-      }
-
-      if (failedError) {
-        workshopDeps.showError?.("翻译失败: " + failedError);
-        return;
-      }
-      workshopDeps.showNotification?.(
-        translatedCount > 0 ? "描述翻译完成" : "描述内容已是中文",
-        translatedCount > 0 ? "success" : "info"
-      );
-    } finally {
-      setTranslateButtonLoading(button, false);
-    }
-  });
-}
-
-function setTranslateButtonLoading(button, loading) {
-  button.disabled = loading;
-  button.textContent = "";
-  if (loading) {
-    const spinner = document.createElement("span");
-    spinner.className = "btn-spinner";
-    button.appendChild(spinner);
-    const label = document.createElement("span");
-    label.textContent = "翻译中...";
-    button.appendChild(label);
-    return;
-  }
-  button.appendChild(createTranslateIconElement());
-  const label = document.createElement("span");
-  label.textContent = "翻译描述";
-  button.appendChild(label);
-}
-
-function createTranslateIconElement() {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "icon-svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2.2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  svg.setAttribute("aria-hidden", "true");
-  ["m5 8 6 6", "m4 14 6-6 2-3", "M2 5h12", "M7 2h1", "m22 22-5-10-5 10", "M14 18h6"].forEach((d) => {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", d);
-    svg.appendChild(path);
-  });
-  return svg;
-}
-
-function setParagraphTranslationLoading(resultEl) {
-  resultEl.textContent = "";
-  resultEl.classList.remove("hidden", "detail-translation-enter", "is-error");
-  resultEl.classList.add("is-loading");
-
-  const spinner = document.createElement("span");
-  spinner.className = "btn-spinner";
-  const label = document.createElement("span");
-  label.textContent = "翻译中...";
-  resultEl.appendChild(spinner);
-  resultEl.appendChild(label);
-}
-
-function showParagraphTranslation(resultEl, text, originalText) {
-  const translatedText = String(text || "").trim();
-  if (
-    !translatedText ||
-    normalizeTranslationComparable(translatedText) ===
-      normalizeTranslationComparable(originalText)
-  ) {
-    hideParagraphTranslation(resultEl);
-    return false;
-  }
-
-  resultEl.textContent = translatedText;
-  resultEl.classList.remove("hidden", "is-loading", "is-error", "detail-translation-enter");
-  void resultEl.offsetWidth;
-  resultEl.classList.add("detail-translation-enter");
-  return true;
-}
-
-function showParagraphTranslationError(resultEl) {
-  resultEl.textContent = "这一段翻译失败";
-  resultEl.classList.remove("hidden", "is-loading", "detail-translation-enter");
-  resultEl.classList.add("is-error");
-}
-
-function hideParagraphTranslation(resultEl) {
-  resultEl.textContent = "";
-  resultEl.classList.add("hidden");
-  resultEl.classList.remove("is-loading", "is-error", "detail-translation-enter");
-}
-
-function normalizeTranslationComparable(text) {
-  return String(text || "").replace(/\s+/g, " ").trim();
-}
-
-function descriptionToPlainText(text) {
-  return String(text || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\[url=([^\]]+)\](.*?)\[\/url\]/gis, "$2 ($1)")
-    .replace(/\[url\](.*?)\[\/url\]/gis, "$1")
-    .replace(/\[img\](.*?)\[\/img\]/gis, "")
-    .replace(/\[code\](.*?)\[\/code\]/gis, "$1")
-    .replace(/\[quote\](.*?)\[\/quote\]/gis, "\n$1\n")
-    .replace(/\[\*\]/g, "\n- ")
-    .replace(/\[\/?(?:h1|h2|h3|b|u|i|strike|spoiler|hr|noparse|table|tr|td|th|list|olist|center|left|right|indent|size|color|font)(?:=[^\]]*)?\]/gi, "")
-    .replace(/\[\/?[a-zA-Z]+(?:=[^\]]*)?\]/g, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 function startDownloadFromBrowser(id) {

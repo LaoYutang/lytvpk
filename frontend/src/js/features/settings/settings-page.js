@@ -180,11 +180,11 @@ export async function renderSettingsPage({
             </div>
           </div>
           <div class="setting-card">
-            <div class="setting-card-title">描述翻译</div>
+            <div class="setting-card-title">工坊翻译</div>
             <div class="setting-row">
               <div class="setting-row-info">
                 <div class="setting-row-label">翻译服务</div>
-                <div class="setting-row-desc">用于创意工坊详情页的描述翻译</div>
+                <div class="setting-row-desc">用于翻译创意工坊详情页的标题和描述</div>
               </div>
               <div class="mode-toggle-group settings-translate-provider-toggle">
                 <label class="mode-option ${translateProvider === "microsoft" ? "active" : ""}">
