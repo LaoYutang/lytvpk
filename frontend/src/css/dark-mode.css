@@ -249,6 +249,11 @@ html.dark-mode .file-item:nth-child(even) {
   background-image: none !important;
 }
 
+/* 缩略图淡入时，骨架消失后仍需保留深色底。 */
+html.dark-mode .workshop-card .card-preview {
+  background-color: var(--bg-card);
+}
+
 /* 创意工坊骨架屏暗黑模式适配 */
 html.dark-mode .card-preview.skeleton-anim,
 html.dark-mode .main-preview-container.skeleton-anim,
