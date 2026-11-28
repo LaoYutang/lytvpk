@@ -2,6 +2,7 @@ import { workshopDeps } from "./deps.js";
 import { appendInstalledBadge } from "./installed.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { createWorkshopRequestError } from "./request-error.js";
+import { appendWorkshopDetailId } from "./detail-id.js";
 import { getWorkshopDetailScrollTop, restoreWorkshopDetailScroll } from "./detail-scroll.js";
 import {
   bindWorkshopDetailTranslation,
@@ -432,6 +433,7 @@ function renderWorkshopDetail(detail, options = {}) {
   const browserBody = detailView.closest(".browser-body");
   const parentDetail = options.parentDetail || null;
   const sequence = detailRequestSequence;
+  const isCurrentDetail = () => sequence === detailRequestSequence;
 
   setWorkshopPreviewImages(getWorkshopPreviewImages(detail));
   if (isInWatchLater(detail.publishedfileid)) {
@@ -447,7 +449,8 @@ function renderWorkshopDetail(detail, options = {}) {
     ? renderCollectionDetail(detail, parentDetail)
     : renderItemDetail(detail, parentDetail);
   appendInstalledBadge(detailView.querySelector(".detail-tags-row"), detail);
-  bindWorkshopDetailTranslation(detailView, detail, () => sequence === detailRequestSequence);
+  appendWorkshopDetailId(detailView, detail.publishedfileid, options.requestedWorkshopId, isCurrentDetail);
+  bindWorkshopDetailTranslation(detailView, detail, isCurrentDetail);
 
   document
     .getElementById("back-to-list-btn")
@@ -532,12 +535,13 @@ function renderWorkshopDetail(detail, options = {}) {
       });
     });
 
-  restoreWorkshopDetailScroll(detailView, options.scrollTop, () => sequence === detailRequestSequence);
+  restoreWorkshopDetailScroll(detailView, options.scrollTop, isCurrentDetail);
 }
 
 export async function openWorkshopDetail(item, options = {}) {
   const line = getAPILineSnapshot();
   const sequence = ++detailRequestSequence;
+  const requestedWorkshopId = item?.publishedfileid;
   const isCurrentRequest = () => isCurrentAPILine(line) && sequence === detailRequestSequence;
   const detailView = document.getElementById("browser-detail-view");
   if (!detailView) return;
@@ -548,7 +552,7 @@ export async function openWorkshopDetail(item, options = {}) {
   try {
     const detail = await workshopDeps.FetchWorkshopDetail(getWorkshopItemId(item));
     if (!isCurrentRequest()) return;
-    renderWorkshopDetail(detail, options);
+    renderWorkshopDetail(detail, { ...options, requestedWorkshopId });
   } catch (err) {
     if (!isCurrentRequest()) return;
     detailView.replaceChildren(createWorkshopRequestError({

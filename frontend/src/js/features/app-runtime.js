@@ -402,6 +402,7 @@ configureWorkshopBrowser({
   showError,
   BrowserOpenURL,
   ClipboardGetText,
+  ClipboardSetText,
   FetchWorkshopList,
   FetchWorkshopDetail,
   TranslateWorkshopDescription,
