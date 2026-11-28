@@ -7,13 +7,14 @@ import { browserState, resetWorkshopPaging } from "../src/js/features/workshop/s
 
 const listURL = new URL("../src/js/features/workshop/list.js", import.meta.url).href;
 const detailURL = new URL("../src/js/features/workshop/detail.js", import.meta.url).href;
+const ready = [];
 const stubs = {
   "./sidebar.js": "export function addFilterIcons(){} export function initBrowserIndicators(){} export function updateBrowserCategoryIndicator(){} export function updateBrowserSortIndicator(){}",
   "./id-jump.js": "export function setupWorkshopIdJump(){}",
   "./watch-later.js": "export function renderWatchLaterDrawer(){} export function setupWatchLaterDrawerListeners(){} export function createWatchLaterItem(x){return x} export function getWatchLaterItems(){return []} export function isInWatchLater(){return false} export function saveWatchLaterItems(){} export function toggleWatchLaterItem(){} export function updateWatchLaterDetailButton(){}",
   "./detail-images.js": "export function getWorkshopPreviewImages(){return []} export function renderThumbnails(){return ''} export function setWorkshopPreviewImages(){}",
 };
-globalThis.document = { addEventListener() {} };
+globalThis.document = { addEventListener(type, callback) { if (type === "DOMContentLoaded") ready.push(callback); } };
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
     if ([listURL, detailURL].includes(context.parentURL) && stubs[specifier]) {
@@ -36,25 +37,62 @@ class Element {
       contains: (value) => this.classes.has(value),
     };
     this.children = [];
+    this.parentElement = null;
     this.listeners = new Map();
     this.dataset = {};
+    this.style = {};
     this.scrollHeight = 1000;
     this.scrollTop = 0;
+    this.clientTop = 0;
     this.clientHeight = 200;
   }
   set className(value) { this.classes = new Set(value.split(/\s+/).filter(Boolean)); }
   get className() { return [...this.classes].join(" "); }
   get childNodes() { return this.children; }
-  set innerHTML(value) { this.html = value; this.children = []; }
+  get nextSibling() {
+    const siblings = this.parentElement?.children;
+    return siblings?.[siblings.indexOf(this) + 1] || null;
+  }
+  set innerHTML(value) { this.replaceChildren(); this.html = value; }
   get innerHTML() { return this.html || this.children.map((child) => child.textContent).join(""); }
   set textContent(value) { this.text = value; }
   get textContent() { return (this.text || "") + this.children.map((child) => child.textContent).join(""); }
-  replaceChildren(...children) { this.children = children; this.html = ""; this.text = ""; }
+  getBoundingClientRect() {
+    const top = this.id === "browser-grid" ? -this.parentElement.scrollTop : 0;
+    const height = this.classList.contains("workshop-card") ? 100 : this.clientHeight;
+    return { width: 700, top, height };
+  }
+  replaceChildren(...children) {
+    this.children.forEach((child) => { child.parentElement = null; });
+    this.children = [];
+    this.html = "";
+    this.text = "";
+    this.append(...children);
+  }
   append(...children) { children.forEach((child) => this.appendChild(child)); }
-  appendChild(child) { this.children.push(child); return child; }
+  appendChild(child) { return this.insertBefore(child, null); }
+  insertBefore(child, reference) {
+    if (child === reference) return child;
+    child.remove();
+    const index = reference === null ? this.children.length : this.children.indexOf(reference);
+    assert.notEqual(index, -1, "reference node must be a child");
+    this.children.splice(index, 0, child);
+    child.parentElement = this;
+    return child;
+  }
+  remove() {
+    if (this.parentElement) this.parentElement.children.splice(this.parentElement.children.indexOf(this), 1);
+    this.parentElement = null;
+  }
   setAttribute(name, value) { this[name] = value; }
-  querySelector() { return null; }
-  querySelectorAll() { return []; }
+  querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+  querySelectorAll(selector) {
+    if (!selector.startsWith(".")) return [];
+    return this.children.flatMap((child) => [
+      ...(child.classList.contains(selector.slice(1)) ? [child] : []),
+      ...child.querySelectorAll(selector),
+    ]);
+  }
   closest() { return document.getElementById("browser-body"); }
   addEventListener(type, listener) { this.listeners.set(type, listener); }
   click() { this.listeners.get("click")?.({}); }
@@ -67,7 +105,11 @@ test.beforeEach(() => {
   frames = [];
   globalThis.document = {
     getElementById(id) {
-      if (!elements.has(id)) elements.set(id, new Element());
+      if (!elements.has(id)) {
+        const node = new Element();
+        node.id = id;
+        elements.set(id, node);
+      }
       return elements.get(id);
     },
     createElement: (tag) => new Element(tag),
@@ -76,16 +118,22 @@ test.beforeEach(() => {
     querySelectorAll: () => [],
   };
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); };
+  globalThis.getComputedStyle = () => ({ gridTemplateColumns: "220px 220px 220px", rowGap: "20px" });
+  globalThis.ResizeObserver = class { observe() {} };
   setAPILineState("primary");
   resetWorkshopPaging();
   browserState.loading = false;
   workshopDeps.IsSelectingIP = async () => false;
   workshopDeps.FetchWorkshopList = async () => ({ items: [] });
+  element("browser-scroll-container").append(element("browser-grid"));
   element("browser-detail-view").classList.add("hidden");
+  ready.forEach((callback) => callback());
 });
 test.after(() => {
   delete globalThis.document;
   delete globalThis.requestAnimationFrame;
+  delete globalThis.getComputedStyle;
+  delete globalThis.ResizeObserver;
 });
 function element(id) { return document.getElementById(id); }
 function item(id, title = id) { return { publishedfileid: id, title, tags: [], description: "" }; }

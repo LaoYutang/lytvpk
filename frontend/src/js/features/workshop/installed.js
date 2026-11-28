@@ -1,6 +1,12 @@
 // The reference is bound by the local-file refresh lifecycle. Before the first
 // scan, installation status is unknown and every badge stays hidden.
 let installationState;
+const installationListeners = new Set();
+
+export function subscribeWorkshopInstallationChange(listener) {
+  installationListeners.add(listener);
+  return () => installationListeners.delete(listener);
+}
 
 export function normalizeWorkshopID(value) {
   if (typeof value !== "string" && !(typeof value === "number" && Number.isSafeInteger(value))) return "";
@@ -12,12 +18,17 @@ export function normalizeWorkshopID(value) {
 }
 
 export function setWorkshopInstallationState(state, status, files = []) {
+  const previousIds = installationState?.installedWorkshopIds;
   installationState = state;
   state.workshopInstallationStatus = status;
   state.installedWorkshopIds = new Set(
     status === "ready" ? files.map((file) => normalizeWorkshopID(file?.workshopId)).filter(Boolean) : [],
   );
   globalThis.document?.querySelectorAll?.("[data-installed-workshop-id]").forEach(updateInstalledBadge);
+  if (previousIds?.size !== state.installedWorkshopIds.size ||
+      [...state.installedWorkshopIds].some((id) => !previousIds.has(id))) {
+    for (const listener of installationListeners) listener();
+  }
 }
 
 export function isWorkshopItemInstalled(id) {
