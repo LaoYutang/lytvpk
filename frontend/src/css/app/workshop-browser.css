@@ -722,9 +722,7 @@ html.dark-mode .workshop-type-toggle-btn.active {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  transition: box-shadow 0.2s;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -732,7 +730,6 @@ html.dark-mode .workshop-type-toggle-btn.active {
 }
 
 .workshop-card:hover {
-  transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
   border-color: var(--primary-light);
 }
