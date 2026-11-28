@@ -229,6 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "keydown",
       (event) => {
         if (modal.style.display !== "flex") return;
+        if (document.querySelector("dialog[open]")) return;
         if (!["Escape", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
         event.preventDefault();
         event.stopPropagation();

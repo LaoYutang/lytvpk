@@ -52,6 +52,10 @@ func (a *App) packVPKDirectoryWithProgress(sourceDir string, outputDir string, o
 }
 
 func (a *App) packVPKDirectoryWithOptions(sourceDir string, outputDir string, outputIsAddons bool, outputBaseName string, progress vpkPackProgressFunc) (VPKPackResult, error) {
+	return a.packVPKDirectory(sourceDir, outputDir, outputIsAddons, outputBaseName, nil, progress)
+}
+
+func (a *App) packVPKDirectory(sourceDir, outputDir string, outputIsAddons bool, outputBaseName string, skipFile func(string) bool, progress vpkPackProgressFunc) (VPKPackResult, error) {
 	result := VPKPackResult{OutputIsAddons: outputIsAddons}
 
 	sourceDir = strings.TrimSpace(sourceDir)
@@ -113,12 +117,14 @@ func (a *App) packVPKDirectoryWithOptions(sourceDir string, outputDir string, ou
 		if !d.Type().IsRegular() {
 			return nil
 		}
-
 		rel, relErr := filepath.Rel(sourceDir, p)
 		if relErr != nil {
 			return fmt.Errorf("无法计算相对路径 %s: %v", p, relErr)
 		}
 		rel = filepath.ToSlash(rel)
+		if skipFile != nil && skipFile(rel) {
+			return nil
+		}
 
 		info, infoErr := d.Info()
 		if infoErr != nil {
@@ -218,7 +224,7 @@ func (a *App) packVPKDirectoryWithOptions(sourceDir string, outputDir string, ou
 	result.OutputPath = outputPath
 	result.TotalFiles = len(entries)
 
-	out, err := os.Create(outputPath)
+	out, err := os.OpenFile(outputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return result, fmt.Errorf("无法创建 VPK 文件 %s: %v", outputPath, err)
 	}
@@ -277,7 +283,7 @@ func createUniqueVPKOutputFileWithBaseName(outputDir string, sourceDir string, o
 			name = fmt.Sprintf("%s(%d)", baseName, i)
 		}
 		outputPath := filepath.Join(outputDir, name+".vpk")
-		if _, err := os.Stat(outputPath); err == nil {
+		if _, err := os.Lstat(outputPath); err == nil {
 			continue
 		} else if !os.IsNotExist(err) {
 			return "", fmt.Errorf("无法检查输出文件 %s: %v", outputPath, err)

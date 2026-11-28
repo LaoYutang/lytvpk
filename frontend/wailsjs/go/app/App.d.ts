@@ -171,6 +171,8 @@ export function GetWorkshopWatchLaterStorage():Promise<app.WorkshopWatchLaterSto
 
 export function HandleFileDrop(arg1:Array<string>):Promise<app.DropImportResult>;
 
+export function HandlePlannedFileDrop(arg1:Array<app.DropImportRequest>,arg2:string):Promise<app.DropImportResult>;
+
 export function HandleProtocolURL(arg1:string):Promise<void>;
 
 export function HasActiveDownloads():Promise<boolean>;
@@ -180,6 +182,8 @@ export function HasActivePanelUploads():Promise<boolean>;
 export function HasWorkshopTranslateCustomAPIKey():Promise<boolean>;
 
 export function HotReloadPanelMaps(arg1:string):Promise<app.PanelMapHotReloadResult>;
+
+export function InspectDroppedFolders(arg1:Array<string>):Promise<app.DropFolderInspection>;
 
 export function InstallSprayVPK(arg1:app.SprayInstallRequest):Promise<app.SprayInstallResult>;
 
