@@ -20,6 +20,91 @@ test("falls back to translating around terms that the provider changes", async (
   assert.equal(translated, "新款 Ellis 搭配 AK-47 [VScript]");
 });
 
+test("Chinese titles keep both Chinese prose and accompanying foreign labels", async () => {
+  for (const title of [
+    "【蔚蓝档案/blue archive】和乐千世[Waraku Chise]官模改UZI",
+    "【明日方舟/Arknights】能天使武器替换 [VScript]",
+    "星穹铁道银狼替换武器 (Silver Wolf)",
+  ]) {
+    const translated = await translateWorkshopText(title, () => {
+      assert.fail(`already Chinese title requested translation: ${title}`);
+    }, { isTitle: true, targetLanguage: "zh-Hans" });
+    assert.equal(translated, title);
+  }
+});
+
+test("English, Japanese with Kana and Korean titles still translate to Chinese", async () => {
+  for (const title of ["Classic weapon sounds", "新しい武器の音", "새로운 무기 소리"]) {
+    const calls = [];
+    const translated = await translateWorkshopText(title, async (text) => {
+      calls.push(text);
+      return "经典武器音效";
+    }, { isTitle: true, targetLanguage: "zh-Hans" });
+    assert.deepEqual(calls, [title]);
+    assert.equal(translated, "经典武器音效");
+  }
+});
+
+test("a short Chinese tag is kept while the foreign title around it is translated", async () => {
+  const title = "Classic weapon sounds [汉化]";
+  const translated = await translateWorkshopText(title, async (text) => {
+    assert.equal(text, "Classic weapon sounds");
+    return "经典武器音效";
+  }, { isTitle: true, targetLanguage: "zh-Hans" });
+  assert.equal(translated, "经典武器音效 [汉化]");
+  assert.equal(await translateWorkshopText(
+    title,
+    async () => "Different weapon audio [汉化]",
+    { isTitle: true, targetLanguage: "zh-Hans" },
+  ), title);
+});
+
+test("the Chinese title shortcut and result guard only apply to a Chinese target", async () => {
+  const title = "【明日方舟/Arknights】能天使武器替换";
+  const calls = [];
+  const translated = await translateWorkshopText(title, async (text) => {
+    calls.push(text);
+    return "Exusiai weapon replacement";
+  }, { isTitle: true, targetLanguage: "en" });
+  assert.ok(calls.length > 0);
+  assert.match(translated, /Exusiai weapon replacement/);
+});
+
+test("translates both parts of the Armory title and keeps its stylized name and parentheses", async () => {
+  const calls = [];
+  const translated = await translateWorkshopText("BlueWatery Armory (Gun SFX)", async (text) => {
+    calls.push(text);
+    return { Armory: "(军械库)", "Gun SFX": "（枪械音效））" }[text];
+  }, { isTitle: true, targetLanguage: "zh-Hans" });
+  assert.deepEqual(calls, ["Armory", "Gun SFX"]);
+  assert.equal(translated, "BlueWatery 军械库 (枪械音效)");
+});
+
+test("provider punctuation cannot alter original mixed, nested, or unbalanced parentheses", async () => {
+  const translations = {
+    Armory: ")军械库）",
+    "Gun SFX": "（枪械音效))",
+    "Extra Maps": "(额外地图）",
+  };
+  for (const [original, expected] of [
+    ["(Armory) NightOps （Gun SFX）", "(军械库) NightOps （枪械音效）"],
+    ["NightOps Armory (Gun SFX （Extra Maps）)", "NightOps 军械库 (枪械音效 （额外地图）)"],
+    ["NightOps Armory) (Gun SFX", "NightOps 军械库) (枪械音效"],
+  ]) {
+    const translated = await translateWorkshopText(original, async (text) => {
+      assert.ok(Object.hasOwn(translations, text), `unexpected provider input: ${text}`);
+      return translations[text];
+    }, { isTitle: true, targetLanguage: "zh-Hans" });
+    assert.equal(translated, expected);
+    assert.deepEqual(translated.match(/[()（）]/g), original.match(/[()（）]/g));
+  }
+  assert.equal(await translateWorkshopText(
+    "Weapon overhaul",
+    async () => "武器)改造",
+    { isTitle: true, targetLanguage: "zh-Hans" },
+  ), "Weapon overhaul");
+});
+
 function element(text = "") {
   let listener;
   let ownText = text;
@@ -184,6 +269,42 @@ test("a failed title translation leaves the original title and keeps successful 
   assert.equal(isHidden(fixture.results[0]), false);
   assert.equal(isHidden(fixture.originals[0]), false);
   assert.match(fixture.button.textContent, /查看原文/);
+});
+
+test("the screenshot title is not sent to the provider and the description stays bilingual", async (t) => {
+  const title = "【蔚蓝档案/blue archive】和乐千世[Waraku Chise]官模改UZI";
+  const fixture = bindDetail(t, {
+    title,
+    description: "[b]Original description[/b]",
+    translate(text) {
+      assert.equal(text, "Original description");
+      return "描述译文";
+    },
+  });
+  await fixture.button.click();
+  assert.deepEqual(fixture.calls, ["Original description"]);
+  assert.equal(fixture.heading.textContent, title);
+  assert.equal(isHidden(fixture.originalTitle), true);
+  assert.equal(isHidden(fixture.originals[0]), false);
+  assert.equal(fixture.results[0].textContent, "描述译文");
+  assert.match(fixture.button.textContent, /查看原文/);
+});
+
+test("a provider response in the wrong language never replaces the title", async (t) => {
+  const title = "Weapon overhaul";
+  const fixture = bindDetail(t, {
+    title,
+    description: "Original description",
+    translate(text) {
+      return text === title ? "Completely different English output" : "描述译文";
+    },
+  });
+  await fixture.button.click();
+  assert.deepEqual([...fixture.calls].sort(), ["Original description", title]);
+  assert.equal(fixture.heading.textContent, title);
+  assert.equal(isHidden(fixture.originalTitle), true);
+  assert.equal(isHidden(fixture.originals[0]), false);
+  assert.equal(fixture.results[0].textContent, "描述译文");
 });
 
 test("a failed paragraph keeps its original alongside the bilingual successful paragraph", async (t) => {

@@ -3,6 +3,8 @@ import { translateWorkshopText } from "./detail-translation-text.js";
 import { escapeHtml, getWorkshopItemId } from "./utils.js";
 
 const translationCache = new Map();
+// The existing Wails translation endpoint uses Simplified Chinese for every provider.
+const WORKSHOP_TRANSLATION_TARGET = "zh-Hans";
 
 export function splitDescriptionParagraphs(text) {
   return String(text || "")
@@ -102,7 +104,7 @@ export function bindWorkshopDetailTranslation(detailView, detail, isCurrentDetai
             throw new Error("翻译服务已更改，请重试");
           }
           return result?.text;
-        }, { isTitle, isCurrent });
+        }, { isTitle, targetLanguage: WORKSHOP_TRANSLATION_TARGET, isCurrent });
         const changed = normalizeText(translated) === normalizeText(text) ? "" : translated;
         if (isCurrent()) translationCache.set(key, changed);
         return changed;
