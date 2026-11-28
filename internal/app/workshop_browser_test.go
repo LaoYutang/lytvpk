@@ -10,6 +10,7 @@ import (
 
 // 校验 /detail 默认轻量（不查询多图预览）、带 with_previews 才返回完整图集，以及两套缓存的隔离
 func TestFetchWorkshopDetailPreviews(t *testing.T) {
+	const workshopID = "18446744073709551615"
 	var mu sync.Mutex
 	var gotQueries []string
 
@@ -20,7 +21,7 @@ func TestFetchWorkshopDetailPreviews(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"response":{"publishedfiledetails":[{
-			"publishedfileid":"123456",
+			"publishedfileid":"` + workshopID + `",
 			"title":"Test Mod",
 			"preview_url":"https://images.steamusercontent.com/main.jpg",
 			"previews":[{"preview_url":"https://images.steamusercontent.com/1.jpg","preview_type":0}],
@@ -34,19 +35,23 @@ func TestFetchWorkshopDetailPreviews(t *testing.T) {
 	app := &App{}
 
 	// 1) 默认（轻量）：不带 with_previews
-	if _, err := app.fetchWorkshopDetailRaw("123456", false, false); err != nil {
+	if _, err := app.fetchWorkshopDetailRaw(workshopID, false, false); err != nil {
 		t.Fatalf("默认轻量模式请求失败: %v", err)
 	}
 	// 2) 完整模式：带 with_previews=1，且不能命中轻量缓存
-	if _, err := app.fetchWorkshopDetailRaw("123456", false, true); err != nil {
+	detail, err := app.FetchWorkshopDetail(workshopID)
+	if err != nil {
 		t.Fatalf("完整模式请求失败: %v", err)
 	}
+	if detail.PublishedFileId != workshopID {
+		t.Errorf("工坊 ID 应保留完整字符串，实际 %q", detail.PublishedFileId)
+	}
 	// 3) 再次完整模式：命中完整缓存，不再发请求
-	if _, err := app.fetchWorkshopDetailRaw("123456", false, true); err != nil {
+	if _, err := app.FetchWorkshopDetail(workshopID); err != nil {
 		t.Fatalf("完整模式缓存命中失败: %v", err)
 	}
 	// 4) 再次默认模式：命中轻量缓存，不再发请求
-	if _, err := app.fetchWorkshopDetailRaw("123456", false, false); err != nil {
+	if _, err := app.fetchWorkshopDetailRaw(workshopID, false, false); err != nil {
 		t.Fatalf("默认模式缓存命中失败: %v", err)
 	}
 
@@ -62,7 +67,7 @@ func TestFetchWorkshopDetailPreviews(t *testing.T) {
 	if !strings.Contains(gotQueries[1], "with_previews=1") {
 		t.Errorf("完整模式应带 with_previews=1，实际 query: %q", gotQueries[1])
 	}
-	if !strings.Contains(gotQueries[1], "id=123456") {
+	if !strings.Contains(gotQueries[1], "id="+workshopID) {
 		t.Errorf("完整模式应带 id，实际 query: %q", gotQueries[1])
 	}
 }

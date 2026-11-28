@@ -1110,6 +1110,28 @@ html.dark-mode .workshop-type-toggle-btn.active {
   margin-top: 4px;
 }
 
+.detail-stat-copy {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.detail-stat-copy:hover,
+.detail-stat-copy:focus-visible {
+  background: var(--bg-hover);
+}
+
+.detail-stat-copy:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.detail-stat-copy .stat-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
 .detail-tags-row {
   display: flex;
   flex-wrap: wrap;

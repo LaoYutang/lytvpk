@@ -4,6 +4,7 @@ export const workshopDeps = {
   showError: undefined,
   BrowserOpenURL: undefined,
   ClipboardGetText: undefined,
+  ClipboardSetText: undefined,
   FetchWorkshopList: undefined,
   FetchWorkshopDetail: undefined,
   TranslateWorkshopDescription: undefined,
