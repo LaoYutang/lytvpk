@@ -361,7 +361,7 @@ func (a *App) translateWorkshopDescriptionWithCustom(text string) (string, error
 		"messages": []map[string]string{
 			{
 				"role":    "system",
-				"content": "你是一位专业的翻译助手。请将以下英文内容翻译成中文，保持语义准确、语言自然流畅。直接返回翻译结果，不要添加解释或额外内容。",
+				"content": "你是一位专业的翻译助手。请将以下文本翻译成简体中文，保留角色名、武器型号和技术标签。直接返回翻译结果，不要添加解释或额外内容。",
 			},
 			{
 				"role":    "user",
