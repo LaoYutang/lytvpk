@@ -7,7 +7,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func commitDropVPK(tempPath, destPath string) error {
+func commitDropFile(tempPath, destPath string) error {
 	from, err := dropMovePath(tempPath)
 	if err != nil {
 		return err

@@ -144,6 +144,13 @@ func openDroppedVPK(root *os.Root, rel string) (*os.File, error) {
 	if !fs.ValidPath(rel) || !strings.EqualFold(path.Ext(rel), ".vpk") {
 		return nil, fmt.Errorf("无效的 VPK 相对路径: %s", rel)
 	}
+	return openDroppedFolderFile(root, rel)
+}
+
+func openDroppedFolderFile(root *os.Root, rel string) (*os.File, error) {
+	if !fs.ValidPath(rel) {
+		return nil, fmt.Errorf("无效的文件相对路径: %s", rel)
+	}
 	localPath, err := filepath.Localize(rel)
 	if err != nil {
 		return nil, err
@@ -157,7 +164,7 @@ func openDroppedVPK(root *os.Root, rel string) (*os.File, error) {
 			return nil, err
 		}
 		if isDroppedLinkMode(info.Mode()) || !info.IsDir() {
-			return nil, fmt.Errorf("VPK 所在的目录已变更: %s", parent)
+			return nil, fmt.Errorf("文件所在的目录已变更: %s", parent)
 		}
 	}
 	info, err := root.Lstat(localPath)
@@ -165,7 +172,7 @@ func openDroppedVPK(root *os.Root, rel string) (*os.File, error) {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("VPK 已变更或不是普通文件: %s", rel)
+		return nil, fmt.Errorf("文件已变更或不是普通文件: %s", rel)
 	}
 	file, err := root.Open(localPath)
 	if err != nil {
@@ -178,7 +185,7 @@ func openDroppedVPK(root *os.Root, rel string) (*os.File, error) {
 	}
 	if !openedInfo.Mode().IsRegular() || !os.SameFile(info, openedInfo) {
 		file.Close()
-		return nil, fmt.Errorf("VPK 已变更，请重新拖入: %s", rel)
+		return nil, fmt.Errorf("文件已变更，请重新拖入: %s", rel)
 	}
 	return file, nil
 }

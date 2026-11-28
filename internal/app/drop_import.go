@@ -92,7 +92,10 @@ func (a *App) runDropImport(jobs []dropImportJob, addonsDir string) DropImportRe
 		Total: len(jobs),
 		Items: make([]DropImportItemResult, 0, len(jobs)),
 	}
-	existingNames := make(map[string]bool)
+	folders := dropFolderImportState{
+		existingNames: make(map[string]bool),
+		sidecars:      make(map[string]droppedDirectorySidecars),
+	}
 	var namesRead bool
 	var namesErr error
 
@@ -102,13 +105,13 @@ func (a *App) runDropImport(jobs []dropImportJob, addonsDir string) DropImportRe
 			var entries []os.DirEntry
 			entries, namesErr = os.ReadDir(addonsDir)
 			for _, entry := range entries {
-				existingNames[strings.ToUpper(entry.Name())] = true
+				folders.existingNames[strings.ToUpper(entry.Name())] = true
 			}
 		}
 		if job.folder != "" && job.err == nil && namesErr != nil {
 			job.err = fmt.Errorf("无法读取 addons 目录: %w", namesErr)
 		}
-		item := a.handleDroppedPath(index+1, len(jobs), job, addonsDir, existingNames)
+		item := a.handleDroppedPath(index+1, len(jobs), job, addonsDir, &folders)
 		result.Items = append(result.Items, item)
 		if item.Success {
 			result.Succeeded++
@@ -116,7 +119,7 @@ func (a *App) runDropImport(jobs []dropImportJob, addonsDir string) DropImportRe
 				result.HasInstallChanges = true
 			}
 			if namesRead && item.OutputPath != "" {
-				existingNames[strings.ToUpper(filepath.Base(item.OutputPath))] = true
+				folders.existingNames[strings.ToUpper(filepath.Base(item.OutputPath))] = true
 			}
 		} else if item.Skipped {
 			result.Skipped++
@@ -131,7 +134,7 @@ func (a *App) runDropImport(jobs []dropImportJob, addonsDir string) DropImportRe
 	return result
 }
 
-func (a *App) handleDroppedPath(current int, total int, job dropImportJob, addonsDir string, existingNames map[string]bool) DropImportItemResult {
+func (a *App) handleDroppedPath(current int, total int, job dropImportJob, addonsDir string, folders *dropFolderImportState) DropImportItemResult {
 	targetPath := job.path
 	item := DropImportItemResult{
 		Path: targetPath,
@@ -186,13 +189,14 @@ func (a *App) handleDroppedPath(current int, total int, job dropImportJob, addon
 	switch kind {
 	case dropImportKindVPK:
 		var outputPath string
+		var sidecarSummary string
 		if job.folder == "" {
 			outputPath, err = installVPKFile(targetPath, addonsDir, progress("copying"))
 		} else {
-			outputPath, err = installFolderVPK(job, addonsDir, existingNames, progress("copying"))
+			outputPath, sidecarSummary, err = folders.installVPK(job, addonsDir, progress("copying"))
 		}
 		item.OutputPath = outputPath
-		if job.folder != "" && errors.Is(err, errDropVPKExists) {
+		if job.folder != "" && errors.Is(err, errDropTargetExists) {
 			item.Skipped = true
 			item.Message = "addons 中已有同名文件，已跳过"
 			a.emitDropImportProgress(current, total, item, 100, "complete", item.Message)
@@ -205,6 +209,9 @@ func (a *App) handleDroppedPath(current int, total int, job dropImportJob, addon
 		}
 		item.Success = true
 		item.Message = "VPK 安装完成"
+		if sidecarSummary != "" {
+			item.Message += "，" + sidecarSummary
+		}
 	case dropImportKindArchive:
 		err := a.extractVPKFromArchiveWithProgress(targetPath, addonsDir, archiveProgress("extracting"))
 		if err != nil {
@@ -285,10 +292,10 @@ func installVPKFile(srcPath, addonsDir string, progress dropImportProgressFunc) 
 		return "", err
 	}
 	defer src.Close()
-	return copyDroppedVPK(src, srcPath, addonsDir, replaceFile, progress)
+	return copyDroppedFile(src, filepath.Join(addonsDir, filepath.Base(srcPath)), replaceFile, progress)
 }
 
-func copyDroppedVPK(src *os.File, srcPath, addonsDir string, commit func(string, string) error, progress dropImportProgressFunc) (string, error) {
+func copyDroppedFile(src *os.File, destPath string, commit func(string, string) error, progress dropImportProgressFunc) (string, error) {
 	emit := func(percent int, message string) {
 		if progress != nil {
 			progress(percent, message)
@@ -300,8 +307,8 @@ func copyDroppedVPK(src *os.File, srcPath, addonsDir string, commit func(string,
 		return "", err
 	}
 
-	destPath := filepath.Join(addonsDir, filepath.Base(srcPath))
-	dst, err := os.CreateTemp(addonsDir, "."+filepath.Base(srcPath)+".tmp-*")
+	name := filepath.Base(destPath)
+	dst, err := os.CreateTemp(filepath.Dir(destPath), "."+name+".tmp-*")
 	if err != nil {
 		return "", err
 	}
@@ -313,11 +320,11 @@ func copyDroppedVPK(src *os.File, srcPath, addonsDir string, commit func(string,
 		return destPath, failErr
 	}
 
-	emit(0, fmt.Sprintf("正在复制: %s", filepath.Base(srcPath)))
+	emit(0, fmt.Sprintf("正在复制: %s", name))
 	var copied int64
 	if err := copyStreamWithProgress(dst, src, func(delta int64) {
 		copied += delta
-		emit(scaledProgressPercent(0, 100, copied, info.Size()), fmt.Sprintf("正在复制: %s", filepath.Base(srcPath)))
+		emit(scaledProgressPercent(0, 100, copied, info.Size()), fmt.Sprintf("正在复制: %s", name))
 	}); err != nil {
 		return abort(err)
 	}
@@ -328,8 +335,8 @@ func copyDroppedVPK(src *os.File, srcPath, addonsDir string, commit func(string,
 		return destPath, err
 	}
 
-	log.Printf("已安装: %s -> %s", srcPath, destPath)
-	emit(100, fmt.Sprintf("已复制: %s", filepath.Base(destPath)))
+	log.Printf("已安装: %s -> %s", src.Name(), destPath)
+	emit(100, fmt.Sprintf("已复制: %s", name))
 	return destPath, nil
 }
 

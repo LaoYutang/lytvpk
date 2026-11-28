@@ -117,7 +117,7 @@ async function planDroppedItems(paths, { folders, addonsDir }) {
       showError(`${folderName}：请先设置游戏 addons 目录`, 7000);
       continue;
     }
-    const folderAction = await chooseDroppedFolderAction(folder, addonsDir);
+    const folderAction = await chooseDroppedFolderAction(folder, Boolean(addonsDir));
     if (folderAction) items.push({ path, folderAction, vpkPaths: folder.vpkPaths });
   }
   return items;

@@ -1,11 +1,15 @@
 package app
 
 import (
+	"bytes"
+	"image"
+	"image/jpeg"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"l4d2-manager-next/pkg/valve/vpk"
@@ -98,6 +102,130 @@ func TestHandlePlannedFileDropImportsFolderWithoutOverwriting(t *testing.T) {
 	assertDropFolderEntries(t, addons, 4)
 }
 
+func TestHandlePlannedFileDropRestoresExportedSidecars(t *testing.T) {
+	base := t.TempDir()
+	addons := filepath.Join(base, "addons")
+	if err := os.Mkdir(addons, 0755); err != nil {
+		t.Fatal(err)
+	}
+	collection := filepath.Join(base, "collection")
+	nested := filepath.Join(collection, "nested")
+	writeLocalScanVPK(t, filepath.Join(nested, "Exported.Mod.VPK"), "")
+	meta := WorkshopMeta{WorkshopID: "123456", Title: "Exported title"}
+	if err := writeWorkshopMeta(filepath.Join(nested, "eXPORTED.mOD.vpk"), meta); err != nil {
+		t.Fatal(err)
+	}
+	var jpegData bytes.Buffer
+	if err := jpeg.Encode(&jpegData, image.NewGray(image.Rect(0, 0, 1, 1)), nil); err != nil {
+		t.Fatal(err)
+	}
+	writeDropFolderFixture(t, filepath.Join(nested, "eXPORTED.mOD.JPG"), jpegData.String())
+	writeDropFolderFixture(t, filepath.Join(nested, "Exported.Mod.webp"), "unsupported")
+	writeDropFolderFixture(t, filepath.Join(nested, "Exported.Mod.txt"), "unrelated")
+	writeDropFolderFixture(t, filepath.Join(collection, "Exported.Mod.meta"), "different directory")
+	writeDropFolderFixture(t, filepath.Join(collection, "Exported.Mod.jpg"), "different directory")
+	writeDropFolderFixture(t, filepath.Join(collection, "bare.vpk"), "no matching files")
+	writeDropFolderFixture(t, filepath.Join(nested, "bare.meta"), "different directory")
+	writeDropFolderFixture(t, filepath.Join(nested, "bare.jpg"), "different directory")
+
+	app := &App{rootDir: addons}
+	inspection := app.InspectDroppedFolders([]string{collection})
+	if len(inspection.Folders) != 1 || inspection.Folders[0].Error != "" {
+		t.Fatalf("unexpected inspection: %+v", inspection)
+	}
+	result, err := app.HandlePlannedFileDrop([]DropImportRequest{{
+		Path: collection, FolderAction: "import", VPKPaths: inspection.Folders[0].VPKPaths,
+	}}, inspection.AddonsDir)
+	if err != nil || result.Succeeded != 2 || result.Failed != 0 {
+		t.Fatalf("folder VPKs and export sidecars were not imported: %+v (%v)", result, err)
+	}
+
+	assertDropFolderEntries(t, addons, 4)
+	assertFileContent(t, filepath.Join(addons, "Exported.Mod.jpg"), jpegData.String())
+	assertFileContent(t, filepath.Join(addons, "bare.vpk"), "no matching files")
+	cache, err := scanVPKFile(filepath.Join(addons, "Exported.Mod.VPK"), vpkScanOptions{rootDir: addons, metaEnabled: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache.File.Title != meta.Title || cache.File.WorkshopID != meta.WorkshopID ||
+		!strings.HasPrefix(cache.File.PreviewImage, "data:image/jpeg;base64,") {
+		t.Fatalf("installed mod preview or metadata was not visible to the scanner: %+v", cache.File)
+	}
+}
+
+func TestHandlePlannedFileDropPreservesConflictingSidecars(t *testing.T) {
+	base := t.TempDir()
+	addons := filepath.Join(base, "addons")
+	collection := filepath.Join(base, "collection")
+	writeDropFolderFixture(t, filepath.Join(addons, "installed.vpk"), "installed VPK")
+	writeDropFolderFixture(t, filepath.Join(addons, "installed.meta"), "installed metadata")
+	writeDropFolderFixture(t, filepath.Join(addons, "fresh.META"), "existing metadata")
+	writeDropFolderFixture(t, filepath.Join(addons, "with-preview.JPG"), "existing preview")
+	writeDropFolderFixture(t, filepath.Join(collection, "installed.VPK"), "different VPK")
+	writeDropFolderFixture(t, filepath.Join(collection, "installed.meta"), "different metadata")
+	writeDropFolderFixture(t, filepath.Join(collection, "installed.jpg"), "different preview")
+	writeDropFolderFixture(t, filepath.Join(collection, "fresh.vpk"), "fresh VPK")
+	writeDropFolderFixture(t, filepath.Join(collection, "fresh.meta"), "fresh metadata")
+	writeDropFolderFixture(t, filepath.Join(collection, "fresh.jpg"), "fresh preview")
+	writeDropFolderFixture(t, filepath.Join(collection, "with-preview.vpk"), "other VPK")
+	writeDropFolderFixture(t, filepath.Join(collection, "with-preview.meta"), "other metadata")
+	writeDropFolderFixture(t, filepath.Join(collection, "with-preview.jpg"), "other preview")
+
+	app := &App{rootDir: addons}
+	result, err := app.HandlePlannedFileDrop([]DropImportRequest{{
+		Path: collection, FolderAction: "import", VPKPaths: []string{"installed.VPK", "fresh.vpk", "with-preview.vpk"},
+	}}, addons)
+	if err != nil || result.Total != 3 || result.Succeeded != 2 || result.Skipped != 1 || result.Failed != 0 {
+		t.Fatalf("unexpected result: %+v (%v)", result, err)
+	}
+	for index, sidecar := range []string{"fresh.meta", "with-preview.jpg"} {
+		item := result.Items[index+1]
+		if !item.Success || !strings.Contains(item.Message, "跳过") || !strings.Contains(strings.ToLower(item.Message), sidecar) {
+			t.Errorf("conflict should be visible for %s: %+v", sidecar, item)
+		}
+	}
+	assertFileContent(t, filepath.Join(addons, "installed.vpk"), "installed VPK")
+	assertFileContent(t, filepath.Join(addons, "installed.meta"), "installed metadata")
+	assertFileContent(t, filepath.Join(addons, "fresh.META"), "existing metadata")
+	assertFileContent(t, filepath.Join(addons, "fresh.vpk"), "fresh VPK")
+	assertFileContent(t, filepath.Join(addons, "fresh.jpg"), "fresh preview")
+	assertFileContent(t, filepath.Join(addons, "with-preview.JPG"), "existing preview")
+	assertFileContent(t, filepath.Join(addons, "with-preview.vpk"), "other VPK")
+	assertFileContent(t, filepath.Join(addons, "with-preview.meta"), "other metadata")
+	assertDropFolderEntries(t, addons, 8)
+}
+
+func TestHandlePlannedFileDropSkipsLinkedSidecars(t *testing.T) {
+	base := t.TempDir()
+	addons := filepath.Join(base, "addons")
+	if err := os.Mkdir(addons, 0755); err != nil {
+		t.Fatal(err)
+	}
+	collection := filepath.Join(base, "collection")
+	outside := filepath.Join(base, "outside.meta")
+	inside := filepath.Join(collection, "unrelated.jpg")
+	writeDropFolderFixture(t, filepath.Join(collection, "mod.vpk"), "VPK")
+	writeDropFolderFixture(t, outside, "outside metadata")
+	writeDropFolderFixture(t, inside, "different photo")
+	for link, target := range map[string]string{"mod.meta": outside, "mod.jpg": inside} {
+		if err := os.Symlink(target, filepath.Join(collection, link)); err != nil {
+			t.Skipf("file symlinks unavailable: %v", err)
+		}
+	}
+
+	app := &App{rootDir: addons}
+	result, err := app.HandlePlannedFileDrop([]DropImportRequest{{
+		Path: collection, FolderAction: "import", VPKPaths: []string{"mod.vpk"},
+	}}, addons)
+	if err != nil || result.Succeeded != 1 || result.Failed != 0 {
+		t.Fatalf("a sidecar link should not prevent the VPK import: %+v (%v)", result, err)
+	}
+	assertFileContent(t, filepath.Join(addons, "mod.vpk"), "VPK")
+	assertDropFolderEntries(t, addons, 1)
+	assertFileContent(t, outside, "outside metadata")
+	assertFileContent(t, inside, "different photo")
+}
+
 func TestHandlePlannedFileDropPacksSourceAndMixedFolders(t *testing.T) {
 	base := t.TempDir()
 	addons := filepath.Join(base, "addons")
@@ -107,8 +235,10 @@ func TestHandlePlannedFileDropPacksSourceAndMixedFolders(t *testing.T) {
 	source := filepath.Join(base, "source")
 	mixed := filepath.Join(base, "mixed")
 	writeDropFolderFixture(t, filepath.Join(source, "scripts", "mod.txt"), "source script")
-	writeDropFolderFixture(t, filepath.Join(mixed, "materials", "mod.vmt"), "mixed resource")
+	writeDropFolderFixture(t, filepath.Join(mixed, "materials", "existing.jpg"), "resource from a different directory")
 	writeDropFolderFixture(t, filepath.Join(mixed, "nested", "existing.VPK"), "existing")
+	writeDropFolderFixture(t, filepath.Join(mixed, "nested", "EXISTING.Meta"), "sidecar metadata")
+	writeDropFolderFixture(t, filepath.Join(mixed, "nested", "EXISTING.JPG"), "sidecar preview")
 	direct := filepath.Join(base, "direct.vpk")
 	writeDropFolderFixture(t, direct, "direct")
 
@@ -125,7 +255,7 @@ func TestHandlePlannedFileDropPacksSourceAndMixedFolders(t *testing.T) {
 		t.Fatalf("unexpected pack result: %+v", result)
 	}
 	assertDroppedArchiveEntry(t, filepath.Join(addons, "source.vpk"), "scripts/mod.txt", "source script")
-	assertDroppedArchiveEntry(t, filepath.Join(addons, "mixed.vpk"), "materials/mod.vmt", "mixed resource")
+	assertDroppedArchiveEntry(t, filepath.Join(addons, "mixed.vpk"), "materials/existing.jpg", "resource from a different directory")
 	assertFileContent(t, filepath.Join(addons, "direct.vpk"), "direct")
 	assertDropFolderEntries(t, addons, 3)
 }

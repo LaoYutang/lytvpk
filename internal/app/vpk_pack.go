@@ -52,10 +52,10 @@ func (a *App) packVPKDirectoryWithProgress(sourceDir string, outputDir string, o
 }
 
 func (a *App) packVPKDirectoryWithOptions(sourceDir string, outputDir string, outputIsAddons bool, outputBaseName string, progress vpkPackProgressFunc) (VPKPackResult, error) {
-	return a.packVPKDirectory(sourceDir, outputDir, outputIsAddons, outputBaseName, false, progress)
+	return a.packVPKDirectory(sourceDir, outputDir, outputIsAddons, outputBaseName, nil, progress)
 }
 
-func (a *App) packVPKDirectory(sourceDir, outputDir string, outputIsAddons bool, outputBaseName string, excludeVPKs bool, progress vpkPackProgressFunc) (VPKPackResult, error) {
+func (a *App) packVPKDirectory(sourceDir, outputDir string, outputIsAddons bool, outputBaseName string, skipFile func(string) bool, progress vpkPackProgressFunc) (VPKPackResult, error) {
 	result := VPKPackResult{OutputIsAddons: outputIsAddons}
 
 	sourceDir = strings.TrimSpace(sourceDir)
@@ -117,15 +117,14 @@ func (a *App) packVPKDirectory(sourceDir, outputDir string, outputIsAddons bool,
 		if !d.Type().IsRegular() {
 			return nil
 		}
-		if excludeVPKs && strings.EqualFold(filepath.Ext(d.Name()), ".vpk") {
-			return nil
-		}
-
 		rel, relErr := filepath.Rel(sourceDir, p)
 		if relErr != nil {
 			return fmt.Errorf("无法计算相对路径 %s: %v", p, relErr)
 		}
 		rel = filepath.ToSlash(rel)
+		if skipFile != nil && skipFile(rel) {
+			return nil
+		}
 
 		info, infoErr := d.Info()
 		if infoErr != nil {

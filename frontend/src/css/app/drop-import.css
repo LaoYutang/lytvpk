@@ -17,49 +17,103 @@
 }
 
 .drop-folder-dialog {
-  width: min(560px, calc(100% - 32px));
-  max-height: calc(100% - 32px);
-  padding: 20px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--bg-surface);
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(34rem, calc(100vw - 2rem));
+  height: fit-content;
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-2xl);
+  background: var(--bg-app);
   color: var(--text-primary);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.24);
-  overflow: auto;
+  box-shadow: var(--shadow-2xl);
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
 .drop-folder-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
 }
 
-.drop-folder-dialog h2 {
-  margin: 0 0 12px;
-  font-size: 1.15rem;
+.drop-folder-dialog form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem - 2px);
 }
 
-.drop-folder-dialog p {
-  margin: 8px 0;
+.drop-folder-header {
+  padding: var(--spacing-5) var(--spacing-6);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+.drop-folder-header h2 {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: var(--leading-tight);
+}
+
+.drop-folder-body {
+  display: grid;
+  gap: var(--spacing-3);
+  min-height: 0;
+  padding: var(--spacing-5) var(--spacing-6);
+  overflow: auto;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
 .drop-folder-files {
-  max-height: min(32vh, 240px);
-  margin: 10px 0;
-  padding: 10px 12px;
+  max-height: min(38dvh, 16rem);
+  padding: var(--spacing-3);
   overflow: auto;
+  overscroll-behavior: contain;
   white-space: pre-wrap;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.65;
+}
+
+.drop-folder-files:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .drop-folder-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-6);
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-surface);
+}
+
+@media (max-width: 440px) {
+  .drop-folder-header,
+  .drop-folder-body,
+  .drop-folder-actions {
+    padding: var(--spacing-4);
+  }
+
+  .drop-folder-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drop-folder-actions .btn {
+    white-space: normal;
+  }
+
+  .drop-folder-actions .btn:nth-child(3) {
+    grid-column: 1 / -1;
+  }
 }
 
 .drop-import-header {
