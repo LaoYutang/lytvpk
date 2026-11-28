@@ -27,6 +27,12 @@ const { loadWorkshopList } = await import(listURL);
 const { openWorkshopDetail } = await import(detailURL);
 hooks.deregister();
 
+const gridWidth = 700;
+const rowGap = 20;
+const cardHeight = 100;
+let gridColumns;
+let resizeCallbacks;
+
 class Element {
   constructor(tag = "div") {
     this.tagName = tag;
@@ -47,20 +53,62 @@ class Element {
     this.dataset = {};
     this.style = {};
     this.disabled = false;
-    this.scrollHeight = 1000;
     this.scrollTop = 0;
+    this.clientTop = 0;
     this.clientHeight = 200;
   }
   set className(value) { this.classes = new Set(value.split(/\s+/).filter(Boolean)); }
   get className() { return [...this.classes].join(" "); }
   get childNodes() { return this.children; }
+  get nextSibling() {
+    const siblings = this.parentElement?.children;
+    return siblings?.[siblings.indexOf(this) + 1] || null;
+  }
   set textContent(value) { this.replaceChildren(); this.text = String(value); }
   get textContent() { return (this.text || this.html?.replace(/<[^>]*>/g, "") || "") + this.children.map((child) => child.textContent).join(""); }
   set innerHTML(value) { this.replaceChildren(); this.html = value; }
   get innerHTML() { return this.html || this.children.map((child) => child.textContent).join(""); }
   get isConnected() { return this === document.body || Boolean(this.parentElement?.isConnected); }
+  set scrollHeight(value) { this.scrollHeightOverride = value; }
+  get scrollHeight() {
+    if (this.scrollHeightOverride !== undefined) return this.scrollHeightOverride;
+    return Math.max(this.clientHeight, this.querySelector(".workshop-grid")?.getBoundingClientRect().height || 0);
+  }
+  getGridHeight() {
+    const heights = [];
+    let cards = 0;
+    for (const child of this.children) {
+      if (child.classList.contains("workshop-card")) {
+        if (cards % gridColumns === 0) heights.push(cardHeight);
+        cards++;
+      } else {
+        heights.push(child.getBoundingClientRect().height);
+        cards = 0;
+      }
+    }
+    return heights.reduce((sum, height) => sum + height, Math.max(0, heights.length - 1) * rowGap);
+  }
+  getBoundingClientRect() {
+    const isCard = this.classList.contains("workshop-card");
+    const isGrid = this.classList.contains("workshop-grid");
+    const width = isCard ? (gridWidth - (gridColumns - 1) * rowGap) / gridColumns : gridWidth;
+    let height = Number.parseFloat(this.style.height) || this.clientHeight;
+    if (isCard) height = cardHeight;
+    if (isGrid) height = this.getGridHeight();
+    const top = isGrid ? -(this.closest("#browser-scroll-container")?.scrollTop || 0) : 0;
+    return { x: 0, y: top, top, left: 0, right: width, bottom: top + height, width, height };
+  }
   append(...nodes) { nodes.forEach((node) => this.appendChild(node)); }
-  appendChild(node) { node.remove(); node.parentElement = this; this.children.push(node); return node; }
+  appendChild(node) { return this.insertBefore(node, null); }
+  insertBefore(node, reference) {
+    if (node === reference) return node;
+    node.remove();
+    const index = reference === null ? this.children.length : this.children.indexOf(reference);
+    assert.notEqual(index, -1, "reference node must be a child");
+    node.parentElement = this;
+    this.children.splice(index, 0, node);
+    return node;
+  }
   remove() {
     if (this.parentElement) this.parentElement.children.splice(this.parentElement.children.indexOf(this), 1);
     this.parentElement = null;
@@ -103,6 +151,8 @@ test.beforeEach(() => {
   elements = new Map();
   frames = [];
   navigations = [];
+  gridColumns = 3;
+  resizeCallbacks = [];
   sortItems = new Map(["relevance", "trend", "recent", "top", "subs"].map((sort) => {
     const node = new Element("li");
     node.dataset.sort = sort;
@@ -127,6 +177,11 @@ test.beforeEach(() => {
     querySelectorAll: (selector) => selector === "#browser-sort-list .filter-item" ? [...sortItems.values()] : [],
   };
   globalThis.requestAnimationFrame = (callback) => { frames.push(callback); };
+  globalThis.getComputedStyle = () => ({ gridTemplateColumns: Array(gridColumns).fill("220px").join(" "), rowGap: `${rowGap}px` });
+  globalThis.ResizeObserver = class {
+    constructor(callback) { resizeCallbacks.push(callback); }
+    observe() {}
+  };
   setAPILineState("primary");
   resetWorkshopPaging();
   Object.assign(browserState, { loading: false, query: "", sort: "trend", tags: [], filetype: "0" });
@@ -135,12 +190,19 @@ test.beforeEach(() => {
   workshopDeps.FetchWorkshopDetail = async (id) => item(id);
   workshopDeps.switchAppPage = (page) => { navigations.push(page); };
   element("browser-body").className = "browser-body";
-  element("browser-body").append(element("browser-detail-view"));
+  element("browser-body").append(element("browser-scroll-container"), element("browser-detail-view"));
+  element("browser-grid").className = "workshop-grid";
+  element("browser-scroll-container").append(element("browser-grid"), element("browser-loading"), element("browser-load-more"));
   element("browser-detail-view").classList.add("hidden");
   ready.forEach((callback) => callback());
 });
 test.afterEach(() => { setAPILineState(getAPILineSnapshot().line === "primary" ? "backup" : "primary"); });
-test.after(() => { delete globalThis.document; delete globalThis.requestAnimationFrame; });
+test.after(() => {
+  delete globalThis.document;
+  delete globalThis.requestAnimationFrame;
+  delete globalThis.getComputedStyle;
+  delete globalThis.ResizeObserver;
+});
 
 function element(id) { return document.getElementById(id); }
 function item(id, title = id) { return { publishedfileid: id, title, tags: [], description: "" }; }
@@ -361,15 +423,20 @@ test("pagination errors retain cards and retry the failed page without skipping 
 test("initial loading and successive append requests use distinct modes without replacing cards or scrolling", async () => {
   let pending = Promise.withResolvers();
   workshopDeps.FetchWorkshopList = () => pending.promise;
+  const firstItems = Array.from({ length: 20 }, (_, index) => item(`first-${index}`));
   element("browser-scroll-container").scrollTop = 150;
   const first = loadWorkshopList();
   await settle();
   assert.equal(element("browser-loading").dataset.loadingMode, "initial");
   assert.equal(element("browser-scroll-container").scrollTop, 0);
-  pending.resolve({ items: [item("first")] });
+  pending.resolve({ items: firstItems });
   await first;
+  const scroll = element("browser-scroll-container");
+  scroll.scrollTop = 250;
+  await scroll.dispatch("scroll");
+  flushFrames();
   const existing = element("browser-grid").querySelector(".workshop-card");
-  element("browser-scroll-container").scrollTop = 250;
+  const mountedCount = element("browser-grid").querySelectorAll(".workshop-card").length;
 
   for (const page of [2, 3]) {
     pending = Promise.withResolvers();
@@ -382,7 +449,8 @@ test("initial loading and successive append requests use distinct modes without 
     assert.equal(element("browser-scroll-container").scrollTop, 250);
     pending.resolve({ items: [item(String(page))] });
     await request;
-    assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, page);
+    assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, mountedCount);
+    assert.equal(browserState.data.length, firstItems.length + page - 1);
     assert.equal(element("browser-scroll-container").scrollTop, 250);
     assert.equal(element("browser-loading").classList.contains("hidden"), true);
   }
@@ -391,7 +459,14 @@ test("initial loading and successive append requests use distinct modes without 
 for (const page of [1, 2]) {
   test(`page ${page} keeps its loading mode and blocks duplicate paging while IP selection is pending`, async (t) => {
     t.mock.timers.enable({ apis: ["setInterval"] });
-    if (page === 2) await loadWorkshopList();
+    if (page === 2) {
+      workshopDeps.FetchWorkshopList = async () => ({ items: Array.from({ length: 30 }, (_, index) => item(String(index))) });
+      await loadWorkshopList();
+      const scroll = element("browser-scroll-container");
+      scroll.scrollTop = 450;
+      await scroll.dispatch("scroll");
+      flushFrames();
+    }
     const existing = element("browser-grid").children.slice();
     const pending = Promise.withResolvers();
     let selecting = true;
@@ -518,11 +593,20 @@ test("a replaced append's delayed readiness result cannot reopen an IP wait over
   assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), ["latest"]);
 });
 
-test("list pagination accepts cached 20-item pages followed by 50 items, retries and a short final page", async () => {
+test("virtualized pagination retains ordered results, retries the failed page and scrolls to the last row", async () => {
   const pages = [];
-  const firstItems = Array.from({ length: 20 }, (_, index) => item(String(index + 1)));
-  const secondItems = Array.from({ length: 50 }, (_, index) => item(String(index + 51)));
-  const lastItems = Array.from({ length: 7 }, (_, index) => item(String(index + 101)));
+  const makeItems = (first, length) => Array.from({ length }, (_, index) => {
+    const id = first + index;
+    return item(String(id), `VPK item ${id}`);
+  });
+  const firstItems = makeItems(1, 20);
+  const secondItems = makeItems(51, 50);
+  const lastItems = makeItems(101, 7);
+  const expectedIds = [...firstItems, ...secondItems, ...lastItems].map((entry) => entry.publishedfileid);
+  const grid = element("browser-grid");
+  const scroll = element("browser-scroll-container");
+  const mountedIds = () => grid.querySelectorAll(".workshop-card")
+    .map((card) => card.textContent.match(/VPK item (\d+)/)?.[1]);
   let failSecondPage = true;
   workshopDeps.FetchWorkshopList = async ({ page, filetype }) => {
     pages.push(page);
@@ -534,18 +618,32 @@ test("list pagination accepts cached 20-item pages followed by 50 items, retries
     return { items: page === 1 ? firstItems : page === 2 ? secondItems : page === 3 ? lastItems : [] };
   };
   await loadWorkshopList();
-  const existing = element("browser-grid").querySelector(".workshop-card");
   assert.equal(browserState.data.length, 20);
   assert.equal(browserState.hasMore, true, "a cached 20-item response must not end pagination");
-  browserState.page = 2;
-  await loadWorkshopList();
+
+  const oldBottom = scroll.scrollHeight - scroll.clientHeight;
+  scroll.scrollTop = oldBottom;
+  await scroll.dispatch("scroll");
+  await settle();
   assert.equal(browserState.data.length, 20);
-  await button(errorCard(), "重新查询").click();
+  assert.deepEqual(pages, [1, 2]);
+  const retryFooter = errorCard();
+  const visibleBeforeRetry = grid.querySelector(".workshop-card");
+  assert.equal(grid.children.at(-1), retryFooter, "the retry stays after the virtualized rows");
+  await button(retryFooter, "重新查询").click();
   await settle();
   assert.equal(browserState.data.length, 70);
   assert.equal(browserState.hasMore, true);
-  assert.equal(element("browser-grid").querySelector(".workshop-card"), existing);
-  assert.equal(element("browser-grid").querySelectorAll(".workshop-card").length, 70);
+  assert.equal(scroll.scrollTop, oldBottom);
+  assert.equal(grid.querySelector(".workshop-card"), visibleBeforeRetry);
+  assert.equal(grid.querySelector(".workshop-request-error"), null);
+
+  scroll.scrollTop = 0;
+  await scroll.dispatch("scroll");
+  flushFrames();
+  const first = grid.querySelector(".workshop-card");
+  assert.ok(mountedIds().length > 0 && mountedIds().length < firstItems.length);
+  assert.deepEqual(mountedIds(), expectedIds.slice(0, mountedIds().length));
   assert.equal(browserState.data[20].publishedfileid, "51", "the client appends the server response without compensating for mixed-size page gaps");
   browserState.page = 3;
   await loadWorkshopList();
@@ -555,8 +653,60 @@ test("list pagination accepts cached 20-item pages followed by 50 items, retries
   await loadWorkshopList();
   assert.equal(browserState.hasMore, false);
   assert.equal(browserState.data.length, 77);
-  assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), [...firstItems, ...secondItems, ...lastItems].map((entry) => entry.publishedfileid));
+  assert.deepEqual(browserState.data.map((entry) => entry.publishedfileid), expectedIds);
+
+  const rowCount = Math.ceil(expectedIds.length / gridColumns);
+  const totalHeight = rowCount * cardHeight + (rowCount - 1) * rowGap;
+  assert.equal(scroll.scrollHeight, totalHeight, "unmounted rows still contribute to the scrollbar range");
+  scroll.scrollTop = scroll.scrollHeight - scroll.clientHeight;
+  await scroll.dispatch("scroll");
+  flushFrames();
+  assert.ok(mountedIds().length > 0 && mountedIds().length < firstItems.length);
+  assert.deepEqual(mountedIds(), expectedIds.slice(-mountedIds().length));
+  assert.equal(first.isConnected, false);
+  assert.equal(scroll.scrollHeight, totalHeight);
   assert.deepEqual(pages, [1, 2, 2, 3, 4]);
+});
+
+test("changing column count keeps the first visible item anchored through a round trip", async () => {
+  workshopDeps.FetchWorkshopList = async () => ({
+    items: Array.from({ length: 60 }, (_, index) => item(String(index))),
+  });
+  await loadWorkshopList();
+  const scroll = element("browser-scroll-container");
+  // Row 9 starts at item 27. With two columns, item 27 shares row 13 with item 26.
+  scroll.scrollTop = 9 * (cardHeight + rowGap) + 35;
+  await scroll.dispatch("scroll");
+  gridColumns = 2;
+  resizeCallbacks.forEach((callback) => callback());
+  assert.equal(scroll.scrollTop, 13 * (cardHeight + rowGap) + 35);
+  await scroll.dispatch("scroll");
+  gridColumns = 3;
+  resizeCallbacks.forEach((callback) => callback());
+  assert.equal(scroll.scrollTop, 9 * (cardHeight + rowGap) + 35);
+});
+
+test("an append while the list is hidden restores the visible scroll position after updating the range", async () => {
+  workshopDeps.FetchWorkshopList = async ({ page }) => ({
+    items: Array.from({ length: 30 }, (_, index) => item(String(page * 100 + index))),
+  });
+  await loadWorkshopList();
+  const scroll = element("browser-scroll-container");
+  scroll.scrollTop = 530;
+  await scroll.dispatch("scroll");
+  scroll.clientHeight = 0;
+  scroll.scrollTop = 0;
+  resizeCallbacks.forEach((callback) => callback());
+
+  browserState.page = 2;
+  await loadWorkshopList();
+  scroll.clientHeight = 200;
+  scroll.scrollTop = 200;
+  // A native scroll notification can arrive before the ResizeObserver callback.
+  await scroll.dispatch("scroll");
+  resizeCallbacks.forEach((callback) => callback());
+  assert.equal(scroll.scrollTop, 530);
+  assert.equal(scroll.scrollHeight, 20 * cardHeight + 19 * rowGap);
 });
 
 test("IP-selection metadata failures show a retryable error without sending a list request", async () => {

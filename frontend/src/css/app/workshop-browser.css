@@ -707,6 +707,8 @@ html.dark-mode .workshop-type-toggle-btn.active {
 .browser-grid-container {
   flex: 1;
   overflow-y: auto;
+  /* Keep the position stable when the paging indicator or mounted rows change. */
+  overflow-anchor: none;
   padding: 24px;
 }
 
@@ -714,6 +716,19 @@ html.dark-mode .workshop-type-toggle-btn.active {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 20px;
+}
+
+.workshop-grid-spacer {
+  grid-column: 1 / -1;
+  pointer-events: none;
+}
+
+.workshop-grid-measure {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
 }
 
 /* 物品卡片 */

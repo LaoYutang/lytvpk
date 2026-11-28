@@ -1,5 +1,5 @@
 import { workshopDeps } from "./deps.js";
-import { appendInstalledBadge } from "./installed.js";
+import { appendInstalledBadge, subscribeWorkshopInstallationChange } from "./installed.js";
 import { getAPILineSnapshot, isCurrentAPILine, subscribeAPILineChange } from "../../core/api-line.js";
 import { openWorkshopDetail, resetWorkshopDetailView } from "./detail.js";
 import { createWorkshopRequestError } from "./request-error.js";
@@ -21,11 +21,13 @@ import {
   renderWatchLaterDrawer,
   setupWatchLaterDrawerListeners,
 } from "./watch-later.js";
+import { createWorkshopVirtualGrid } from "./virtual-grid.js";
 
 let browserOpenedFromWorkshopModal = false;
 let listRequestSequence = 0;
 let ipSelectionTimer;
 let searchDebounceTimer;
+let virtualGrid;
 
 subscribeAPILineChange(() => {
   listRequestSequence++;
@@ -33,10 +35,12 @@ subscribeAPILineChange(() => {
   clearTimeout(searchDebounceTimer);
   browserState.loading = false;
   resetWorkshopPaging();
-  document.getElementById("browser-grid")?.replaceChildren();
+  virtualGrid?.clear();
   document.getElementById("browser-loading")?.classList.add("hidden");
   updateWorkshopLoadMoreButton();
 });
+
+subscribeWorkshopInstallationChange(() => virtualGrid?.invalidate());
 
 function updateWorkshopTypeToggle() {
   const toggle = document.getElementById("browser-type-toggle");
@@ -121,7 +125,8 @@ function renderWorkshopListRequestError(error, { page, line, isCurrentRequest, f
     },
   });
   if (page === 1) {
-    grid.replaceChildren(view);
+    virtualGrid.clear();
+    grid.appendChild(view);
   } else {
     grid.querySelector(".error-state")?.remove();
     grid.appendChild(view);
@@ -134,6 +139,7 @@ function maybeAutoLoadNextWorkshopPage() {
   const detailView = document.getElementById("browser-detail-view");
   if (
     !scrollContainer ||
+    !scrollContainer.clientHeight ||
     browserState.loading ||
     browserState.loadFailed ||
     !browserState.hasMore ||
@@ -199,12 +205,11 @@ export async function loadWorkshopList() {
   }
   if (!isCurrentRequest()) return;
   if (isSelecting) {
-    const grid = document.getElementById("browser-grid");
     const loadMoreBtn = document.getElementById("browser-load-more");
 
     browserState.loadFailed = false;
     if (loadMoreBtn) updateWorkshopLoadMoreButton();
-    if (grid && browserState.page === 1) grid.innerHTML = "";
+    if (page === 1) virtualGrid.clear();
 
     if (loadingEl) {
       loadingEl.classList.remove("hidden");
@@ -257,7 +262,7 @@ export async function loadWorkshopList() {
   updateWorkshopLoadMoreButton();
 
   if (browserState.page === 1) {
-    grid.innerHTML = "";
+    virtualGrid.clear();
     browserState.hasMore = true;
     const scrollContainer = document.getElementById("browser-scroll-container");
     if (scrollContainer) scrollContainer.scrollTop = 0;
@@ -280,8 +285,8 @@ export async function loadWorkshopList() {
     if (page > 1) grid.querySelector(".error-state")?.remove();
 
     if (result.items && result.items.length > 0) {
-      renderWorkshopGrid(result.items);
       browserState.data = browserState.data.concat(result.items);
+      virtualGrid.setItems(browserState.data);
     } else {
       browserState.hasMore = false;
       if (browserState.page === 1) {
@@ -304,29 +309,26 @@ export async function loadWorkshopList() {
   }
 }
 
-function renderWorkshopGrid(items) {
-  const grid = document.getElementById("browser-grid");
-
-  items.forEach((item) => {
-    const isCollection = isWorkshopCollection(item);
-    const card = document.createElement("div");
-    card.className = `workshop-card${isCollection ? " collection" : ""}`;
-    card.innerHTML = `
-            <div class="card-preview skeleton-anim">
-                 <div class="skeleton-image-placeholder">
-                     <svg class="icon-svg" style="width: 32px; height: 32px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                         <polyline points="21 15 16 10 5 21"></polyline>
-                     </svg>
-                 </div>
-                <img src="${
-                  escapeHtml(item.preview_url || "assets/images/no-preview.png")
-                }" loading="lazy" alt="${escapeHtml(item.title)}"
+function createWorkshopCard(item, measureOnly = false) {
+  const isCollection = isWorkshopCollection(item);
+  const card = document.createElement("div");
+  card.className = `workshop-card${isCollection ? " collection" : ""}`;
+  const preview = measureOnly ? "" : `
+            <div class="skeleton-image-placeholder">
+                <svg class="icon-svg" style="width: 32px; height: 32px; opacity: 0.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+            </div>
+            <img src="${escapeHtml(item.preview_url || "assets/images/no-preview.png")}"
+                loading="lazy" alt="${escapeHtml(item.title)}"
                 style="opacity: 0; transition: opacity 0.3s; position: relative; z-index: 2;"
                 onload="this.style.opacity='1'; this.parentElement.classList.remove('skeleton-anim'); this.previousElementSibling.style.display='none';">
-                ${isCollection ? '<span class="collection-card-tag">合集</span>' : ""}
-            </div>
+            ${isCollection ? '<span class="collection-card-tag">合集</span>' : ""}
+        `;
+  card.innerHTML = `
+            <div class="card-preview${measureOnly ? "" : " skeleton-anim"}">${preview}</div>
             <div class="card-info">
                 <div class="card-title">${escapeHtml(item.title)}</div>
                 <div class="card-meta">
@@ -338,16 +340,21 @@ function renderWorkshopGrid(items) {
             </div>
         `;
 
-    appendInstalledBadge(card.querySelector(".card-meta"), item);
-    card.addEventListener("click", () => {
-      openWorkshopDetail(item);
-    });
-
-    grid.appendChild(card);
-  });
+  appendInstalledBadge(card.querySelector(".card-meta"), item);
+  if (!measureOnly) card.addEventListener("click", () => openWorkshopDetail(item));
+  return card;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  const scrollContainer = document.getElementById("browser-scroll-container");
+  const grid = document.getElementById("browser-grid");
+  if (scrollContainer && grid) {
+    virtualGrid = createWorkshopVirtualGrid(grid, scrollContainer, createWorkshopCard);
+    scrollContainer.addEventListener("scroll", () => {
+      virtualGrid.onScroll();
+      maybeAutoLoadNextWorkshopPage();
+    }, { passive: true });
+  }
   const openBrowserBtn = document.getElementById("open-browser-btn");
   if (openBrowserBtn) {
     openBrowserBtn.addEventListener("click", () => {
@@ -384,12 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
       loadWorkshopList();
     });
   }
-
-  document
-    .getElementById("browser-scroll-container")
-    ?.addEventListener("scroll", maybeAutoLoadNextWorkshopPage, {
-      passive: true,
-    });
 
   setupWatchLaterDrawerListeners();
   setupWorkshopIdJump();
