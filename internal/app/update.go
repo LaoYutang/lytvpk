@@ -48,11 +48,8 @@ type GithubRelease struct {
 var MirrorList = []string{
 	"https://gh-proxy.com/",
 	"https://ghfast.top/",
-	"https://gh.xxooo.cf/",
 	"https://ghproxy.net/",
 	"https://gh.acmsz.top/",
-	"https://gh.felicity.ac.cn/",
-	"https://ghproxy.cxkpro.top/",
 	"https://hk.gh-proxy.com/",
 }
 

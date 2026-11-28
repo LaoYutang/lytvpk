@@ -3,6 +3,8 @@ import { translateWorkshopText } from "./detail-translation-text.js";
 import { escapeHtml, getWorkshopItemId } from "./utils.js";
 
 const translationCache = new Map();
+// The existing Wails translation endpoint uses Simplified Chinese for every provider.
+const WORKSHOP_TRANSLATION_TARGET = "zh-Hans";
 
 export function splitDescriptionParagraphs(text) {
   return String(text || "")
@@ -44,7 +46,6 @@ export function bindWorkshopDetailTranslation(detailView, detail, isCurrentDetai
   const paragraphs = splitDescriptionParagraphs(detail.description);
   const segments = Array.from(detailView.querySelectorAll("[data-description-paragraph-index]"), (paragraph, index) => ({
     text: descriptionToPlainText(paragraphs[index]),
-    original: paragraph.querySelector(".detail-description-original"),
     output: paragraph.querySelector(".detail-paragraph-translation"),
     translation: "",
     failed: false,
@@ -82,7 +83,7 @@ export function bindWorkshopDetailTranslation(detailView, detail, isCurrentDetai
     if (hasTranslation) {
       viewingTranslation = !viewingTranslation;
       renderTitle(viewingTranslation);
-      segments.forEach((segment) => renderParagraph(segment, viewingTranslation));
+      segments.forEach((segment) => renderParagraphTranslation(segment, viewingTranslation));
       updateButton();
       return;
     }
@@ -103,7 +104,7 @@ export function bindWorkshopDetailTranslation(detailView, detail, isCurrentDetai
             throw new Error("翻译服务已更改，请重试");
           }
           return result?.text;
-        }, { isTitle, isCurrent });
+        }, { isTitle, targetLanguage: WORKSHOP_TRANSLATION_TARGET, isCurrent });
         const changed = normalizeText(translated) === normalizeText(text) ? "" : translated;
         if (isCurrent()) translationCache.set(key, changed);
         return changed;
@@ -130,7 +131,7 @@ export function bindWorkshopDetailTranslation(detailView, detail, isCurrentDetai
             failures.push(error);
             segment.failed = true;
           }
-          if (isCurrent()) renderParagraph(segment, true);
+          if (isCurrent()) renderParagraphTranslation(segment, true);
         }
       };
 
@@ -163,10 +164,9 @@ function showParagraphLoading(output) {
   output.classList.add("is-loading");
 }
 
-function renderParagraph({ original, output, translation, failed }, showTranslation) {
+function renderParagraphTranslation({ output, translation, failed }, showTranslation) {
   const text = showTranslation ? translation : "";
   const showError = showTranslation && failed;
-  original.classList.toggle("hidden", Boolean(text));
   output.classList.remove("is-loading", "detail-translation-enter");
   output.classList.toggle("is-error", showError);
   output.classList.toggle("hidden", !text && !showError);
